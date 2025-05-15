@@ -25,7 +25,7 @@ core_services.setup_logging()
 app = FastAPI(
     title="ANY FOR API",
     description="eogee.com any4any ASR、TTS和Rerank模型兼容OpenAI-API",
-    version="0.0.3",
+    version="0.0.4",
     lifespan=services.lifespan
 )
 
