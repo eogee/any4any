@@ -11,8 +11,8 @@ class Config:
     
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-    MODEL_DIR = "/mnt/c/models/SenseVoiceSmall"  # 本地ASR模型路径
-    RERANK_MODEL_PATH = "/mnt/c/models/bge-reranker-base"  # 本地rerank模型路径
+    ASR_MODEL_DIR = "/mnt/c/models/SenseVoiceSmall"  # 本地ASR模型路径
+    RERANK_MODEL_DIR = "/mnt/c/models/bge-reranker-base"  # 本地rerank模型路径
 
     # 是否开启nothink，目前仅有qwen3系列LLM模型支持
     NO_THINK = True
@@ -21,5 +21,5 @@ class Config:
     PROMPT = "" # 自定义提示词，会在语音转文字识别结果后面显示，建议使用中文，留空则无内容
     
     # 确保模型目录存在
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    os.makedirs(RERANK_MODEL_PATH, exist_ok=True)
+    os.makedirs(ASR_MODEL_DIR, exist_ok=True)
+    os.makedirs(RERANK_MODEL_DIR, exist_ok=True)

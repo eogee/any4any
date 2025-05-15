@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, Form, UploadFile, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from models import Config, Message, ChatCompletionRequest, SpeechRequest, QADocs
+from api_models import Config, Message, ChatCompletionRequest, SpeechRequest, QADocs
 import services
 from services import (
     verify_token,
@@ -15,16 +15,16 @@ from services import (
     health_check
 )
 # 导入工具模块
-import app_utils
+import core_services
 
 # 初始化日志
-app_utils.setup_logging()
+core_services.setup_logging()
 
 # 初始化FastAPI应用
 app = FastAPI(
     title="ANY FOR API",
-    description="eogee.com 整合语音转录和文本转语音的API服务",
-    version="0.2.0",
+    description="eogee.com any4any ASR、TTS和Rerank模型兼容OpenAI-API",
+    version="0.0.3",
     lifespan=services.lifespan
 )
 
@@ -46,3 +46,14 @@ app.get("/health")(health_check)
 app.get("/tts-test")(tts_test)
 app.get("/public-test")(public_test)
 app.get("/api-docs")(get_api_docs)
+
+# 启动服务
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app:app",
+        host=Config.HOST,
+        port=Config.PORT,
+        reload=True,
+        log_level="info"
+    )

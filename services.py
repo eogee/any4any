@@ -8,7 +8,8 @@ import json
 import logging
 from typing import Optional, List
 from fastapi import HTTPException, Request, Header, File, UploadFile, Form
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
+from core_services import FileResponseWithCleanup
 import torch
 import torchaudio
 from io import BytesIO
@@ -16,7 +17,7 @@ from edge_tts import Communicate, VoicesManager
 from model import SenseVoiceSmall
 from funasr.utils.postprocess_utils import rich_transcription_postprocess
 from FlagEmbedding import FlagReranker
-from models import Config, Message, ChatCompletionRequest, SpeechRequest, QADocs
+from api_models import Config, Message, ChatCompletionRequest, SpeechRequest, QADocs
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +68,10 @@ async def initialize_models():
     
     try:
         # 初始化语音转录模型
-        logger.info(f"Loading model from: {Config.MODEL_DIR}")
+        logger.info(f"Loading model from: {Config.ASR_MODEL_DIR}")
         logger.info(f"Using device: {Config.DEVICE}")
         m, kwargs = SenseVoiceSmall.from_pretrained(
-            model=Config.MODEL_DIR,
+            model=Config.ASR_MODEL_DIR,
             device=Config.DEVICE
         )
         m.eval()
@@ -82,7 +83,7 @@ async def initialize_models():
         logger.info(f"Loaded {len(available_voices)} available voices")
 
         # 初始化reranker模型
-        reranker = FlagReranker(Config.RERANK_MODEL_PATH, use_fp16=False)
+        reranker = FlagReranker(Config.RERANK_MODEL_DIR, use_fp16=False)
         logger.info("Reranker model loaded successfully")
 
     except Exception as e:
@@ -179,10 +180,11 @@ async def create_speech(
         if not os.path.exists(output_file):
             raise HTTPException(status_code=500, detail="Audio file creation failed")
             
-        return FileResponse(
+        return FileResponseWithCleanup(
             output_file,
             media_type="audio/mpeg",
-            filename="speech.mp3"
+            filename="speech.mp3",
+            cleanup_file=output_file
         )
 
     except Exception as e:
@@ -275,10 +277,11 @@ async def tts_test():
                 content={"error": "Audio file not created"}
             )
             
-        return FileResponse(
+        return FileResponseWithCleanup(
             output_file,
             media_type="audio/mpeg",
-            filename="test.mp3"
+            filename="test.mp3",
+            cleanup_file=output_file
         )
         
     except Exception as e:
