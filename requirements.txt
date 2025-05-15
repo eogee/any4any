@@ -13,3 +13,4 @@ FlagEmbedding
 pydantic==1.10.13
 itsdangerous
 protobuf
+mysql-connector-python>=8.1.0

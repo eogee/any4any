@@ -1,20 +1,27 @@
-# any4any: 语音识别、文本转语音、文档重排的一键式API服务
+# any4any: 语音识别、文本转语音、文档重排和数据库连接的一键式API服务
+
+<div align="center">
+  中文简体 ·
+  <a href="./README_EN.md">English</a>
+</div>
 
 ## 目的
 
-- 快速、便捷地部署语音识别模型（ASR）、文本转语音模型（TTS）和重排序模型（Rerank）供Dify等应用调用。
-- 避免Xinference等框架、应用及依赖库的安装，降低部署难度。
-- 使用开源模型edge-tts模型提升文字转语音速度。
-- 使用开源模型SenseVoice模型提升语音识别准确度。
-- 使用开源模型bge-reranker-base实现知识库检索的重排序。
+- 快速、便捷地部署语音识别模型（ASR）、文本转语音模型（TTS）和重排序模型（Rerank）供Dify等应用调用
+- 避免Xinference等框架、应用及依赖库的安装，降低部署难度
+- 使用开源模型edge-tts模型提升文字转语音速度
+- 使用开源模型SenseVoice模型提升语音识别准确度
+- 使用开源模型bge-reranker-base实现知识库检索的重排序
+- 提供MySQL数据库API，可进行数据库连接并执行SQL查询和更新操作
 
 ## 功能特性
 
-- 语音转录：将音频文件转换为文本
-- 文本转语音：将文本转换为语音文件（支持多种语音风格）：默认使用`zh-CN-XiaoyiNeural`音色
-- 文档重排：基于查询对文档进行相关性排序
-- 自动清理：生成的临时音频文件会在响应后自动删除
-- API文档：自动生成API使用说明，可通过浏览器访问http://localhost:8888/docs#/
+- 语音转录：将音频文件转换为文本。
+- 文本转语音：将文本转换为语音文件（支持多种语音风格）：默认使用`zh-CN-XiaoyiNeural`音色。
+- 文档重排：基于查询对文档进行相关性排序。
+- MySQL数据库API：数据库连接并执行SQL查询和更新操作。
+- 自动清理：生成的临时音频文件会在响应后自动删除。
+- API文档：自动生成API使用说明，可通过浏览器访问：http://localhost:8888/docs#/
 
 ## 项目结构
 
@@ -116,7 +123,7 @@ eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
 ```
 模型类型：TTS
 模型名称：edge-tts
-API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.internal:8888/v1`
 API Key：EMPTY
 可用声音（用英文逗号分隔）：zh-CN-XiaoyiNeural
 其他可空余不填
@@ -129,7 +136,7 @@ API Key：EMPTY
 模型类型：Speech2text
 模型名称：SenseVoiceSmall
 API Key：EMPTY
-API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.internal:8888/v1`
 ```
 **5.4导入ASR模型**
 
@@ -138,7 +145,7 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
 模型类型：rerank
 模型名称：bge-reranker-base
 API Key：EMPTY
-API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.internal:8888/v1`
 ```
 
 **5.5设置为默认模型**
@@ -149,32 +156,56 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
 
 添加任意一个`chatflow`，进入工作流内容后在右上角`功能`，找到`文字转语音`和`语音转文字`功能，配置我们添加好的模型，将`自动播放`打开，然后对话即可。
 
+### 6. dify中连接MySQL数据库
+
+在`config.py`中配置MySQL数据库连接信息，启动服务后，即可使用MySQL数据库API。
+
+在dify中的`workflow`或`chatflow`中添加`http请求节点`，配置信息如下：
+```
+请求方式：POST
+请求地址：http://localhost:8888/v1/db/query
+form-data参数名：query
+form-data参数值：SELECT * FROM users LIMIT 1
+```
+
 ## 配置说明
 
 在`config.py`中修改以下配置：
 
 ```python
+import os
+import torch
 class Config:
     # 服务器配置
     HOST = "0.0.0.0"
     PORT = 8888
     
     # 认证配置
-    API_KEY = "EMPTY"  # 替换为你的实际API密钥
+    API_KEY = "EMPTY"           # 替换为你的实际API密钥
     
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-    ASR_MODEL_DIR = "/mnt/c/models/SenseVoiceSmall"  # 本地ASR模型路径
-    RERANK_MODEL_DIR = "/mnt/c/models/bge-reranker-base"  # 本地rerank模型路径
+    ASR_MODEL_DIR = "/mnt/c/models/SenseVoiceSmall"       # 替换为你本地ASR模型路径
+    RERANK_MODEL_DIR = "/mnt/c/models/bge-reranker-base"  # 替换为你本地rerank模型路径
 
-    # 是否开启nothink，目前仅有qwen3系列LLM模型支持
-    NO_THINK = True
+    # MySQL数据库配置
+    MYSQL_HOST = "172.21.48.1"  # 替换为你的实际的IP地址 可以使用ipconfig | findstr "IPv4" 查看
+    MYSQL_PORT = 3306
+    MYSQL_USER = "root"
+    MYSQL_PASSWORD = "root"
+    MYSQL_DATABASE = "any4any"  # 替换为你的数据库名称
 
-    # 提示词
-    PROMPT = "" # 自定义提示词，会在语音转文字识别结果后面显示，建议使用中文，留空则无内容
+    # 功能开关配置
+    NO_THINK = True             # 是否开启nothink
+    QUERY_CLEANING = True       # 是否开启SQL查询清洗功能
+    PROMPT = ""                 # 自定义提示词
+    
+    # 确保模型目录存在
+    os.makedirs(ASR_MODEL_DIR, exist_ok=True)
+    os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
 ```
 
-## 使用示例
+## API使用示例
 
 ### 语音转录
 ```bash
@@ -201,6 +232,27 @@ curl -X POST "http://localhost:8888/v1/rerank" \
 -H "Content-Type: application/json" \
 -d '{"query": "你好，any4any！", "documents": ["hello,any4any!", "any4any!", "heello,world!"]}' \
 -o "output.json"
+```
+
+### 连接MySQL数据库
+支持两种请求格式：
+1. application/json
+2. multipart/form-data
+**安全警告**：当前实现未使用参数化查询，存在SQL注入风险
+
+**JSON格式请求**:
+```bash
+curl -X POST "http://localhost:8888/v1/db/query" \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer YOUR_API_KEY" \
+-d '{"query":"SELECT * FROM users LIMIT 1"}'
+```
+
+**form-data格式请求**:
+```bash
+curl -X POST "http://localhost:8888/v1/db/query" \
+-H "Authorization: Bearer YOUR_API_KEY" \
+-F "query=SELECT * FROM users LIMIT 1"
 ```
 
 ### 健康检查

@@ -1,7 +1,8 @@
 from fastapi import FastAPI, File, Form, UploadFile, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from api_models import Config, Message, ChatCompletionRequest, SpeechRequest, QADocs
+from config import Config
+from api_models import Message, ChatCompletionRequest, SpeechRequest, QADocs
 import services
 from services import (
     verify_token,
@@ -41,6 +42,8 @@ app.add_middleware(
 app.post("/v1/rerank")(rerank_documents)
 app.post("/v1/audio/transcriptions")(create_transcription)
 app.post("/v1/audio/speech")(create_speech)
+app.post("/v1/db/query")(services.query_data)
+app.post("/v1/db/execute")(services.execute_query)
 app.get("/v1/models")(list_models)
 app.get("/health")(health_check)
 app.get("/tts-test")(tts_test)
