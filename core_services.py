@@ -24,7 +24,7 @@ def setup_logging():
     # 文件Handler（持久化存储）
     file_handler = RotatingFileHandler(
         'api.log',
-        maxBytes=10*1024*1024,  # 10MB
+        maxBytes=10*1024*1024,  # 单个日志文件最大10MB（字节数计算：10*1024*1024）
         backupCount=5,
         encoding='utf-8'
     )
@@ -47,12 +47,6 @@ def cleanup_file(filepath: str):
     except Exception as e:
         logging.error(f"Error cleaning up file {filepath}: {str(e)}")
 
-def filter_special_chars(text: str) -> str:
-    """过滤特殊字符"""
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    text = re.sub(r'<video\b[^>]*>.*?</video>', '', text, flags=re.DOTALL)
-    text = re.sub(r'[#*]', '', text)
-    return text
 
 def get_audio_duration(file_path: str) -> float:
     """获取音频文件时长"""
@@ -62,6 +56,42 @@ def get_audio_duration(file_path: str) -> float:
     except Exception as e:
         logging.warning(f"Cannot get audio duration: {str(e)}")
         return 0.0
+
+def clean_img_text(text: str)  -> str:
+    """过滤img标签及内容"""
+    pattern_full_img = r'<img\b[^>]*>'                      # 匹配完整标签
+    pattern_start_img = r'<img\b[^>]*$'                     # 匹配开头标签
+    pattern_end_alt = r'[^<]*alt="image">'                  # 匹配结尾alt标签
+
+    cleaned = re.sub(pattern_full_img, '', text)
+    if cleaned != text:                                     # 如果完整标签被替换过，直接返回结果
+        return cleaned.strip()
+
+    cleaned = re.sub(pattern_start_img, '', cleaned)
+    cleaned = re.sub(pattern_end_alt, '', cleaned)
+    return cleaned.strip()
+
+def clean_video_text(text: str)  -> str:
+    """过滤video标签及内容"""
+    pattern_full_video = r'<video\b[^>]*>[\s\S]*?</video>'  # 匹配完整标签
+    pattern_start_video = r'<video\b[\s\S]*$'               # 匹配开头标签
+    pattern_end_video = r'[\s\S]*?</video>'                 # 匹配结尾标签
+
+    cleaned = re.sub(pattern_full_video, '', text, flags=re.DOTALL)
+    if cleaned != text:  # 如果完整标签被替换过，直接返回结果
+        return cleaned.strip()
+
+    cleaned = re.sub(pattern_start_video, '', cleaned)
+    cleaned = re.sub(pattern_end_video, '', cleaned)
+    return cleaned.strip()
+
+def filter_special_chars(text: str) -> str:
+    """过滤文本转语音特殊字符"""
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    text = re.sub(r'[#*]', '', text)
+    text = clean_img_text(text)
+    text = clean_video_text(text)
+    return text
 
 class FileResponseWithCleanup(FileResponse):
     """带自动清理功能的文件响应"""

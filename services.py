@@ -9,7 +9,7 @@ import logging
 from typing import Optional, List
 from fastapi import HTTPException, Request, Header, File, UploadFile, Form
 from fastapi.responses import JSONResponse
-from core_services import FileResponseWithCleanup
+from core_services import FileResponseWithCleanup, filter_special_chars
 import torch
 import torchaudio
 from io import BytesIO
@@ -343,19 +343,20 @@ async def create_speech(
         text = data.get("input", "")
         voice = data.get("voice", "zh-CN-XiaoyiNeural")
         
-        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<video\b[^>]*>.*?</video>', '', text, flags=re.DOTALL)
-        text = re.sub(r'[#*]', '', text)
+        text = filter_special_chars(text)
         
-        if not text:
-            raise HTTPException(status_code=400, detail="No input text provided")
-            
         if not any(v["ShortName"] == voice for v in available_voices):
             raise HTTPException(status_code=400, detail=f"Voice {voice} not available")
 
-        output_file = f"temp_{uuid.uuid4().hex}.mp3"
-        communicate = Communicate(text, voice)
-        await communicate.save(output_file)
+        if not text:
+            # 输入为空时生成一个静默的音频文件
+            output_file = f"temp_{uuid.uuid4().hex}.mp3"
+            with open(output_file, 'wb') as f:
+                f.write(b'')  # 写入空内容
+        else:
+            output_file = f"temp_{uuid.uuid4().hex}.mp3"
+            communicate = Communicate(text, voice)
+            await communicate.save(output_file)
 
         if not os.path.exists(output_file):
             raise HTTPException(status_code=500, detail="Audio file creation failed")
@@ -366,7 +367,6 @@ async def create_speech(
             filename="speech.mp3",
             cleanup_file=output_file
         )
-
     except Exception as e:
         logger.error(f"TTS generation failed: {str(e)}")
         if output_file and os.path.exists(output_file):
