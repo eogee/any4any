@@ -1,8 +1,9 @@
 # any4any: 语音识别、文本转语音、文档重排的一键式API服务
 
 ## 目的
-- 快速、便捷地部署语音识别模型（ASR）、文本转语音模型（TTS）和重排序模型（Rerank）供Dify等其他应用调用。
-- 避免Xinference等框架应用及依赖库的安装，降低部署难度。
+
+- 快速、便捷地部署语音识别模型（ASR）、文本转语音模型（TTS）和重排序模型（Rerank）供Dify等应用调用。
+- 避免Xinference等框架、应用及依赖库的安装，降低部署难度。
 - 使用开源模型edge-tts模型提升文字转语音速度。
 - 使用开源模型SenseVoice模型提升语音识别准确度。
 - 使用开源模型bge-reranker-base实现知识库检索的重排序。
@@ -33,20 +34,25 @@
     ├── export_utils.py
     └── ...
 ```
-## 前置环境
-- wsl2 (Windows Subsystem for Linux):windows系统下的必要条件。
+
+## 前置环境要求
+
+- wsl2 (Windows Subsystem for Linux)：windows系统下的必要条件。
 - Conda (Anaconda or Miniconda)：用于管理Python环境。
 - Docker-desktop：windows系统下的Docker桌面应用，用于运行dify服务。
 
 ## 安装指南
 
-1. 克隆本项目
+### 1.克隆本项目
+
 ```bash
 git clone https://github.com/AnyForAny.git
 # 或
 git clone https://gitee.com/AnyForAny.git
 ```
-2. 下载模型
+
+### 2.下载模型
+
 ```bash
 # 确认已安装git-lfs (https://git-lfs.com)，用于下载大文件
 git lfs install
@@ -62,7 +68,8 @@ git clone https://hf-mirror.com/BAAI/bge-reranker-base
 git clone https://hugginface.co/BAAI/bge-reranker-base
 ```
 
-2. 创建conda环境
+### 2. 创建conda环境
+
 ```bash
 # 创建conda环境
 conda create -n any4any python=3.10
@@ -72,25 +79,75 @@ conda activate any4any
 
 3. 安装依赖
 
-安装具体依赖前，确认在wsl中安装了`ffmpeg`。
 ```bash
 # 安装ffmpeg
 sudo apt-get install ffmpeg
 # 验证ffmpeg是否安装成功
 ffmpeg -version
-```
-在本项目根目录下执行以下命令安装依赖：
-```bash
+# 安装其他依赖
 pip install -r requirements.txt
 ```
 
 4. 启动服务
+
 ```bash
 python app.py
 # 或
 uvicorn app:app --host 0.0.0.0 --port 8888
 ```
 服务将运行在: http://localhost:8888
+
+### 5. dify内添加并调用模型
+
+**5.1查看宿主机的ip地址**
+
+在linux命令行中执行`ifconfig`命令，查看宿主机的ip地址。
+```bash
+eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.21.56.14  netmask 255.255.240.0  broadcast 172.21.63.255
+```
+其中`inet 172.21.56.14`即为宿主机的ip地址。
+
+**5.2导入TTS模型**
+
+启动Docker并保证dify服务正常运行。
+将插件`langgenius-openai_api_compatible_0.0.16.difypkg`导入并安装至dify中。
+打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
+```
+模型类型：TTS
+模型名称：edge-tts
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
+API Key：EMPTY
+可用声音（用英文逗号分隔）：zh-CN-XiaoyiNeural
+其他可空余不填
+```
+
+**5.3导入ASR模型**
+
+同样打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
+```
+模型类型：Speech2text
+模型名称：SenseVoiceSmall
+API Key：EMPTY
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
+```
+**5.4导入ASR模型**
+
+同样打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
+```
+模型类型：rerank
+模型名称：bge-reranker-base
+API Key：EMPTY
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://localhost:8888/v1`
+```
+
+**5.5设置为默认模型**
+
+在右上角`系统模型设置`中的最下方，将`文本转语音模型`设置为`edge-tts`，将`语音识别模型`设置为`SenseVoiceSmall`，将`文档重排模型`设置为`bge-reranker-base`，点击，保存设置。
+
+**5.6使用模型**
+
+添加任意一个`chatflow`，进入工作流内容后在右上角`功能`，找到`文字转语音`和`语音转文字`功能，配置我们添加好的模型，将`自动播放`打开，然后对话即可。
 
 ## 配置说明
 
@@ -157,6 +214,7 @@ curl http://localhost:8888/health
 - SenseVoice：https://github.com/FunAudioLLM/SenseVoice
 - bge-reranker-base：https://hf-mirror.com/BAAI/bge-reranker-base
 - dify：https://github.com/langgenius/dify
+- fastapi：https://github.com/fastapi/fastapi
 
 ## 更新计划
 - 增加更多TTS和ASR模型的支持
@@ -167,4 +225,4 @@ curl http://localhost:8888/health
 - 官方网站：https://eogee.com
 - 邮箱：eogee@qq.com
 - B站：https://space.bilibili.com/315734619
-- 抖音：[抖音主页](https://www.douyin.com/user/MS4wLjABAAAAdH5__CXhFJtSrDQKNuI_vh4mI4-LdyQ_LPKB4d9gR3gISMC_Ak0ApCjFYy_oxhfC)，每晚8点直播
+- 抖音：[抖音eogee](https://www.douyin.com/user/MS4wLjABAAAAdH5__CXhFJtSrDQKNuI_vh4mI4-LdyQ_LPKB4d9gR3gISMC_Ak0ApCjFYy_oxhfC)，每晚8点直播
