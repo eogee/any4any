@@ -50,13 +50,4 @@ app.get("/tts-test")(tts_test)
 app.get("/public-test")(public_test)
 app.get("/api-docs")(get_api_docs)
 
-# 启动服务
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "app:app",
-        host=Config.HOST,
-        port=Config.PORT,
-        reload=True,
-        log_level="info"
-    )
+

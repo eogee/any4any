@@ -14,7 +14,7 @@ class Config:
     RERANK_MODEL_DIR = "/mnt/c/models/bge-reranker-base"    # 本地rerank模型路径
     
     # MySQL数据库配置
-    MYSQL_HOST = "172.21.48.1"  # 替换为你的实际的IP地址 可以使用ipconfig | findstr "IPv4" 查看
+    MYSQL_HOST = "172.17.64.1"  # 替换为你的实际的IP地址 可以使用ipconfig | findstr "IPv4" 查看
     MYSQL_PORT = 3306
     MYSQL_USER = "root"
     MYSQL_PASSWORD = "root"
