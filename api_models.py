@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 # 语言枚举
 class Language(str, Enum):
@@ -32,3 +32,27 @@ class SpeechRequest(BaseModel):
 class QADocs(BaseModel):
     query: Optional[str]
     documents: Optional[List[str]]
+
+# 文本处理请求模型
+class TextRequest(BaseModel):
+    text: str
+
+# 文本分块响应模型
+class ChunkResponse(BaseModel):
+    chunk_number: int
+    content: str
+    length: int
+
+# 处理结果响应模型
+class ProcessTextResponse(BaseModel):
+    total_chunks: int
+    chunk_size: int
+    overlap: int
+    chunks: List[ChunkResponse]
+
+# 分块数据模型(用于内容检索)
+class ChunkData(BaseModel):
+    total_chunks: int
+    chunk_size: Optional[int] = None
+    overlap: Optional[int] = None
+    chunks: List[Dict[str, Any]]

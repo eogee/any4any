@@ -25,6 +25,10 @@ class Config:
     QUERY_CLEANING = True       # 是否开启SQL查询清洗功能
     PROMPT = ""                 # 自定义提示词
     
+    # 文本分块配置
+    DEFAULT_CHUNK_SIZE = 2000   # 默认文本块大小(字符数)
+    DEFAULT_OVERLAP = 200       # 默认块间重叠大小(字符数)
+    
     # 确保模型目录存在
     os.makedirs(ASR_MODEL_DIR, exist_ok=True)
     os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
