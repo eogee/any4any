@@ -10,7 +10,7 @@ async def rerank_documents(
     docs: QADocs,
     authorization: str = Header(None)
 ):
-    """Rerank documents based on query"""
+    """根据请求内容重排序文档"""
     await verify_token(authorization)
     
     try:

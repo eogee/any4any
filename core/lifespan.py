@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 async def lifespan(app: FastAPI):
-    """Initialize models on startup"""
+    """模型启动加载初始化"""
     await ModelManager.initialize()
     yield
     # Cleanup on shutdown if needed

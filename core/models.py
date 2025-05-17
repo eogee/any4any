@@ -23,7 +23,7 @@ class ModelManager:
 
     @classmethod
     async def initialize(cls):
-        """Initialize all models and voice list"""
+        """初始化所有模型和声音列表"""
         try:
             # Initialize ASR model
             logger.info(f"Loading model from: {Config.ASR_MODEL_DIR}")

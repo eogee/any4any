@@ -21,7 +21,7 @@ async def create_transcription(
     temperature: float = Form(0),
     authorization: str = Header(None),
 ):
-    """Transcribes audio into the input language."""
+    """转录音频文件为文本"""
     await verify_token(authorization)
     
     start_time = time.time()

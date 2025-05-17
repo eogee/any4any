@@ -15,7 +15,7 @@ async def create_speech(
     request: Request,
     authorization: str = Header(None),
 ):
-    """Generates audio from the input text."""
+    """根据输入文本生成语音文件"""
     await verify_token(authorization)
     start_time = time.time()
     output_file = None
