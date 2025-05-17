@@ -21,7 +21,7 @@ class Config:
     MYSQL_DATABASE = "any4any"  # 替换为你的数据库名称
 
     # 功能开关配置
-    NO_THINK = False             # 是否开启nothink
+    NO_THINK = True             # 是否开启nothink
     QUERY_CLEANING = True       # 是否开启SQL查询清洗功能
     PROMPT = ""                 # 自定义提示词
     

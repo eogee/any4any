@@ -2,7 +2,7 @@
 
 <div align="center">
   中文简体 ·
-  <a href="./README_EN.md">English</a>
+  <a href="docs/README_EN.md">English</a>
 </div>
 
 ## ✨功能特性

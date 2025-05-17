@@ -1,8 +1,8 @@
 # any4any: One-Click API Service for Speech Recognition, Text-to-Speech, Document Reranking, Database Connection, and Knowledge Base Text Processing 🚀  
 
 <div align="center">  
-  Simplified Chinese ·  
-  <a href="./README_EN.md">English</a>  
+  <a href="../README_EN.md">中文简体 ·  
+  English
 </div>  
 
 ## ✨Features  

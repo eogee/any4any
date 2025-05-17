@@ -1,5 +1,5 @@
 from fastapi import Form, HTTPException
-from api_models import ChunkData
+from core.api_models import ChunkData
 import json
 
 async def get_chunk_content(

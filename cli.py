@@ -1,13 +1,12 @@
-#!/usr/bin/env python
+# 启动文件
 from fastapi import FastAPI
 import uvicorn
 from config import Config
-import services
-import core_services
+from core.log import setup_logging
 
 def main():
     # 初始化日志
-    core_services.setup_logging()
+    setup_logging()
 
     # 启动服务
     uvicorn.run(
