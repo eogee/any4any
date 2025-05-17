@@ -90,8 +90,8 @@ python cli.py
 
 # 或使用快捷命令(WSL/Linux环境):
 # 永久安装any4any-run命令:
-sudo cp any4any-run.sh /usr/local/bin/any4any-run
-sudo chmod +x /usr/local/bin/any4any-run
+sudo cp a4a-run.sh /usr/local/bin/a4a-run
+sudo chmod +x /usr/local/bin/a4a-run
 # 安装后可直接使用:
 any4any-run
 ```

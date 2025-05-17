@@ -90,8 +90,8 @@ python cli.py
 
 # Or use the shortcut command (WSL/Linux environments):  
 # Permanently install the any4any-run command:  
-sudo cp any4any-run.sh /usr/local/bin/any4any-run  
-sudo chmod +x /usr/local/bin/any4any-run  
+sudo cp a4a-run.sh /usr/local/bin/a4a-run
+sudo chmod +x /usr/local/bin/a4a-run
 # After installation, use directly:  
 any4any-run  
 ```  
