@@ -1,10 +1,13 @@
 import os
 import re
+import logging
 from fastapi import Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from core.api_models import TextRequest
 
 import json
+
+logger = logging.getLogger(__name__)
 
 def process_keywords(keywords: str) -> str:
     """
@@ -19,18 +22,30 @@ def write_content_to_file(content: str, filename: str = "text_add_keywords.txt")
     """
     将内容写入文件（如果文件不存在则创建）
     :param content: 要写入的文本内容
-    :param filename: 文件名（默认 text_add_keywords.txt）
+    :param filename: 文件名（默认text_add_keywords.txt）
     :return: 文件路径
     """
-    filepath = os.path.join("data", filename)
-    with open(filepath, "a", encoding="utf-8") as file:
-        file.write(content + "\n")  # 追加内容并换行
-    return filepath
+    try:
+        # 确保data目录存在
+        os.makedirs("data", exist_ok=True)
+        
+        filepath = os.path.join("data", filename)
+        # 安全检查：确保路径在data目录下
+        if not os.path.abspath(filepath).startswith(os.path.abspath("data")):
+            raise ValueError("Invalid file path")
+            
+        with open(filepath, "a", encoding="utf-8") as file:
+            file.write(content + "\n")  # 追加内容并换行
+        return filepath
+    except Exception as e:
+        logger.error(f"Failed to write to file {filename}: {str(e)}")
+        raise
 
 async def write_content(
     content: str = Form(None, description="直接传递文本内容或JSON格式的content字段"), 
     keywords: str = Form(None, description="关键词内容，会过滤<think>标签并拼接<<<<<"),
-    file: UploadFile = Form(None, description="或通过文件上传内容")
+    file: UploadFile = Form(None, description="或通过文件上传内容"),
+    filename: str = Form("text_add_keywords.txt", description="要写入的文件名，默认为text_add_keywords.txt")
 ):
     """
     接收 form-data 格式的 POST 请求，支持多种方式提交内容：
@@ -61,22 +76,25 @@ async def write_content(
             raise HTTPException(status_code=400, detail="必须提供 content、keywords 或 file 字段")
         
         # 写入文件
-        filepath = write_content_to_file(text_content)
+        filepath = write_content_to_file(text_content, filename)
         return JSONResponse(
             status_code=200,
             content={"message": "内容已写入文件", "filepath": filepath}
         )
     except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {str(e)}")
         raise HTTPException(
             status_code=400, 
             detail=f"Invalid JSON format: {str(e)}"
         )
     except IOError as e:
+        logger.error(f"File write error: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"File write error: {str(e)}. Please check file permissions."
         )
     except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
