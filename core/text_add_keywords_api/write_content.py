@@ -1,4 +1,5 @@
 import os
+import re
 from fastapi import Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from core.api_models import TextRequest
@@ -65,5 +66,18 @@ async def write_content(
             status_code=200,
             content={"message": "内容已写入文件", "filepath": filepath}
         )
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid JSON format: {str(e)}"
+        )
+    except IOError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"File write error: {str(e)}. Please check file permissions."
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
