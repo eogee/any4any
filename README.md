@@ -25,9 +25,9 @@
 ### 1.克隆本项目
 
 ```bash
-git clone https://github.com/any4any.git
+git clone https://github.com/eogee/any4any.git
 # 或
-git clone https://gitee.com/any4any.git
+git clone https://gitee.com/eogee/any4any.git
 ```
 
 ### 2.下载模型

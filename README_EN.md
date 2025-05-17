@@ -25,9 +25,9 @@
 ### 1. Clone the Project
 
 ```bash
-git clone https://github.com/any4any.git
+git clone https://github.com/eogee/any4any.git
 # Or
-git clone https://gitee.com/any4any.git
+git clone https://gitee.com/eogee/any4any.git
 ```
 
 ### 2. Download Models
