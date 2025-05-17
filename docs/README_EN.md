@@ -93,7 +93,7 @@ python cli.py
 sudo cp a4a-run.sh /usr/local/bin/a4a-run
 sudo chmod +x /usr/local/bin/a4a-run
 # After installation, use directly:  
-any4any-run  
+a4a-run 
 ```  
 The service will run at: http://localhost:8888  
 
