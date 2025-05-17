@@ -1,4 +1,4 @@
-# any4any: 语音识别、文本转语音、文档重排和数据库连接的一键式API服务🚀
+# any4any: 语音识别、文本转语音、文档重排、数据库连接和知识库文本处理的一键式API服务🚀
 
 <div align="center">
   中文简体 ·
@@ -12,7 +12,21 @@
 - 文档重排：基于查询对文档进行相关性排序。
 - MySQL数据库API：数据库连接并执行SQL查询和更新操作。
 - 自动清理：生成的临时音频文件会在响应后自动删除。
+- 文本处理：将文本分块、关键词提取、文本追加写入、知识库处理。
 - API文档：自动生成API使用说明，可通过浏览器访问：http://localhost:8888/docs#/
+
+## 🎉更新内容
+
+**2025.5.18(V0.0.5)：新增支持文本添加关键词（text_add_keywords）**
+新增：
+- 文本分块：将`.text`或`.md`文件按照一定字符数进行分块，并返回分块后的文本，默认按每2000字符分块，允许200字符重叠。
+- 文本关键词提取：配合大模型语义理解能力将分块后的内容进行关键字提取，默认提取10-20个关键词。
+- 文本追加写入：将原始文本和提取的关键词追加到新的`.text`文件中，文件位于`data/text_add_keywords.txt`。
+- 知识库处理：可以在dify中使用生成的`.text`文件作为知识库，进行文本检索。
+
+具体API文档见:[text_add_keywords.md](./docs/text_add_keywords.md)。
+
+dify工作流文件:[text_add_keywords.yml](./third_party_plugins/text_add_keywords.yml)。
 
 ## 🛠️前置环境要求
 
@@ -70,13 +84,13 @@ pip install -r requirements.txt
 4. 启动服务
 
 ```bash
+# 直接启动服务
 python cli.py
-# 或使用快捷命令(WSL/Linux环境):
 
+# 或使用快捷命令(WSL/Linux环境):
 # 永久安装any4any-run命令:
 sudo cp any4any-run.sh /usr/local/bin/any4any-run
 sudo chmod +x /usr/local/bin/any4any-run
-
 # 安装后可直接使用:
 any4any-run
 ```
@@ -260,39 +274,18 @@ curl -X POST "http://localhost:8888/v1/rerank" \
 ```bash
 curl -X POST "http://localhost:8888/v1/db/query" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer YOUR_API_KEY" \
 -d '{"query":"SELECT * FROM users LIMIT 1"}'
 ```
 
 **form-data格式请求**:
 ```bash
 curl -X POST "http://localhost:8888/v1/db/query" \
--H "Authorization: Bearer YOUR_API_KEY" \
 -F "query=SELECT * FROM users LIMIT 1"
 ```
 
 ### 健康检查
 ```bash
 curl http://localhost:8888/health
-```
-
-## 📂项目结构
-
-```
-├── api_models.py          # API数据模型和配置
-├── app.py                 # FastAPI主应用
-├── config.py              # 配置文件
-├── core_services.py       # 核心工具类
-├── langgenius-openai_api_compatible_0.0.16.difypkg
-├                          # Dify插件，用于导入模型   
-├── services.py            # 业务逻辑实现
-├── model.py               # 语音转录模型实现（源自SenseVoiceSmall项目）
-├── requirements.txt       # 依赖列表
-├── README.md              # 项目文档
-└── utils/                 # 工具模块（源自SenseVoiceSmall项目）
-    ├── ctc_alignment.py
-    ├── export_utils.py
-    └── ...
 ```
 
 ## 🌟相关开源项目

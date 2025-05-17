@@ -44,7 +44,7 @@ db_connection_pool = None
 def get_db_connection():
     """创建并返回MySQL数据库连接"""
     # 打印最终连接配置
-    logger.info(f"DB连接配置 - host:{Config.MYSQL_HOST} port:{Config.MYSQL_PORT} "
+    logger.info(f"DBSETTING： - host:{Config.MYSQL_HOST} port:{Config.MYSQL_PORT} "
                f"user:{Config.MYSQL_USER} db:{Config.MYSQL_DATABASE}")
     
     max_retries = 3

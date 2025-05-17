@@ -1,0 +1,730 @@
+app:
+  description: 文本添加关键字，提升知识库检索能力
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: advanced-chat
+  name: text_add_keywords
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: package
+  value:
+    plugin_unique_identifier: langgenius/ollama:0.0.6@7d66a960a68cafdcdf5589fdf5d01a995533f956853c69c54eddcf797006fa37
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables:
+  - description: ''
+    id: 130308fc-3923-4d8e-9542-7908a924ef63
+    name: text
+    selector:
+    - conversation
+    - text
+    value: ''
+    value_type: string
+  - description: ''
+    id: 72e6b213-6343-4175-8783-ec6544a074e1
+    name: content
+    selector:
+    - conversation
+    - content
+    value: []
+    value_type: array[string]
+  - description: ''
+    id: c2ef76e9-897c-4362-8577-ce9a1dc194b9
+    name: round
+    selector:
+    - conversation
+    - round
+    value: 1
+    value_type: number
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_size_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: document-extractor
+      id: 1747415642783-source-1747415651423-target
+      source: '1747415642783'
+      sourceHandle: source
+      target: '1747415651423'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: document-extractor
+        targetType: http-request
+      id: 1747415651423-source-1747429049576-target
+      source: '1747415651423'
+      sourceHandle: source
+      target: '1747429049576'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        sourceType: loop-start
+        targetType: http-request
+      id: 1747425777018start-source-1747425988574-target
+      source: 1747425777018start
+      sourceHandle: source
+      target: '1747425988574'
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        sourceType: answer
+        targetType: assigner
+      id: 1747431997810-source-1747427075641-target
+      source: '1747431997810'
+      sourceHandle: source
+      target: '1747427075641'
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        sourceType: llm
+        targetType: http-request
+      id: 1747426923747-source-1747438638240-target
+      source: '1747426923747'
+      sourceHandle: source
+      target: '1747438638240'
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        sourceType: http-request
+        targetType: http-request
+      id: 1747438638240-source-1747440768565-target
+      source: '1747438638240'
+      sourceHandle: source
+      target: '1747440768565'
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        sourceType: http-request
+        targetType: answer
+      id: 1747440768565-source-1747431997810-target
+      source: '1747440768565'
+      sourceHandle: source
+      target: '1747431997810'
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: answer
+      id: 1747429049576-source-1747441382075-target
+      source: '1747429049576'
+      sourceHandle: source
+      target: '1747441382075'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: answer
+        targetType: loop
+      id: 1747441382075-source-1747425777018-target
+      source: '1747441382075'
+      sourceHandle: source
+      target: '1747425777018'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        sourceType: http-request
+        targetType: answer
+      id: 1747425988574-source-1747441407891-target
+      source: '1747425988574'
+      sourceHandle: source
+      target: '1747441407891'
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        sourceType: answer
+        targetType: llm
+      id: 1747441407891-source-1747426923747-target
+      source: '1747441407891'
+      sourceHandle: source
+      target: '1747426923747'
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: loop
+        targetType: answer
+      id: 1747425777018-source-1747441622379-target
+      source: '1747425777018'
+      sourceHandle: source
+      target: '1747441622379'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: ''
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - allowed_file_extensions: []
+          allowed_file_types:
+          - document
+          allowed_file_upload_methods:
+          - local_file
+          label: 文件
+          max_length: 5
+          options: []
+          required: true
+          type: file
+          variable: file
+      height: 90
+      id: '1747415642783'
+      position:
+        x: 30
+        y: 312.5
+      positionAbsolute:
+        x: 30
+        y: 312.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: ''
+        is_array_file: false
+        selected: false
+        title: 文档提取器
+        type: document-extractor
+        variable_selector:
+        - '1747415642783'
+        - file
+      height: 92
+      id: '1747415651423'
+      position:
+        x: 334
+        y: 312.5
+      positionAbsolute:
+        x: 334
+        y: 312.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        break_conditions:
+        - comparison_operator: '>'
+          id: 0b0807e0472e49ffa9468817482ddc79
+          numberVarType: constant
+          value: '200'
+          varType: number
+          variable_selector:
+          - '1747425988574'
+          - status_code
+        desc: ''
+        error_handle_mode: terminated
+        height: 225
+        logical_operator: and
+        loop_count: 100
+        selected: false
+        start_node_id: 1747425777018start
+        title: 循环
+        type: loop
+        width: 2137.7706257677514
+      height: 225
+      id: '1747425777018'
+      position:
+        x: 1263.1012617146475
+        y: 312.5
+      positionAbsolute:
+        x: 1263.1012617146475
+        y: 312.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 2138
+      zIndex: 1
+    - data:
+        desc: ''
+        isInLoop: true
+        selected: false
+        title: ''
+        type: loop-start
+      draggable: false
+      height: 48
+      id: 1747425777018start
+      parentId: '1747425777018'
+      position:
+        x: 24
+        y: 68
+      positionAbsolute:
+        x: 1287.1012617146475
+        y: 380.5
+      selectable: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-loop-start
+      width: 44
+      zIndex: 1002
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - key: json_data
+            type: text
+            value: '{{#1747429049576.body#}}'
+          - key: round_number
+            type: text
+            value: '{{#conversation.round#}}'
+          - id: key-value-51
+            key: ''
+            type: text
+            value: ''
+          type: form-data
+        desc: ''
+        headers: ''
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        method: POST
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: 获取文本块
+        type: http-request
+        url: http://host.docker.internal:8888/get_chunk_content
+        variables: []
+      height: 136
+      id: '1747425988574'
+      parentId: '1747425777018'
+      position:
+        x: 104.20431771212861
+        y: 65
+      positionAbsolute:
+        x: 1367.3055794267761
+        y: 377.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: ''
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        model:
+          completion_params: {}
+          mode: chat
+          name: qwen3:30b
+          provider: langgenius/ollama/ollama
+        prompt_template:
+        - id: 9adebb0d-bd02-4f2b-b65e-25e9a8584102
+          role: system
+          text: '/no_think
+
+
+            ## 角色
+
+            你是一名文档分析师
+
+
+            ## 任务
+
+            你需要根据此内容：{{#1747425988574.body#}}，提取10-20个关键词，并在每个关键词前添加''!!!''
+
+
+            ## 要求
+
+            1.请不要输出我上述要求之外的任何内容
+
+            2.注意输出的关键词数量不要超过20个'
+        selected: false
+        title: 提取关键字
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: '1747426923747'
+      parentId: '1747425777018'
+      position:
+        x: 694.6259388421347
+        y: 65
+      positionAbsolute:
+        x: 1957.7272005567822
+        y: 377.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        desc: ''
+        isInIteration: false
+        isInLoop: true
+        items:
+        - input_type: constant
+          operation: +=
+          value: 1
+          variable_selector:
+          - conversation
+          - round
+          write_mode: over-write
+        loop_id: '1747425777018'
+        selected: true
+        title: 轮次变化
+        type: assigner
+        version: '2'
+      height: 88
+      id: '1747427075641'
+      parentId: '1747425777018'
+      position:
+        x: 1877.7706257677514
+        y: 65
+      positionAbsolute:
+        x: 3140.871887482399
+        y: 377.5
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-51
+            key: text
+            type: text
+            value: '{{#1747415651423.text#}}'
+          - id: key-value-52
+            key: ''
+            type: text
+            value: ''
+          type: form-data
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: HTTP 请求 3
+        type: http-request
+        url: http://host.docker.internal:8888/process_text
+        variables: []
+      height: 136
+      id: '1747429049576'
+      position:
+        x: 638
+        y: 312.5
+      positionAbsolute:
+        x: 638
+        y: 312.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        answer: '
+
+          第{{#conversation.round#}}块文本内容和关键字已写入文件✔'
+        desc: ''
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        selected: false
+        title: 直接回复
+        type: answer
+        variables: []
+      height: 121
+      id: '1747431997810'
+      parentId: '1747425777018'
+      position:
+        x: 1583.4849114820372
+        y: 65
+      positionAbsolute:
+        x: 2846.5861731966847
+        y: 377.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-27
+            key: content
+            type: text
+            value: '{{#1747425988574.body#}}'
+          - id: key-value-28
+            key: ''
+            type: text
+            value: ''
+          type: form-data
+        desc: ''
+        headers: ''
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: HTTP 请求 3
+        type: http-request
+        url: http://host.docker.internal:8888/write_content
+        variables: []
+      height: 136
+      id: '1747438638240'
+      parentId: '1747425777018'
+      position:
+        x: 988.8820466288537
+        y: 65
+      positionAbsolute:
+        x: 2251.9833083435014
+        y: 377.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-76
+            key: keywords
+            type: text
+            value: '{{#1747426923747.text#}}'
+          - id: key-value-77
+            key: ''
+            type: text
+            value: ''
+          type: form-data
+        desc: ''
+        headers: ''
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: HTTP 请求 4
+        type: http-request
+        url: http://host.docker.internal:8888/write_content
+        variables: []
+      height: 136
+      id: '1747440768565'
+      parentId: '1747425777018'
+      position:
+        x: 1282.926267913001
+        y: 65
+      positionAbsolute:
+        x: 2546.0275296276486
+        y: 377.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        answer: 已将文本分块
+        desc: ''
+        selected: false
+        title: 直接回复 2
+        type: answer
+        variables: []
+      height: 102
+      id: '1747441382075'
+      position:
+        x: 942
+        y: 312.5
+      positionAbsolute:
+        x: 942
+        y: 312.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        answer: '
+
+          正在提取第{{#conversation.round#}}块文本的关键字...'
+        desc: ''
+        isInIteration: false
+        isInLoop: true
+        loop_id: '1747425777018'
+        selected: false
+        title: 直接回复 3
+        type: answer
+        variables: []
+      height: 121
+      id: '1747441407891'
+      parentId: '1747425777018'
+      position:
+        x: 394.6259388421347
+        y: 65
+      positionAbsolute:
+        x: 1657.7272005567822
+        y: 377.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        answer: '
+
+          已将文本全部处理完成🎉'
+        desc: ''
+        selected: false
+        title: 直接回复 4
+        type: answer
+        variables: []
+      height: 102
+      id: '1747441622379'
+      position:
+        x: 3465.0969560200874
+        y: 312.5
+      positionAbsolute:
+        x: 3465.0969560200874
+        y: 312.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: -1446.4070421810638
+      y: 73.29115096086298
+      zoom: 0.7791645796605006

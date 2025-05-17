@@ -1,7 +1,10 @@
-# 文本分块处理API使用说明
+# 文本添加关键词（text_add_keywords）API使用说明
 
 ## 服务概述
-本服务提供文本分块处理功能，将长文本分割为指定大小的块，支持重叠区域设置。
+- 文本分块：将`.text`或`.md`文件按照一定字符数进行分块，并返回分块后的文本，默认按每2000字符分块，允许200字符重叠。
+- 文本关键词提取：配合大模型语义理解能力将分块后的内容进行关键字提取，默认提取10-20个关键词。
+- 文本追加写入：将原始文本和提取的关键词追加到新的`.text`文件中，文件位于`data/text_add_keywords.txt`。
+- 知识库处理：可以在dify使用生成的`.text`文件作为知识库，进行文本检索。
 
 ## API端点
 
@@ -19,12 +22,9 @@
 ### 2. 文本分块处理
 - **URL**: `/process_text`
 - **方法**: POST
-- **请求体**:
-  ```json
-  {
-    "text": "需要分块的长文本内容..."
-  }
-  ```
+- **请求参数**:
+  - `chunk_size`: 每块文本大小，默认值可在config.py中配置(DEFAULT_CHUNK_SIZE)
+  - `overlap`: 块间重叠区域大小，默认值可在config.py中配置(DEFAULT_OVERLAP)
 - **响应示例**:
   ```json
   {
@@ -45,47 +45,20 @@
     ]
   }
   ```
+- **使用示例**:
+  json请求示例:
+  ```bash
+  curl -X POST http://localhost:8888/process_text \
+    -H "Content-Type: application/json" \
+    -d '{"text": "你的长文本内容..."}'
+  ```
+  form-data请求示例：
+  ```bash
+  curl -X POST http://localhost:8888/process_text \
+    -F "text=你的长文本内容..."
+  ```
 
-## 使用示例
-
-### JSON请求示例
-```bash
-curl -X POST http://localhost:8888/process_text \
-  -H "Content-Type: application/json" \
-  -d '{"text": "你的长文本内容..."}'
-```
-
-### form-data请求示例
-```bash
-curl -X POST http://localhost:8888/process_text \
-  -F "text=你的长文本内容..."
-```
-
-### Python示例 (JSON)
-```python
-import requests
-
-url = "http://localhost:8888/process_text"
-data = {"text": "你的长文本内容..."}
-response = requests.post(url, json=data)
-print(response.json())
-```
-
-### Python示例 (form-data)
-```python
-import requests
-
-url = "http://localhost:8888/process_text"
-data = {"text": "你的长文本内容..."}
-response = requests.post(url, files=data)
-print(response.json())
-```
-
-## 参数说明
-- `chunk_size`: 每块文本大小，默认值可在config.py中配置(DEFAULT_CHUNK_SIZE)
-- `overlap`: 块间重叠区域大小，默认值可在config.py中配置(DEFAULT_OVERLAP)
-
-## 3. 获取指定分块内容
+### 3. 获取指定分块内容
 - **URL**: `/get_chunk_content/`
 - **方法**: POST
 - **请求参数**:
@@ -98,21 +71,25 @@ print(response.json())
   }
   ```
 - **使用示例**:
+  json请求示例:
+  ```bash
+  curl -X POST http://localhost:8888/get_chunk_content \
+    -H "Content-Type: application/json" \
+    -d '{"json_data": {"total_chunks":3,"chunks":[{"chunk_number":1,"content":"内容1"}]}, "round_number":1}'
+  ```
+  form-data请求示例：
   ```bash
   curl -X POST http://localhost:8888/get_chunk_content \
     -F "json_data={\"total_chunks\":3,\"chunks\":[{\"chunk_number\":1,\"content\":\"内容1\"}]}" \
     -F "round_number=1"
   ```
 
-## 4. 写入内容到文件
+### 4. 写入内容到文件
 - **URL**: `/write_content`
 - **方法**: POST
 - **请求参数**:
   - `content`: 直接传递的文本内容或JSON格式的content字段(如{"content":"文本内容"})
-    - 会自动将双换行符(\n\n)替换为单换行符(\n)
-    - 会自动过滤掉'# '字符串
   - `keywords`: 关键词内容(会自动过滤<think>标签并在末尾添加<<<<<)
-  - `file`: 上传的文件内容
 - **说明**: 
   - 支持四种方式：
     1. 直接传递文本内容(如content=附件)
@@ -120,17 +97,15 @@ print(response.json())
     3. 传递JSON格式的content字段(如content={"content":"附件"})
     4. 上传文件
   - content和keywords不能同时使用
-  - content字段会进行以下处理：
-    - 将连续的两个换行符替换为一个
-    - 删除所有出现的'# '字符串
 - **响应示例**:
   ```json
   {
     "message": "内容已写入文件",
-    "filepath": "data/fixed_knowledge.txt"
+    "filepath": "data/text_add_keywords.txt"
   }
   ```
 - **使用示例**:
+
   ```bash
   # 方式1：直接传文本
   curl -X POST http://localhost:8888/write_content \
@@ -139,23 +114,4 @@ print(response.json())
   # 方式2：上传文件
   curl -X POST http://localhost:8888/write_content \
     -F "file=@test.txt"
-  ```
-- **Python示例**:
-  ```python
-  import requests
-
-  # 方式1：直接传文本
-  response = requests.post(
-      "http://localhost:8888/write_content",
-      files={"content": (None, "这是要保存的文本内容")}
-  )
-
-  # 方式2：上传文件
-  with open("test.txt", "rb") as f:
-      response = requests.post(
-          "http://localhost:8888/write_content",
-          files={"file": ("test.txt", f)}
-      )
-  
-  print(response.json())
   ```
