@@ -1,7 +1,7 @@
 # any4any: One-Click API Service for Speech Recognition, Text-to-Speech, Document Reranking, Database Connection, and Knowledge Base Text Processing 🚀  
 
 <div align="center">  
-  <a href="../README_EN.md">中文简体 ·  
+  <a href="../README.md">中文简体 ·  </a>
   English
 </div>  
 
@@ -18,6 +18,7 @@
 ## 🎉Updates  
 
 **2025.5.18 (V0.0.5): Added Support for Text Keyword Addition (`text_add_keywords`)**  
+
 New Features:  
 - **Text Chunking**: Split `.text` or `.md` files into chunks by character count (default: 2000 characters per chunk with 200-character overlap).  
 - **Keyword Extraction**: Use large language models to extract keywords from chunked content (default: 10–20 keywords).  
