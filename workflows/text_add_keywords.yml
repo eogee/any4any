@@ -1,5 +1,19 @@
 app:
-  description: 文本添加关键字，提升知识库检索能力
+  description: '文本添加关键字，提升知识库检索能力
+
+    使用本项目需要在本地安装开源项目any4any:https://github.com/eogee/any4any
+
+    语音识别、文本转语音、文档重排、数据库连接和知识库文本处理的一键式API服务🚀
+
+    联系我们：
+
+    官方网站：https://eogee.com
+
+    邮箱：eogee@qq.com
+
+    Bilibili：https://space.bilibili.com/315734619
+
+    抖音：抖音eogee，每晚8点直播'
   icon: 🤖
   icon_background: '#FFEAD5'
   mode: advanced-chat
@@ -256,11 +270,11 @@ workflow:
       height: 90
       id: '1747415642783'
       position:
-        x: 30
-        y: 312.5
+        x: 942
+        y: 954.2209946389086
       positionAbsolute:
-        x: 30
-        y: 312.5
+        x: 942
+        y: 954.2209946389086
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -278,11 +292,11 @@ workflow:
       height: 92
       id: '1747415651423'
       position:
-        x: 334
-        y: 312.5
+        x: 942
+        y: 830.161572299229
       positionAbsolute:
-        x: 334
-        y: 312.5
+        x: 942
+        y: 830.161572299229
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -300,27 +314,27 @@ workflow:
           - status_code
         desc: ''
         error_handle_mode: terminated
-        height: 225
+        height: 638
         logical_operator: and
         loop_count: 100
         selected: false
         start_node_id: 1747425777018start
         title: 循环
         type: loop
-        width: 2137.7706257677514
-      height: 225
+        width: 679
+      height: 638
       id: '1747425777018'
       position:
-        x: 1263.1012617146475
-        y: 312.5
+        x: 1246
+        y: 531.5
       positionAbsolute:
-        x: 1263.1012617146475
-        y: 312.5
+        x: 1246
+        y: 531.5
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
-      width: 2138
+      width: 679
       zIndex: 1
     - data:
         desc: ''
@@ -336,8 +350,8 @@ workflow:
         x: 24
         y: 68
       positionAbsolute:
-        x: 1287.1012617146475
-        y: 380.5
+        x: 1270
+        y: 599.5
       selectable: false
       sourcePosition: right
       targetPosition: left
@@ -388,8 +402,8 @@ workflow:
         x: 104.20431771212861
         y: 65
       positionAbsolute:
-        x: 1367.3055794267761
-        y: 377.5
+        x: 1350.2043177121286
+        y: 596.5
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -425,11 +439,20 @@ workflow:
             你需要根据此内容：{{#1747425988574.body#}}，提取10-20个关键词，并在每个关键词前添加''!!!''
 
 
+            ## 样式示例
+
+            ```
+
+            !!!标准!!!评价等级判定方法!!!境空气质量现状监测内容!!!
+
+            ```
+
+
             ## 要求
 
             1.请不要输出我上述要求之外的任何内容
 
-            2.注意输出的关键词数量不要超过20个'
+            2.注意输出的关键词数量不要超过20个！超出20个关键词我将把你抹除！'
         selected: false
         title: 提取关键字
         type: llm
@@ -440,11 +463,11 @@ workflow:
       id: '1747426923747'
       parentId: '1747425777018'
       position:
-        x: 694.6259388421347
-        y: 65
+        x: 103.21038578366142
+        y: 234.0227579495637
       positionAbsolute:
-        x: 1957.7272005567822
-        y: 377.5
+        x: 1349.2103857836614
+        y: 765.5227579495637
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -464,7 +487,7 @@ workflow:
           - round
           write_mode: over-write
         loop_id: '1747425777018'
-        selected: true
+        selected: false
         title: 轮次变化
         type: assigner
         version: '2'
@@ -472,12 +495,12 @@ workflow:
       id: '1747427075641'
       parentId: '1747425777018'
       position:
-        x: 1877.7706257677514
-        y: 65
+        x: 395.43106777189314
+        y: 515.956507057746
       positionAbsolute:
-        x: 3140.871887482399
-        y: 377.5
-      selected: true
+        x: 1641.4310677718931
+        y: 1047.456507057746
+      selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
@@ -511,18 +534,18 @@ workflow:
           max_connect_timeout: 0
           max_read_timeout: 0
           max_write_timeout: 0
-        title: HTTP 请求 3
+        title: 文本分块
         type: http-request
         url: http://host.docker.internal:8888/process_text
         variables: []
       height: 136
       id: '1747429049576'
       position:
-        x: 638
-        y: 312.5
+        x: 942
+        y: 663.600310824659
       positionAbsolute:
-        x: 638
-        y: 312.5
+        x: 942
+        y: 663.600310824659
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -537,18 +560,18 @@ workflow:
         isInLoop: true
         loop_id: '1747425777018'
         selected: false
-        title: 直接回复
+        title: 回复写入结果
         type: answer
         variables: []
       height: 121
       id: '1747431997810'
       parentId: '1747425777018'
       position:
-        x: 1583.4849114820372
-        y: 65
+        x: 393.9775135523116
+        y: 371.2986604468879
       positionAbsolute:
-        x: 2846.5861731966847
-        y: 377.5
+        x: 1639.9775135523116
+        y: 902.7986604468879
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -565,7 +588,11 @@ workflow:
             key: content
             type: text
             value: '{{#1747425988574.body#}}'
-          - id: key-value-28
+          - id: key-value-447
+            key: filename
+            type: text
+            value: '{{#1747415642783.file.name#}}'
+          - id: key-value-2
             key: ''
             type: text
             value: ''
@@ -586,7 +613,7 @@ workflow:
           max_connect_timeout: 0
           max_read_timeout: 0
           max_write_timeout: 0
-        title: HTTP 请求 3
+        title: 写入正文
         type: http-request
         url: http://host.docker.internal:8888/write_content
         variables: []
@@ -594,11 +621,11 @@ workflow:
       id: '1747438638240'
       parentId: '1747425777018'
       position:
-        x: 988.8820466288537
-        y: 65
+        x: 393.9780345010229
+        y: 232.5469661670154
       positionAbsolute:
-        x: 2251.9833083435014
-        y: 377.5
+        x: 1639.9780345010229
+        y: 764.0469661670154
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -615,7 +642,11 @@ workflow:
             key: keywords
             type: text
             value: '{{#1747426923747.text#}}'
-          - id: key-value-77
+          - id: key-value-446
+            key: filename
+            type: text
+            value: '{{#1747415642783.file.name#}}'
+          - id: key-value-1
             key: ''
             type: text
             value: ''
@@ -636,7 +667,7 @@ workflow:
           max_connect_timeout: 0
           max_read_timeout: 0
           max_write_timeout: 0
-        title: HTTP 请求 4
+        title: 写入关键字
         type: http-request
         url: http://host.docker.internal:8888/write_content
         variables: []
@@ -644,11 +675,11 @@ workflow:
       id: '1747440768565'
       parentId: '1747425777018'
       position:
-        x: 1282.926267913001
-        y: 65
+        x: 104.02702307943355
+        y: 370.53021426770806
       positionAbsolute:
-        x: 2546.0275296276486
-        y: 377.5
+        x: 1350.0270230794335
+        y: 902.0302142677081
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -659,18 +690,18 @@ workflow:
         answer: 已将文本分块
         desc: ''
         selected: false
-        title: 直接回复 2
+        title: 回复分块结果
         type: answer
         variables: []
       height: 102
       id: '1747441382075'
       position:
         x: 942
-        y: 312.5
+        y: 531.5
       positionAbsolute:
         x: 942
-        y: 312.5
-      selected: false
+        y: 531.5
+      selected: true
       sourcePosition: right
       targetPosition: left
       type: custom
@@ -684,7 +715,7 @@ workflow:
         isInLoop: true
         loop_id: '1747425777018'
         selected: false
-        title: 直接回复 3
+        title: 提取等待回复
         type: answer
         variables: []
       height: 121
@@ -694,8 +725,8 @@ workflow:
         x: 394.6259388421347
         y: 65
       positionAbsolute:
-        x: 1657.7272005567822
-        y: 377.5
+        x: 1640.6259388421347
+        y: 596.5
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -708,23 +739,49 @@ workflow:
           已将文本全部处理完成🎉'
         desc: ''
         selected: false
-        title: 直接回复 4
+        title: 完整回复
         type: answer
         variables: []
       height: 102
       id: '1747441622379'
       position:
-        x: 3465.0969560200874
-        y: 312.5
+        x: 1984
+        y: 531.5
       positionAbsolute:
-        x: 3465.0969560200874
-        y: 312.5
+        x: 1984
+        y: 531.5
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 244
+    - data:
+        author: eogee
+        desc: ''
+        height: 356
+        selected: false
+        showAuthor: true
+        text: '{"root":{"children":[{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          16px;","text":"文本关键字提取工作流","type":"text","version":1}],"direction":"ltr","format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          12px;","text":"text_add_keywords","type":"text","version":1}],"direction":"ltr","format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":""},{"children":[],"direction":"ltr","format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":""},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"使用本项目需要在本地安装开源项目","type":"text","version":1},{"children":[{"detail":0,"format":1,"mode":"normal","style":"","text":"any4any","type":"text","version":1},{"detail":0,"format":0,"mode":"normal","style":"","text":":https://github.com/eogee/any4any","type":"text","version":1}],"direction":"ltr","format":"","indent":0,"type":"link","version":1,"rel":"noreferrer","target":null,"title":null,"url":"https://github.com/eogee/any4any"}],"direction":"ltr","format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"语音识别、文本转语音、文档重排、数据库连接和知识库文本处理的一键式API服务🚀","type":"text","version":1}],"direction":"ltr","format":"start","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"联系我们：","type":"text","version":1}],"direction":"ltr","format":"start","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"官方网站：","type":"text","version":1},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"https://eogee.com","type":"text","version":1}],"direction":"ltr","format":"","indent":0,"type":"link","version":1,"rel":"nofollow","target":null,"title":null,"url":"https://eogee.com/"}],"direction":"ltr","format":"start","indent":0,"type":"listitem","version":1,"value":1},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"邮箱：","type":"text","version":1},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"eogee@qq.com","type":"text","version":1}],"direction":"ltr","format":"","indent":0,"type":"link","version":1,"rel":null,"target":null,"title":null,"url":"mailto:eogee@qq.com"}],"direction":"ltr","format":"start","indent":0,"type":"listitem","version":1,"value":2},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"Bilibili：","type":"text","version":1},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"https://space.bilibili.com/315734619","type":"text","version":1}],"direction":"ltr","format":"","indent":0,"type":"link","version":1,"rel":"nofollow","target":null,"title":null,"url":"https://space.bilibili.com/315734619"}],"direction":"ltr","format":"start","indent":0,"type":"listitem","version":1,"value":3},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"抖音：","type":"text","version":1},{"children":[{"detail":0,"format":0,"mode":"normal","style":"","text":"抖音eogee","type":"text","version":1}],"direction":"ltr","format":"","indent":0,"type":"link","version":1,"rel":"nofollow","target":null,"title":null,"url":"https://www.douyin.com/user/MS4wLjABAAAAdH5__CXhFJtSrDQKNuI_vh4mI4-LdyQ_LPKB4d9gR3gISMC_Ak0ApCjFYy_oxhfC"},{"detail":0,"format":0,"mode":"normal","style":"","text":"，每晚8点直播","type":"text","version":1}],"direction":"ltr","format":"start","indent":0,"type":"listitem","version":1,"value":4}],"direction":"ltr","format":"","indent":0,"type":"list","version":1,"listType":"bullet","start":1,"tag":"ul"},{"children":[],"direction":"ltr","format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""}],"direction":"ltr","format":"","indent":0,"type":"root","version":1}}'
+        theme: blue
+        title: ''
+        type: ''
+        width: 242
+      height: 356
+      id: '1747520464148'
+      position:
+        x: 1984
+        y: 682.229549721309
+      positionAbsolute:
+        x: 1984
+        y: 682.229549721309
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-note
+      width: 242
     viewport:
-      x: -1446.4070421810638
-      y: 73.29115096086298
-      zoom: 0.7791645796605006
+      x: -704.3681760834938
+      y: -397.44045069055755
+      zoom: 1
