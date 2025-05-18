@@ -9,9 +9,9 @@ from core.api_models import (
     Message, ChatCompletionRequest, SpeechRequest, QADocs,
     TextRequest, ProcessTextResponse, ChunkResponse, ChunkData
 )
-from core.text_add_keywords_api.process_text import process_text
-from core.text_add_keywords_api.write_content import write_content
-from core.text_add_keywords_api.get_chunk_content import get_chunk_content
+from core.text_add_keywords.process_text import process_text
+from core.text_add_keywords.write_content import write_content
+from core.text_add_keywords.get_chunk_content import get_chunk_content
 from core.log import setup_logging
 from core.database import query_data,execute_query
 from core.auth import verify_token
