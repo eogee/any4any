@@ -4,6 +4,7 @@ from config import Config
 from model import SenseVoiceSmall
 from edge_tts import VoicesManager
 from FlagEmbedding import FlagReranker
+from core.auth import verify_token
 import logging
 import time
 
