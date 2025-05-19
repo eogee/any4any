@@ -1,5 +1,5 @@
-from fastapi import Form, HTTPException
 from config import Config
+from fastapi import Form, HTTPException
 from core.api_models import TextRequest
 
 def chunk_text(text: str, chunk_size: int = None, overlap: int = None) -> list[str]:

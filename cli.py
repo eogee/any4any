@@ -1,7 +1,5 @@
-# 启动文件
-from fastapi import FastAPI
-import uvicorn
 from config import Config
+import uvicorn
 from core.log import setup_logging
 
 def main():

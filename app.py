@@ -1,20 +1,13 @@
-import json
 import os
-import re
-from fastapi import FastAPI, File, Form, UploadFile, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI 
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from config import Config
-from core.api_models import (
-    Message, ChatCompletionRequest, SpeechRequest, QADocs,
-    TextRequest, ProcessTextResponse, ChunkResponse, ChunkData
-)
+from core.api_models import ProcessTextResponse
 from core.text_add_keywords.process_text import process_text
 from core.text_add_keywords.write_content import write_content
 from core.text_add_keywords.get_chunk_content import get_chunk_content
 from core.log import setup_logging
 from core.database import query_data,execute_query
-from core.auth import verify_token
 from core.lifespan import lifespan
 from core.models import health_check,list_models
 from core.transcription import create_transcription
@@ -56,9 +49,8 @@ app.post("/get_chunk_content")(get_chunk_content)
 app.get("/v1/models")(list_models)
 app.get("/health")(health_check)
 
-@app.get("/")
-async def root():
-    return {
-        "message": "文本分块处理服务",
-        "usage": "发送POST请求到/process_text端点，包含JSON数据: {'text': '你的长文本内容...'}"
-    }
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    with open("public/index/index.html", "r") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)

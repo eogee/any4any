@@ -1,11 +1,10 @@
 import os
 import re
+import json
 import logging
 from fastapi import Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from core.api_models import TextRequest
 
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +27,10 @@ def write_content_to_file(content: str, filename: str = "text_add_keywords.txt")
     try:
         # 确保data目录存在
         os.makedirs("data", exist_ok=True)
+        
+        # 强制使用.txt扩展名
+        base_name = os.path.splitext(filename)[0]
+        filename = f"{base_name}.txt"
         
         filepath = os.path.join("data", filename)
         # 安全检查：确保路径在data目录下
@@ -55,7 +58,7 @@ async def write_content(
     4. 通过文件上传（文件内容作为文本）
     """
     try:
-            # 处理传入的内容
+        # 处理传入的内容
         if keywords:
             text_content = process_keywords(keywords)
         elif content:

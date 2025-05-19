@@ -1,6 +1,6 @@
+import json
 from fastapi import Form, HTTPException
 from core.api_models import ChunkData
-import json
 
 async def get_chunk_content(
     json_data: str = Form(..., description="JSON字符串格式的chunks数据"),

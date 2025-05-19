@@ -1,9 +1,9 @@
+import time
+import logging
 from fastapi import Form, HTTPException, Request, Body
 from pydantic import BaseModel, Field
 import mysql.connector
 from mysql.connector import Error
-import time
-import logging
 from config import Config
 
 logger = logging.getLogger(__name__)

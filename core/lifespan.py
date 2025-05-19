@@ -1,6 +1,6 @@
+import logging
 from fastapi import FastAPI
 from core.models import ModelManager
-import logging
 
 logger = logging.getLogger(__name__)
 

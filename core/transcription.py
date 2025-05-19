@@ -1,14 +1,14 @@
-from fastapi import UploadFile, File, Form, Header, HTTPException
-from typing import Optional
 import re
 import time
+import logging
+from typing import Optional
 from io import BytesIO
-import torchaudio
 from config import Config
+from fastapi import UploadFile, File, Form, Header, HTTPException
+import torchaudio
+from funasr.utils.postprocess_utils import rich_transcription_postprocess
 from core.auth import verify_token
 from core.models import ModelManager
-from funasr.utils.postprocess_utils import rich_transcription_postprocess
-import logging
 
 logger = logging.getLogger(__name__)
 

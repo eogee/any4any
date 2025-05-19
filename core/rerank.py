@@ -1,8 +1,8 @@
+import logging
 from fastapi import Header, HTTPException
 from core.api_models import QADocs
 from core.auth import verify_token
 from core.models import ModelManager
-import logging
 
 logger = logging.getLogger(__name__)
 
