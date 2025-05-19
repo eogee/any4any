@@ -38,7 +38,7 @@ def write_content_to_file(content: str, filename: str = "text_add_keywords.txt")
             raise ValueError("Invalid file path")
             
         with open(filepath, "a", encoding="utf-8") as file:
-            file.write(content + "\n")  # 追加内容并换行
+            file.write(content)
         return filepath
     except Exception as e:
         logger.error(f"Failed to write to file {filename}: {str(e)}")
