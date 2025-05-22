@@ -1,11 +1,10 @@
-# any4any: 语音识别、文本转语音、文档重排、数据库连接和知识库文本处理的一键式API服务🚀
-
+# any4any: 语音识别、文本转语音、文档重排、数据库连接和知识库文本处理的一键式API服务
 <div align="center">
   中文简体 ·
   <a href="docs/README_EN.md">English</a>
 </div>
 
-## ✨功能特性
+## 功能特性
 
 - 语音转录：将音频文件转换为文本。
 - 文本转语音：将文本转换为语音文件（支持多种语音风格）：默认使用`zh-CN-XiaoyiNeural`音色。
@@ -15,7 +14,7 @@
 - 文本处理：将文本分块、关键词提取、文本追加写入、知识库处理。
 - API文档：自动生成API使用说明，可通过浏览器访问：http://localhost:8888/docs#/
 
-## 🎉更新内容
+## 更新内容
 
 **2025.5.18(V0.0.5)：新增支持文本添加关键词（text_add_keywords）**
 
@@ -29,13 +28,13 @@
 
 dify工作流文件:[text_add_keywords.yml](./third_party_plugins/text_add_keywords.yml)。
 
-## 🛠️前置环境要求
+## 前置环境要求
 
 - wsl2 (Windows Subsystem for Linux)：windows系统下的必要条件。
 - Conda (Anaconda or Miniconda)：用于管理Python环境。
 - Docker-desktop：windows系统下的Docker桌面应用，用于运行dify服务。
 
-## 📥安装指南
+## 安装指南
 
 ### 1.克隆本项目
 
@@ -44,6 +43,8 @@ git clone https://github.com/eogee/any4any.git
 # 或
 git clone https://gitee.com/eogee/any4any.git
 ```
+
+你也可以通过网盘下载本项目：https://pan.quark.cn/s/3c14d0c4b3c7
 
 ### 2.下载模型
 
@@ -197,7 +198,7 @@ form-data参数名：query
 form-data参数值：SELECT * FROM users LIMIT 1  # 示例查询语句
 ```
 
-## ⚙️配置说明
+## 配置说明
 
 在`config.py`中修改以下配置：
 
@@ -234,7 +235,7 @@ class Config:
     os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
 ```
 
-## 📡API使用示例
+## API使用示例
 
 ### 语音转录
 ```bash
@@ -289,7 +290,7 @@ curl -X POST "http://localhost:8888/v1/db/query" \
 curl http://localhost:8888/health
 ```
 
-## 🌟相关开源项目
+## 相关开源项目
 
 - edge-tts：https://github.com/rany2/edge-tts
 - SenseVoice：https://github.com/FunAudioLLM/SenseVoice
@@ -297,12 +298,12 @@ curl http://localhost:8888/health
 - dify：https://github.com/langgenius/dify
 - fastapi：https://github.com/fastapi/fastapi
 
-## 🚧更新计划
+## 更新计划
 - 增加更多TTS和ASR模型的支持
 - 构建前端界面，提供更友好的用户体验
 - 增加其他接口和服务
 
-## 📞联系我们
+## 联系我们
 - 官方网站：https://eogee.com
 - 邮箱：eogee@qq.com
 - B站：https://space.bilibili.com/315734619
