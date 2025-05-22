@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server.fastmcp import FastMCP
+from config import Config
 from core.api_models import ProcessTextResponse
 from core.text_add_keywords.process_text import process_text
 from core.text_add_keywords.write_content import write_content
@@ -27,8 +28,8 @@ mcp.tool()(sub)
 # 运行 MCP 服务
 def run_mcp_server():
     """运行 MCP 服务"""
-    mcp.settings.port = 9999  # MCP 监听 9999 端口
-    mcp.run(transport="sse")
+    mcp.settings.port = Config.MCP_PORT  # MCP 监听 9999 端口
+    mcp.run(transport=Config.MCP_TRANSPORT)
 
 # 初始化日志
 setup_logging()

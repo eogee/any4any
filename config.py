@@ -9,6 +9,10 @@ class Config:
     # 服务器配置
     HOST = os.getenv("HOST", "0.0.0.0")
     PORT = int(os.getenv("PORT", 8888))
+
+    # MCP配置
+    MCP_PORT = int(os.getenv("MCP_PORT", 9999))
+    MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "sse")
     
     # 认证配置
     API_KEY = os.getenv("API_KEY", "EMPTY")

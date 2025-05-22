@@ -145,19 +145,8 @@ workflow:
             value: 5
           mcp_servers_config:
             type: constant
-            value: '{
-
-                  "mcpServers": {
-
-                      "mcp_test": {
-
-                          "url": "http://host.docker.internal:9999/sse"
-
-                      }
-
-                  }
-
-              }'
+            value: "{\n  \"mcp_test\": {\n    \"transport\": \"sse\",\n    \"url\"\
+              : \"http://host.docker.internal:9999/sse\"\n  }\n}"
           model:
             type: constant
             value:
@@ -195,7 +184,7 @@ workflow:
       positionAbsolute:
         x: 334
         y: 273
-      selected: false
+      selected: true
       sourcePosition: right
       targetPosition: left
       type: custom
@@ -244,12 +233,12 @@ workflow:
       positionAbsolute:
         x: 30
         y: 360.304716941068
-      selected: true
+      selected: false
       sourcePosition: right
       targetPosition: left
       type: custom-note
       width: 241
     viewport:
-      x: 181.78318094781162
-      y: -238.6510656051687
+      x: 87.6739878126001
+      y: -98.99982495657719
       zoom: 1.3195079107728946
