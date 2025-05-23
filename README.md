@@ -44,7 +44,7 @@ git clone https://github.com/eogee/any4any.git
 git clone https://gitee.com/eogee/any4any.git
 ```
 
-你也可以通过网盘下载本项目：https://pan.quark.cn/s/3c14d0c4b3c7
+你也可以通过网盘下载本项目：https://pan.quark.cn/s/ea4434702727
 
 ### 2.下载模型
 

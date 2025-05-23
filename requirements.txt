@@ -8,7 +8,7 @@ gradio_client>=1.10.0   # Gradio的客户端库
 fastapi>=0.111.1        # 快速构建API的框架
 uvicorn                 # ASGI服务器，用于运行FastAPI应用
 python-dotenv           # 从.env文件加载环境变量
-transformers[sentencepiece]  # Transformer模型框架，包含sentencepiece分词器
+transformers[sentencepiece]==4.44.2  # Transformer模型框架，包含sentencepiece分词器
 FlagEmbedding           # 文本嵌入模型库
 pydantic>=2.0.0         # 数据模型验证库
 itsdangerous            # 安全签名数据序列化库
