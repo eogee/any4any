@@ -17,6 +17,8 @@ from core.speech import create_speech
 from core.rerank import rerank_documents
 from core.mcp_tools import add
 from core.mcp_tools import sub
+from core.mcp_tools import mul
+from core.mcp_tools import div
 
 # 初始化 MCP 服务
 mcp = FastMCP("tools")
@@ -24,6 +26,8 @@ mcp = FastMCP("tools")
 # 注册工具
 mcp.tool()(add)
 mcp.tool()(sub)
+mcp.tool()(mul)
+mcp.tool()(div)
 
 # 运行 MCP 服务
 def run_mcp_server():

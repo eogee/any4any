@@ -11,3 +11,13 @@ def add(a: int, b: int) -> int:
 def sub(a: int, b: int) -> int:
     """两个整数相减"""
     return a - b
+
+@mcp.tool()
+def mul(a: int, b: int) -> int:
+    """两个整数相乘"""
+    return a * b
+
+@mcp.tool()
+def div(a: int, b: int) -> float:
+    """两个整数相除"""
+    return a / b
