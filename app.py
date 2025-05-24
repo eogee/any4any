@@ -15,19 +15,12 @@ from core.models import health_check,list_models
 from core.transcription import create_transcription
 from core.speech import create_speech
 from core.rerank import rerank_documents
-from core.mcp_tools import add
-from core.mcp_tools import sub
-from core.mcp_tools import mul
-from core.mcp_tools import div
-
+from core.mcp_tools import add, sub, mul, div
 # 初始化 MCP 服务
 mcp = FastMCP("tools")
 
 # 注册工具
-mcp.tool()(add)
-mcp.tool()(sub)
-mcp.tool()(mul)
-mcp.tool()(div)
+mcp.tool()(add,sub,mul,div)
 
 # 运行 MCP 服务
 def run_mcp_server():

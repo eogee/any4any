@@ -1,4 +1,4 @@
-# any4any: One-Click API Service for Speech Recognition, Text-to-Speech, Document Reranking, Database Connection, and Knowledge Base Text Processing 🚀  
+# any4any:One-stop API service for voice recognition, text-to-speech, document rearrangement, database connection, knowledge base text processing, and MCP services🚀  
 
 <div align="center">  
   <a href="../README.md">中文简体 ·  </a>
@@ -10,14 +10,26 @@
 - **Speech-to-Text**: Convert audio files to text.  
 - **Text-to-Speech**: Convert text to speech files (supports multiple voice styles). Default voice: `zh-CN-XiaoyiNeural`.  
 - **Document Reranking**: Sort documents based on relevance to a query.  
-- **MySQL Database API**: Connect to a database and execute SQL queries and updates.  
+- **MySQL Database API**: Connect to a database and execute SQL queries and updates. 
+- **MCP Service**: Supports building MCP tools, interfaces, and can be invoked by any MCP client. 
 - **Automatic Cleanup**: Temporary audio files are automatically deleted after the response.  
 - **Text Processing**: Text chunking, keyword extraction, text appending, and knowledge base processing.  
 - **API Documentation**: Automatically generated API documentation accessible via browser at: http://localhost:8888/docs#/  
 
 ## 🎉Updates  
 
-**2025.5.18 (V0.0.5): Added Support for Text Keyword Addition (`text_add_keywords`)**  
+**2025.5.24(V0.0.6): Added support for building MCP services**
+
+New Features:
+- MCP Tool Construction: You can add any MCP tools in `core/mcp_tools.py`. By default, it provides addition, subtraction, multiplication, and division of two integers.
+- MCP Tool Registration: Import the corresponding module in `app.py`, such as `from core.mcp_tools import add, sub, mul, div`, and register them in the `mcp.tool()` function.
+- MCP Service Startup: Run the start command: `python cli.py` or `a4a-run`, and the service will be available at: http://localhost:9999/sse
+
+Example documents for calling in Dify and Cherrystudio can be found at: [mcp_test.md](./docs/mcp_test.md) (to be completed later).
+
+Dify workflow file: [mcp_test.yml](./workflows/mcp_test.yml).
+
+**2025.5.18(V0.0.5): Added support for text keyword addition (text_add_keywords)**
 
 New Features:  
 - **Text Chunking**: Split `.text` or `.md` files into chunks by character count (default: 2000 characters per chunk with 200-character overlap).  
@@ -27,7 +39,7 @@ New Features:
 
 For detailed API documentation, see: [text_add_keywords.md](./docs/text_add_keywords.md).  
 
-Dify workflow file: [text_add_keywords.yml](./third_party_plugins/text_add_keywords.yml).  
+Dify workflow file: [text_add_keywords.yml](./workflows/text_add_keywords.yml).  
 
 ## 🛠️Prerequisites  
 

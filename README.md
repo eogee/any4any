@@ -1,4 +1,4 @@
-# any4any: 语音识别、文本转语音、文档重排、数据库连接和知识库文本处理的一键式API服务
+# any4any: 语音识别、文本转语音、文档重排、数据库连接、知识库文本处理和MCP服务的一键式API服务
 <div align="center">
   中文简体 ·
   <a href="docs/README_EN.md">English</a>
@@ -10,11 +10,23 @@
 - 文本转语音：将文本转换为语音文件（支持多种语音风格）：默认使用`zh-CN-XiaoyiNeural`音色。
 - 文档重排：基于查询对文档进行相关性排序。
 - MySQL数据库API：数据库连接并执行SQL查询和更新操作。
+- MCP服务：支持构建MCP工具、接口，可在任意MCP客户端调用。
 - 自动清理：生成的临时音频文件会在响应后自动删除。
 - 文本处理：将文本分块、关键词提取、文本追加写入、知识库处理。
 - API文档：自动生成API使用说明，可通过浏览器访问：http://localhost:8888/docs#/
 
 ## 更新内容
+
+**2025.5.24(V0.0.6)：新增支持构建MCP服务**
+
+新增：
+- MCP工具构建：可在`core/mcp_tools.py`中任意添加MCP工具，默认提供了两个整数的加、减、乘和除的计算。
+- MCP工具注册：在`app.py`中引入对应的模块，如`from core.mcp_tools import add, sub, mul, div`，并在`mcp.tool()`函数中注册。
+- MCP服务服务启动：运行启动命令：`python cli.py`或`a4a-run`，服务将运行在: http://localhost:9999/sse
+
+在Dify和Cherrystudio中调用的示例文档见:[mcp_test.md](./docs/mcp_test.md)(稍后补全)。
+
+dify工作流文件:[mcp_test.yml](./workflows/mcp_test.yml)。
 
 **2025.5.18(V0.0.5)：新增支持文本添加关键词（text_add_keywords）**
 
@@ -26,7 +38,7 @@
 
 具体API文档见:[text_add_keywords.md](./docs/text_add_keywords.md)。
 
-dify工作流文件:[text_add_keywords.yml](./third_party_plugins/text_add_keywords.yml)。
+dify工作流文件:[text_add_keywords.yml](./workflows/text_add_keywords.yml)。
 
 ## 前置环境要求
 
