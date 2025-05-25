@@ -20,7 +20,10 @@ from core.mcp_tools import add, sub, mul, div
 mcp = FastMCP("tools")
 
 # 注册工具
-mcp.tool()(add,sub,mul,div)
+mcp.tool()(add)
+mcp.tool()(sub)
+mcp.tool()(mul)
+mcp.tool()(div)
 
 # 运行 MCP 服务
 def run_mcp_server():
