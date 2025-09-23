@@ -1,3 +1,4 @@
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from core.chat.preview import preview_service
 

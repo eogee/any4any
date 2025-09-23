@@ -1,8 +1,8 @@
 import time
 import logging
+import mysql.connector
 from fastapi import Form, HTTPException, Request, Body
 from pydantic import BaseModel, Field
-import mysql.connector
 from mysql.connector import Error
 from config import Config
 

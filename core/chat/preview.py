@@ -1,5 +1,5 @@
-from typing import Dict, Optional
 import time
+from typing import Dict, Optional
 from fastapi import HTTPException
 from pydantic import BaseModel
 from config import Config

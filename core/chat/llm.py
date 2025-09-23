@@ -1,12 +1,12 @@
 import logging
-from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 import torch
 import queue
 import asyncio
 import time
 import gc
-from config import Config
 import threading
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
+from config import Config
 
 logger = logging.getLogger(__name__)
 

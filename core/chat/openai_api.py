@@ -1,13 +1,13 @@
-from typing import List, Optional, Literal
 import time
 import json
 import asyncio
+from typing import List, Optional, Literal
 from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+from config import Config
 from core.model_manager import ModelManager
 from core.chat.preview import preview_service
-from config import Config
 
 class ChatRequest(BaseModel):
     message: str
