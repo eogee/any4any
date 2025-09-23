@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
 from config import Config
-from core.api_models import ProcessTextResponse
+from utils.text_add_keywords.process_text import ProcessTextResponse
 from utils.text_add_keywords.process_text import process_text
 from utils.text_add_keywords.write_content import write_content
 from utils.text_add_keywords.get_chunk_content import get_chunk_content
@@ -17,8 +17,9 @@ from core.asr.transcription import create_transcription
 from core.tts.speech import create_speech
 from core.rerank.rerank import rerank_documents
 from core.chat.openai_api import openai_api
-from core.chat.api import get_pending_previews,get_preview,confirm_preview,get_preview_data,update_preview_content
 from core.mcp.mcp_tools import add,sub,mul,div
+from servers.IndexServer import IndexServer
+from servers.AuthServer import AuthServer
 
 # 初始化 MCP 服务
 mcp = FastMCP("tools")
@@ -67,13 +68,7 @@ app.post("/v1/rerank")(rerank_documents)
 app.post("/v1/audio/transcriptions")(create_transcription)
 app.post("/v1/audio/speech")(create_speech)
 app.post("/v1/chat/completions")(openai_api.chat_completions)
-
-app.get("/api/pending-previews")(get_pending_previews)
-app.get("/v1/chat/preview/{preview_id}")(get_preview)
-app.post("/v1/chat/confirm/{preview_id}")(confirm_preview)
-app.get("/api/preview/{preview_id}")(get_preview_data)
-app.post("/api/preview/{preview_id}/edit")(update_preview_content)
-app.get("/v1/chat/completions/result/{preview_id}")(get_preview_data)
+app.get("/health")(health_check)
 
 app.post("/v1/db/query")(query_data)
 app.post("/v1/db/execute")(execute_query)
@@ -82,10 +77,11 @@ app.post("/process_text", response_model=ProcessTextResponse)(process_text)
 app.post("/write_content")(write_content)
 app.post("/get_chunk_content")(get_chunk_content)
 
-app.get("/health")(health_check)
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    with open("static/index/index.html", "r") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content)
+# 初始化IndexServer并注册路由
+index_server = IndexServer()
+index_server.register_routes(app)
+
+# 初始化AuthServer并注册路由
+auth_server = AuthServer()
+auth_server.register_routes(app)

@@ -1,10 +1,16 @@
 import logging
+from typing import Optional, List
+from pydantic import BaseModel
 from fastapi import Header, HTTPException
-from core.api_models import QADocs
 from core.auth.model_auth import verify_token
 from core.model_manager import ModelManager
 
 logger = logging.getLogger(__name__)
+
+# Rerank数据模型
+class QADocs(BaseModel):
+    query: Optional[str]
+    documents: Optional[List[str]]
 
 async def rerank_documents(
     docs: QADocs,

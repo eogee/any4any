@@ -245,9 +245,47 @@ body::before {
     border-radius: 8px;
 }
 .layui-btn:hover {
+    opacity: 0.9;
     background: #e9ecef;
     border-color: var(--primary);
     color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.layui-btn-normal {
+    background: linear-gradient(90deg, var(--primary), #0052a3);
+}
+
+.layui-btn-normal:hover {
+    border: 0;
+}
+
+.layui-input:focus {
+    border-color: #0066cc !important;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15) !important;
+    transition: all 0.3s ease !important;
+}
+
+.layui-textarea:focus {
+    border-color: #0066cc !important;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15) !important;
+    transition: all 0.3s ease !important;
+}
+
+.layui-select:focus {
+    border-color: #0066cc !important;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15) !important;
+    transition: all 0.3s ease !important;
+}
+
+.layui-form-checkbox:focus-within {
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1) !important;
+    border-radius: 2px;
+}
+
+.layui-form-radio:focus-within {
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1) !important;
+    border-radius: 50%;
 }
 
 .sidebar-section {
@@ -579,4 +617,153 @@ body::before {
     background: #e9ecef;
     border-color: var(--primary);
     color: var(--primary);
+}
+
+/* 登录页面样式 */
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.login-container {
+    background: var(--card-bg);
+    border-radius: 15px;
+    padding: 40px;
+    box-shadow: 0 10px 30px var(--shadow);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 450px;
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.login-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+.login-header p {
+    color: var(--text-secondary);
+    font-size: 1rem;
+}
+
+.login-form {
+    margin-bottom: 20px;
+}
+
+.login-form .layui-form-item {
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.login-form .layui-form-label {
+    width: 45px;
+    padding: 9px 0;
+    color: var(--text-secondary);
+}
+
+.login-form .layui-input-block {
+    margin-left: 40px;
+}
+
+.login-form .layui-input {
+    border-radius: 8px;
+    border-color: var(--border);
+    background: rgba(255, 255, 255, 0.7);
+    transition: all 0.3s;
+    padding-left: 40px;
+}
+
+.login-form .layui-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.form-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 18px;
+}
+
+.login-btn {
+    background: linear-gradient(90deg, var(--primary), #0052a3);
+    border: none;
+    height: 42px;
+    line-height: 42px;
+    font-size: 16px;
+    border-radius: 8px;
+    transition: all 0.3s;
+    width: 100%;
+}
+
+.login-btn:hover {
+    opacity: 0.9;
+    background: #e9ecef;
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.login-footer {
+    text-align: center;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.login-footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.login-footer a:hover {
+    text-decoration: underline;
+}
+
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.login-form .layui-form-checkbox[lay-skin="primary"] span {
+    color: var(--text-secondary);
+}
+
+.login-form .layui-form-checkbox[lay-skin="primary"] i {
+    border-color: var(--border);
+}
+
+.login-form .layui-form-checked[lay-skin="primary"] i {
+    border-color: var(--primary) !important;
+    background-color: var(--primary);
+}
+
+/* 登录页面响应式设计 */
+@media (max-width: 768px) {
+    .login-container {
+        padding: 30px 20px;
+        margin: 20px;
+    }
+    
+    .login-header h1 {
+        font-size: 1.8rem;
+    }
 }

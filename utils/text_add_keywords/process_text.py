@@ -1,6 +1,24 @@
 from config import Config
 from fastapi import Form, HTTPException
-from core.api_models import TextRequest
+from typing import Optional, List
+from pydantic import BaseModel
+
+# 文本处理请求模型
+class TextRequest(BaseModel):
+    text: str
+
+# 文本分块响应模型
+class ChunkResponse(BaseModel):
+    chunk_number: int
+    content: str
+    length: int
+
+# 处理结果响应模型
+class ProcessTextResponse(BaseModel):
+    total_chunks: int
+    chunk_size: int
+    overlap: int
+    chunks: List[ChunkResponse]
 
 def chunk_text(text: str, chunk_size: int = None, overlap: int = None) -> list[str]:
     """

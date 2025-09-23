@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - Any4Chat 智能AI客服辅助系统</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/a4a.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-header">
+            <h1 class="neon-text">Any4Chat</h1>
+            <p>智能AI客服辅助系统</p>
+        </div>
+        
+        <form class="layui-form login-form" id="loginForm">
+            <div class="layui-form-item">
+                <i class="fas fa-user form-icon"></i>
+                <div class="layui-input-block">
+                    <input type="text" name="username" lay-verify="required" placeholder="请输入用户名" class="layui-input">
+                </div>
+            </div>
+            
+            <div class="layui-form-item">
+                <i class="fas fa-lock form-icon"></i>
+                <div class="layui-input-block">
+                    <input type="password" name="password" lay-verify="required" placeholder="请输入密码" class="layui-input">
+                </div>
+            </div>
+            
+            <div class="form-options">
+                <div class="layui-form-item layui-form-text">
+                    <input type="checkbox" name="remember" lay-skin="primary" title="记住我">
+                </div>
+            </div>
+            
+            <div class="layui-form-item">
+                <button class="layui-btn login-btn" lay-submit lay-filter="login">
+                    <i class="fas fa-sign-in-alt"></i> 登录
+                </button>
+            </div>
+        </form>
+        
+        <div class="login-footer">
+            <p>© 2025 Any4Chat 智能AI客服辅助系统</p>
+        </div>
+    </div>
+    
+    <script src="/static/layui/layui.js"></script>
+    <script>
+        layui.use(['form', 'layer'], function() {
+            const form = layui.form;
+            const layer = layui.layer;
+            
+            // 表单验证
+            form.verify({
+                username: function(value) {
+                    if (value.length < 3) {
+                        return '用户名至少3个字符';
+                    }
+                },
+                password: function(value) {
+                    if (value.length < 6) {
+                        return '密码至少6个字符';
+                    }
+                }
+            });
+            
+            // 监听表单提交
+            form.on('submit(login)', function(data) {
+                // 模拟登录请求
+                const loading = layer.load(2, {
+                    shade: [0.3, '#fff'],
+                    content: '登录中...',
+                    success: function(layero) {
+                        layero.find('.layui-layer-content').css({
+                            'padding-top': '40px',
+                            'text-align': 'center'
+                        });
+                    }
+                });
+                
+                // 模拟请求延迟
+                setTimeout(function() {
+                    layer.close(loading);
+                    
+                    // 这里应该是真实的登录API调用
+                    console.log('登录请求数据:', data.field);
+                    
+                    // 模拟登录成功
+                    if (data.field.username && data.field.password) {
+                        // 如果选择了记住我，可以保存用户名到localStorage
+                        if (data.field.remember) {
+                            localStorage.setItem('rememberedUsername', data.field.username);
+                        } else {
+                            localStorage.removeItem('rememberedUsername');
+                        }
+                        
+                        layer.msg('登录成功', {
+                            icon: 1,
+                            time: 1500,
+                            end: function() {
+                                // 登录成功后跳转到主页面
+                                window.location.href = '/index.html';
+                            }
+                        });
+                    } else {
+                        layer.msg('用户名或密码错误', {
+                            icon: 2,
+                            time: 1500
+                        });
+                    }
+                }, 1500);
+                
+                // 阻止表单默认提交
+                return false;
+            });
+            
+            // 检查是否有记住的用户名
+            const rememberedUsername = localStorage.getItem('rememberedUsername');
+            if (rememberedUsername) {
+                document.querySelector('input[name="username"]').value = rememberedUsername;
+                document.querySelector('input[name="remember"]').checked = true;
+                form.render();
+            }
+        });
+    </script>
+</body>
+</html>

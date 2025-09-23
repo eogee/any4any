@@ -1,6 +1,14 @@
 import json
 from fastapi import Form, HTTPException
-from core.api_models import ChunkData
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
+
+# 分块数据模型(用于内容检索)
+class ChunkData(BaseModel):
+    total_chunks: int
+    chunk_size: Optional[int] = None
+    overlap: Optional[int] = None
+    chunks: List[Dict[str, Any]]
 
 async def get_chunk_content(
     json_data: str = Form(..., description="JSON字符串格式的chunks数据"),

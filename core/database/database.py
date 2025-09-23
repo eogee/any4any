@@ -16,7 +16,6 @@ class DatabaseExecuteRequest(BaseModel):
 
 def get_db_connection():
     """创建并返回MySQL数据库连接"""
-    # 打印连接配置
     logger.info(f"DBSETTING： - host:{Config.MYSQL_HOST} port:{Config.MYSQL_PORT} "
                f"user:{Config.MYSQL_USER} db:{Config.MYSQL_DATABASE}")
     
@@ -110,13 +109,11 @@ async def query_data(
         query = preprocess_sql_query(query)
     
     """执行查询并返回结果
-    WARNING: 不使用参数化查询，存在SQL注入风险
-    
+    WARNING: 不使用参数化查询，存在SQL注入风险    
     请求示例:
     {
         "query": "SELECT * FROM users WHERE id = 1"
     }
-
     返回格式:
     [
         {
@@ -151,7 +148,6 @@ async def query_data(
 async def execute_query(request: DatabaseExecuteRequest):
     """执行插入/更新/删除操作
     WARNING: 不使用参数化查询，存在SQL注入风险
-    
     请求示例:
     {
         "query": "INSERT INTO users (name) VALUES ('John')"
