@@ -1,3 +1,7 @@
+"""
+日志配置模块-提供双输出日志系统(控制台和文件)
+"""
+
 import logging
 from logging.handlers import RotatingFileHandler
 

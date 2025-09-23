@@ -67,7 +67,7 @@ app.post("/v1/audio/transcriptions")(create_transcription)
 app.post("/v1/audio/speech")(create_speech)
 app.post("/v1/chat/completions")(openai_api.chat_completions)
 
-@app.get("/api/pending-previews")
+@app.get("/api/pending-previews")(get_pending_previews)
 async def get_pending_previews():
     """获取所有等待确认的预览列表"""
     try:

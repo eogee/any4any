@@ -1,7 +1,7 @@
 import logging
 from fastapi import Header, HTTPException
 from core.api_models import QADocs
-from core.auth import verify_token
+from core.auth.model_auth import verify_token
 from core.model_manager import ModelManager
 
 logger = logging.getLogger(__name__)

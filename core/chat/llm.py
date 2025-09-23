@@ -137,7 +137,7 @@ class LLMService:
         # 垃圾回收
         gc.collect()
         
-        logger.info("LLM服务资源清理完成")
+        logger.info("LLM service resources cleaned up")
 
     def initialize_model(self):
         """初始化模型和分词器"""

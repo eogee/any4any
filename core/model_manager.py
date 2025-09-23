@@ -1,3 +1,7 @@
+"""
+模型管理器-用于初始化所有模型和资源
+"""
+
 import logging
 import time
 import multiprocessing 
@@ -6,12 +10,12 @@ import logging
 import gc
 from typing import Optional
 from config import Config
-from utils.funasr.model import SenseVoiceSmall
 from fastapi import Header, HTTPException
 from edge_tts import VoicesManager
 from FlagEmbedding import FlagReranker
-from core.auth import verify_token
+from core.auth.model_auth import verify_token
 from core.chat.llm import get_llm_service
+from utils.funasr.model import SenseVoiceSmall
 
 try:
     multiprocessing.set_start_method('spawn', force=True)
@@ -19,7 +23,7 @@ except RuntimeError:
     pass
 
 # 设置环境变量避免多进程问题
-os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+os.environ['TOKENIZERS_PARALLELISM'] = 'true' if Config.TOKENIZERS_PARALLELISM else 'false'
 
 logger = logging.getLogger(__name__)
 
