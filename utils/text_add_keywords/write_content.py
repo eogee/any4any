@@ -5,7 +5,6 @@ import logging
 from fastapi import Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-
 logger = logging.getLogger(__name__)
 
 def process_keywords(keywords: str) -> str:

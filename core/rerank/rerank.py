@@ -2,7 +2,7 @@ import logging
 from fastapi import Header, HTTPException
 from core.api_models import QADocs
 from core.auth import verify_token
-from core.models import ModelManager
+from core.model_manager import ModelManager
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ async def rerank_documents(
 
         reranker = ModelManager.get_reranker()
         pairs = [[docs.query, doc] for doc in docs.documents]
-        scores = reranker.compute_score(pairs, normalize=True)
+        scores = reranker.compute_score(pairs)
         
         if isinstance(scores, float):
             scores = [scores]

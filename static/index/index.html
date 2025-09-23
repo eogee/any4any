@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Any4Chat 智能AI客服辅助系统</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/a4a.css">
+</head>
+<body>   
+    <div class="container">
+        <div class="header">
+            <h1 class="neon-text">Any4Chat 智能AI客服辅助系统</h1>
+            <p>预览待审核的AI响应内容，确保质量后再发送给用户</p>
+        </div>
+        
+        <div class="preview-container">
+            <div class="preview-sidebar">
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title"><i class="fas fa-list"></i> 待预览内容</h3>
+                    <div class="preview-list" id="previewList">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>暂无待预览内容</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title"><i class="fas fa-chart-bar"></i> 统计信息</h3>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="previewCount">0</div>
+                            <div class="stat-label">待预览数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="approvedCount">0</div>
+                            <div class="stat-label">已回复</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="avgResponseTime">0s</div>
+                            <div class="stat-label">平均响应</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="preview-main">
+                <div class="preview-detail" id="previewDetail">
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-search"></i>
+                        <p>请从左侧选择一项内容进行预览</p>
+                    </div>
+                    <div class="content-editor-container" id="editorContainer" style="display: none;">
+                        <textarea class="content-editor" id="contentEditor" placeholder="在此编辑内容..."></textarea>
+                        <div class="content-preview" id="contentPreview"></div>
+                        <div class="editor-actions">
+                            <button class="layui-btn layui-btn-normal" id="saveAndSendBtn"><i class="fas fa-save"></i> 保存并发送</button>
+                            <button class="layui-btn layui-btn-primary" id="cancelBtn"><i class="fas fa-times"></i> 取消</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/marked.min.js"></script>
+    <script>
+        // 配置marked.js
+        marked.setOptions({
+            highlight: function(code, lang) {
+                return code;
+            },
+            breaks: true,
+            gfm: true
+        });
+
+        // 全局变量
+        let currentPreviewId = null;
+        let previewPollingInterval = null;
+        let previews = [];
+        let layer = null;
+
+        // DOM元素
+        const previewList = document.getElementById('previewList');
+        const previewDetail = document.getElementById('previewDetail');
+        const previewCount = document.getElementById('previewCount');
+        const approvedCount = document.getElementById('approvedCount');
+        const emptyState = document.getElementById('emptyState');
+        const editorContainer = document.getElementById('editorContainer');
+        const contentEditor = document.getElementById('contentEditor');
+        const contentPreview = document.getElementById('contentPreview');
+
+        // 去除think标签的内容
+        function removeThinkContent(text) {
+            if (!text) return '';
+            // 使用正则表达式去除<think>...</think>标签及其内容
+            return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        }
+
+        // Think标签处理函数
+        function processThinkContent(text) {
+            if (!text) return '';
+            
+            const thinkPattern = /<think>([\s\S]*?)<\/think>/g;
+            let processedText = text;
+            let thinkCount = 0;
+
+            processedText = processedText.replace(thinkPattern, (match, content) => {
+                const formattedContent = content.trim()
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                    .join('\n');
+
+                const uniqueId = `think-${Date.now()}-${thinkCount}`;
+                thinkCount++;
+                
+                return `<div class="think-container">
+                    <button class="think-toggle" onclick="toggleThink('${uniqueId}')">
+                        <i class="fas fa-lightbulb"></i> 展开思考过程
+                    </button>
+                    <div id="${uniqueId}" class="think-content" style="display: none;">${formattedContent}</div>
+                </div>`;
+            });
+
+            return processedText;
+        }
+
+        // 切换think显示
+        window.toggleThink = function(thinkId) {
+            const content = document.getElementById(thinkId);
+            if (!content) return;
+            
+            const button = content.previousElementSibling;
+            const isHidden = content.style.display === 'none';
+            
+            content.style.display = isHidden ? 'block' : 'none';
+            button.innerHTML = isHidden ? 
+                '<i class="fas fa-lightbulb"></i> 收起思考过程' :
+                '<i class="fas fa-lightbulb"></i> 展开思考过程';
+        }
+
+        // 渲染Markdown
+        function renderMarkdown(content) {
+            if (!content) return '';
+            
+            try {
+                // 先处理think标签
+                content = processThinkContent(content);
+                
+                // 保护已处理的think内容不被Markdown渲染
+                const thinkBlocks = [];
+                content = content.replace(/<div class="think-container">[\s\S]*?<\/div><\/div>/g, (match) => {
+                    const id = `THINK_BLOCK_${thinkBlocks.length}`;
+                    thinkBlocks.push({
+                        id: id,
+                        content: match
+                    });
+                    return id;
+                });
+
+                // 渲染Markdown
+                content = marked.parse(content);
+
+                // 还原think内容
+                thinkBlocks.forEach(block => {
+                    content = content.replace(
+                        new RegExp(block.id, 'g'),
+                        block.content
+                    );
+                });
+
+                return content;
+            } catch (e) {
+                console.error('Markdown渲染错误:', e);
+                return content;
+            }
+        }
+
+        // 预览数据轮询函数
+        async function pollPreviewData() {
+            try {
+                const response = await fetch('/api/pending-previews');
+                if (response.ok) {
+                    const data = await response.json();
+                    // 处理两种数据格式: {previews: [...]} 或直接 [...]
+                    if (Array.isArray(data)) {
+                        // 直接是数组格式
+                        previews = data;
+                    } else if (data.previews && data.previews.length > 0) {
+                        // 带有previews属性的对象格式
+                        previews = data.previews;
+                    } else {
+                        previews = [];
+                    }
+                    
+                    if (previews.length > 0) {
+                        renderPreviewList();
+                        updateStats();
+                        
+                        // 如果当前预览项已不存在，清空预览详情
+                        if (currentPreviewId && !previews.find(p => p.preview_id === currentPreviewId)) {
+                            currentPreviewId = null;
+                            renderPreviewDetail(null);
+                        }
+                    } else {
+                        renderPreviewList();
+                        updateStats();
+                    }
+                }
+            } catch (error) {
+                console.error('轮询预览数据失败:', error);
+            }
+        }
+        
+        // 启动预览数据轮询
+        function startPreviewPolling() {
+            if (previewPollingInterval) {
+                clearInterval(previewPollingInterval);
+            }
+            // 每3秒轮询一次
+            previewPollingInterval = setInterval(pollPreviewData, 3000);
+            
+            // 立即获取一次数据
+            pollPreviewData();
+        }
+        
+        // 停止预览数据轮询
+        function stopPreviewPolling() {
+            if (previewPollingInterval) {
+                clearInterval(previewPollingInterval);
+                previewPollingInterval = null;
+            }
+        }
+
+        // 渲染预览列表
+        function renderPreviewList() {
+            if (!previewList) return;
+            
+            if (previews.length === 0) {
+                previewList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>暂无待预览内容</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            previews.forEach(preview => {
+                const isActive = preview.preview_id === currentPreviewId;
+                const previewTime = new Date(preview.timestamp || Date.now()).toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                // 获取最后一个用户消息作为标题
+                let lastUserMessage = '无内容';
+                const messages = preview.request_data?.messages;
+                if (messages && Array.isArray(messages)) {
+                    // 从后往前查找最后一个user角色的消息
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                        if (messages[i].role === 'user') {
+                            lastUserMessage = messages[i].content || '无内容';
+                            break;
+                        }
+                    }
+                }
+                
+                // 获取generated_content并去除think标签
+                let previewContent = preview.generated_content || '等待响应...';
+                previewContent = removeThinkContent(previewContent);
+                
+                // 截取预览内容的前100个字符
+                if (previewContent.length > 100) {
+                    previewContent = previewContent.substring(0, 100) + '...';
+                }
+                
+                html += `
+                    <div class="preview-item ${isActive ? 'active' : ''}" data-id="${preview.preview_id}">
+                        <div class="preview-item-header">
+                            <div class="preview-item-title">${lastUserMessage}</div>
+                            <div class="preview-item-time">${previewTime}</div>
+                        </div>
+                        <div class="preview-item-content">${previewContent}</div>
+                    </div>
+                `;
+            });
+            
+            previewList.innerHTML = html;
+            
+            // 添加点击事件
+            document.querySelectorAll('.preview-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const previewId = this.getAttribute('data-id');
+                    selectPreviewItem(previewId);
+                });
+            });
+        }
+
+        // 选择预览项
+        function selectPreviewItem(previewId) {
+            currentPreviewId = previewId;
+            renderPreviewList();
+            
+            const selectedPreview = previews.find(p => p.preview_id === previewId);
+            renderPreviewDetail(selectedPreview);
+        }
+
+        // 渲染预览详情
+        function renderPreviewDetail(preview) {
+            if (!previewDetail) return;
+            
+            if (!preview) {
+                // 显示空状态，隐藏编辑器
+                if (emptyState) emptyState.style.display = 'flex';
+                if (editorContainer) editorContainer.style.display = 'none';
+                
+                // 清空预览内容区域（如果存在）
+                const previewContent = document.getElementById('previewContent');
+                if (previewContent) {
+                    previewContent.style.display = 'none';
+                }
+                return;
+            }
+            
+            // 隐藏空状态和编辑器，显示预览内容
+            if (emptyState) emptyState.style.display = 'none';
+            if (editorContainer) editorContainer.style.display = 'none';
+            
+            // 查找或创建预览内容容器
+            let previewContent = document.getElementById('previewContent');
+            if (!previewContent) {
+                previewContent = document.createElement('div');
+                previewContent.id = 'previewContent';
+                previewDetail.appendChild(previewContent);
+            }
+            
+            previewContent.style.display = 'block';
+            
+            const requestData = preview.request_data || {};
+            const responseContent = preview.generated_content || "等待模型响应...";
+            
+            // 获取最后一个用户问题
+            let lastUserQuestion = '无问题';
+            const messages = requestData.messages;
+            if (messages && Array.isArray(messages)) {
+                // 从后往前查找最后一个user角色的消息
+                for (let i = messages.length - 1; i >= 0; i--) {
+                    if (messages[i].role === 'user') {
+                        lastUserQuestion = messages[i].content || '无问题';
+                        break;
+                    }
+                }
+            }
+            
+            previewContent.innerHTML = `
+                <div class="preview-section">
+                    <h3><i class="fas fa-question-circle"></i> 当前问题</h3>
+                    <div class="preview-request">${lastUserQuestion}</div>
+                </div>
+                
+                <div class="preview-section">
+                    <h3><i class="fas fa-paper-plane"></i> 用户会话历史</h3>
+                    <div class="request-table-container">
+                        <table class="request-table">
+                            <thead>
+                                <tr>
+                                    <th>用户消息</th>
+                                    <th>助手回复</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requestTableBody">
+                                <!-- 对话数据在这里动态生成 -->
+                            </tbody>
+                        </table>
+                        <button class="table-toggle-btn" id="toggleRequestTable">
+                            <i class="fas fa-chevron-down"></i> 显示更多
+                        </button>
+                    </div>
+                </div>                
+                <div class="preview-section">
+                    <h3><i class="fas fa-robot"></i> AI响应</h3>
+                    <div class="preview-response markdown-body">${renderMarkdown(responseContent)}</div>
+                </div>
+                
+                <div class="preview-actions">
+                    <button class="layui-btn layui-btn-normal" id="editBtn">
+                        <i class="fas fa-edit"></i> 编辑
+                    </button>
+                    <button class="layui-btn layui-btn-primary" id="confirmBtnDetail">
+                        <i class="fas fa-check"></i> 确认发送
+                    </button>
+                </div>
+            `;
+            
+            // 添加事件监听器
+            const editBtn = document.getElementById('editBtn');
+            const confirmBtnDetail = document.getElementById('confirmBtnDetail');
+            
+            if (editBtn) {
+                editBtn.onclick = () => startEditMode(preview);
+            }
+            if (confirmBtnDetail) {
+                confirmBtnDetail.onclick = () => confirmPreview(preview.preview_id);
+            }
+            
+            // 生成请求表格数据
+            generateRequestTable(requestData);
+            
+            // 滚动到顶部
+            previewDetail.scrollTop = 0;
+        }
+        
+        // 生成请求表格数据
+        function generateRequestTable(requestData) {
+            const tableBody = document.getElementById('requestTableBody');
+            const toggleBtn = document.getElementById('toggleRequestTable');
+            
+            if (!tableBody || !toggleBtn) return;
+            
+            // 清空表格
+            tableBody.innerHTML = '';
+            
+            // 获取messages数组
+            const messages = requestData.messages || [];
+            
+            // 提取用户和助手消息对
+            const conversationPairs = [];
+            let currentUser = null;
+            
+            messages.forEach(msg => {
+                if (msg.role === 'user') {
+                    currentUser = msg.content || '';
+                } else if (msg.role === 'assistant' && currentUser !== null) {
+                    conversationPairs.push({
+                        user: currentUser,
+                        assistant: msg.content || ''
+                    });
+                    currentUser = null;
+                }
+            });
+            
+            // 如果最后有用户消息但没有助手回复，也添加进去
+            if (currentUser !== null) {
+                conversationPairs.push({
+                    user: currentUser,
+                    assistant: '等待回复...'
+                });
+            }
+            
+            // 生成表格行
+            conversationPairs.forEach((pair, index) => {
+                const row = document.createElement('tr');
+                row.className = index === 0 ? 'table-row-visible' : 'table-row-hidden';
+                row.style.display = index === 0 ? 'table-row' : 'none';
+                
+                const userCell = document.createElement('td');
+                userCell.textContent = pair.user;
+                userCell.style.padding = '12px';
+                userCell.style.borderBottom = '1px solid #eee';
+                userCell.style.verticalAlign = 'top';
+                userCell.style.maxWidth = '300px';
+                userCell.style.wordWrap = 'break-word';
+                userCell.style.backgroundColor = 'rgba(0, 102, 204, 0.05)';
+                
+                const assistantCell = document.createElement('td');
+                assistantCell.textContent = pair.assistant;
+                assistantCell.style.padding = '12px';
+                assistantCell.style.borderBottom = '1px solid #eee';
+                assistantCell.style.verticalAlign = 'top';
+                assistantCell.style.maxWidth = '300px';
+                assistantCell.style.wordWrap = 'break-word';
+                assistantCell.style.backgroundColor = 'rgba(126, 34, 206, 0.05)';
+                
+                row.appendChild(userCell);
+                row.appendChild(assistantCell);
+                tableBody.appendChild(row);
+            });
+            
+            // 设置按钮状态
+            let isExpanded = false;
+            
+            toggleBtn.onclick = () => {
+                const hiddenRows = tableBody.querySelectorAll('.table-row-hidden');
+                
+                if (isExpanded) {
+                    // 收起
+                    hiddenRows.forEach(row => {
+                        row.style.display = 'none';
+                    });
+                    toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> 显示更多';
+                    isExpanded = false;
+                } else {
+                    // 展开
+                    hiddenRows.forEach(row => {
+                        row.style.display = 'table-row';
+                    });
+                    toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> 收起';
+                    isExpanded = true;
+                }
+            };
+            
+            // 如果只有一行数据，隐藏按钮
+            if (conversationPairs.length <= 1) {
+                toggleBtn.style.display = 'none';
+            } else {
+                toggleBtn.style.display = 'block';
+            }
+        }
+
+        // 启动编辑模式
+        function startEditMode(preview) {            
+            // 检查必要的DOM元素是否存在
+            if (!emptyState || !editorContainer || !contentEditor || !contentPreview) {
+                console.error('编辑器元素缺失:', {
+                    emptyState: !!emptyState,
+                    editorContainer: !!editorContainer,
+                    contentEditor: !!contentEditor,
+                    contentPreview: !!contentPreview
+                });
+                if (layer) {
+                    layer.msg('编辑器初始化失败，请刷新页面重试', {icon: 2, time: 2000});
+                }
+                return;
+            }
+            
+            try {
+                // 设置当前预览ID
+                currentPreviewId = preview.preview_id;
+                
+                // 隐藏空状态和预览内容，显示编辑器
+                if (emptyState) emptyState.style.display = 'none';
+                const previewContent = document.getElementById('previewContent');
+                if (previewContent) previewContent.style.display = 'none';
+                editorContainer.style.display = 'flex';
+                
+                // 设置编辑器内容
+                contentEditor.value = preview.generated_content || '';
+                contentPreview.innerHTML = renderMarkdown(contentEditor.value);
+                
+                // 自动聚焦到编辑器
+                setTimeout(() => {
+                    contentEditor.focus();
+                }, 100);
+
+            } catch (error) {
+                console.error('启动编辑模式失败:', error);
+                if (layer) {
+                    layer.msg('编辑模式启动失败', {icon: 2, time: 1500});
+                }
+            }
+        }
+
+        // 确认预览
+        async function confirmPreview(previewId) {
+            try {
+                const response = await fetch(`/v1/chat/confirm/${previewId}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    if (layer) layer.msg('内容已确认发送', {icon: 1, time: 1500});
+                    pollPreviewData();
+                } else {
+                    throw new Error('服务器响应错误');
+                }
+            } catch (error) {
+                console.error('确认预览失败:', error);
+                if (layer) layer.msg('确认发送失败', {icon: 2, time: 1500});
+            }
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            if (previewCount) previewCount.textContent = previews.length;
+            if (approvedCount) approvedCount.textContent = Math.floor(previews.length * 0.7);
+        }
+
+        // 初始化编辑器功能
+        function initEditor() {
+            const saveAndSendBtn = document.getElementById('saveAndSendBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+
+            if (!contentEditor || !contentPreview || !saveAndSendBtn || !cancelBtn) {
+                console.warn('编辑器元素未找到，将在100ms后重试');
+                setTimeout(initEditor, 100);
+                return;
+            }
+
+            // 实时预览
+            contentEditor.addEventListener('input', function() {
+                contentPreview.innerHTML = renderMarkdown(this.value);
+            });
+
+            // 保存并发送内容
+            saveAndSendBtn.addEventListener('click', async function() {
+                if (!currentPreviewId) return;
+                
+                try {
+                    // 先保存内容
+                    const saveResponse = await fetch(`/api/previews/${currentPreviewId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            content: contentEditor.value
+                        })
+                    });
+
+                    if (!saveResponse.ok) {
+                        throw new Error('保存失败');
+                    }
+
+                    // 再确认发送
+                    const confirmResponse = await fetch(`/v1/chat/confirm/${currentPreviewId}`, {
+                        method: 'POST'
+                    });
+
+                    if (confirmResponse.ok) {
+                        if (layer) layer.msg('内容已保存并发送', {icon: 1, time: 1500});
+                        
+                        // 隐藏编辑器，返回预览状态
+                        if (editorContainer) editorContainer.style.display = 'none';
+                        if (emptyState) emptyState.style.display = 'flex';
+                        
+                        // 重新轮询数据
+                        pollPreviewData();
+                    } else {
+                        throw new Error('发送失败');
+                    }
+                } catch (error) {
+                    console.error('保存并发送失败:', error);
+                    if (layer) layer.msg('保存并发送失败', {icon: 2, time: 1500});
+                }
+            });
+
+            // 取消编辑
+            cancelBtn.addEventListener('click', function() {
+                // 隐藏编辑器
+                if (editorContainer) editorContainer.style.display = 'none';
+                
+                // 重新渲染预览详情
+                if (currentPreviewId) {
+                    const selectedPreview = previews.find(p => p.preview_id === currentPreviewId);
+                    if (selectedPreview) {
+                        renderPreviewDetail(selectedPreview);
+                    } else {
+                        // 如果找不到预览项，显示空状态
+                        if (emptyState) emptyState.style.display = 'flex';
+                        const previewContent = document.getElementById('previewContent');
+                        if (previewContent) previewContent.style.display = 'none';
+                    }
+                } else {
+                    // 显示空状态
+                    if (emptyState) emptyState.style.display = 'flex';
+                    const previewContent = document.getElementById('previewContent');
+                    if (previewContent) previewContent.style.display = 'none';
+                }
+            });
+        }
+
+        // 初始化Layui
+        layui.use(['layer', 'form'], function(){
+            layer = layui.layer;
+            var form = layui.form;
+            
+            // 初始化应用
+            (function initializeApp() {
+                // 启动预览数据轮询
+                startPreviewPolling();
+                // 初始化编辑器
+                setTimeout(initEditor, 100);
+            })();
+
+            // 暴露函数到全局
+            window.confirmPreview = confirmPreview;
+
+            // 页面卸载时清理轮询
+            window.addEventListener('beforeunload', function() {
+                stopPreviewPolling();
+            });
+            
+            // 页面隐藏/显示时的处理
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    stopPreviewPolling();
+                } else {
+                    startPreviewPolling();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

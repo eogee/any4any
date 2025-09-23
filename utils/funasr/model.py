@@ -13,7 +13,7 @@ from funasr.train_utils.device_funcs import force_gatherable
 from funasr.losses.label_smoothing_loss import LabelSmoothingLoss
 from funasr.metrics.compute_acc import compute_accuracy, th_accuracy
 from funasr.utils.load_utils import load_audio_text_image_video, extract_fbank
-from utils.ctc_alignment import ctc_forced_align
+from utils.funasr.ctc_alignment import ctc_forced_align
 
 class SinusoidalPositionEncoder(torch.nn.Module):
     """ """
@@ -646,9 +646,9 @@ class SenseVoiceSmall(nn.Module):
         )
     
     @staticmethod
-    def from_pretrained(model:str=None, **kwargs):
+    def from_pretrained(model_dir:str=None, **kwargs):
         from funasr import AutoModel
-        model, kwargs = AutoModel.build_model(model=model, trust_remote_code=True, **kwargs)
+        model, kwargs = AutoModel.build_model(model=model_dir, trust_remote_code=True, **kwargs)
         
         return model, kwargs
 

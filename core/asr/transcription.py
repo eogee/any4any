@@ -8,7 +8,7 @@ from fastapi import UploadFile, File, Form, Header, HTTPException
 import torchaudio
 from funasr.utils.postprocess_utils import rich_transcription_postprocess
 from core.auth import verify_token
-from core.models import ModelManager
+from core.model_manager import ModelManager
 
 logger = logging.getLogger(__name__)
 

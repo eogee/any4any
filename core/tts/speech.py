@@ -4,8 +4,8 @@ import uuid
 from fastapi import Request, Header, HTTPException
 from edge_tts import Communicate
 from core.auth import verify_token
-from core.models import ModelManager
-from core.file import file_response_with_cleanup
+from core.model_manager import ModelManager
+from core.tts.file import file_response_with_cleanup
 from core.filter import filter_special_chars
 import logging
 
