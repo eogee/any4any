@@ -1,1 +1,4 @@
 * text=auto eol=lf
+# Windows特定文件保持CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf

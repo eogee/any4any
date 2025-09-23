@@ -21,7 +21,7 @@ def clean_video_text(text: str)  -> str:
     pattern_end_video = r'[\s\S]*?</video>'                 # 匹配结尾标签
 
     cleaned = re.sub(pattern_full_video, '', text, flags=re.DOTALL)
-    if cleaned != text:  # 如果完整标签被替换过，直接返回结果
+    if cleaned != text:                                     # 如果完整标签被替换过，直接返回结果
         return cleaned.strip()
 
     cleaned = re.sub(pattern_start_video, '', cleaned)

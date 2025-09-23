@@ -1,16 +1,15 @@
-import multiprocessing
-from multiprocessing import Process, resource_tracker
 import signal
 import time
-# import os
-# import warnings
+import warnings
 import gc
-from config import Config
+import multiprocessing
+from multiprocessing import Process
 import uvicorn
+from config import Config
 from app import run_mcp_server
 from core.log import setup_logging
 
-# warnings.filterwarnings("ignore", message="resource_tracker: There appear to be .* leaked semaphore objects")
+warnings.filterwarnings("ignore", message="resource_tracker: There appear to be .* leaked semaphore objects")
 
 def run_fastapi_server():
     """运行 FastAPI 服务（Uvicorn）"""

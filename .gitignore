@@ -9,3 +9,6 @@ __pycache__/
 
 # VSCode settings
 .vscode/
+
+# data files
+data/
