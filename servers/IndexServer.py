@@ -193,6 +193,14 @@ class IndexServer(Server):
             # 为update_preview_content方法提供request参数
             return await self.update_preview_content(preview_id, request)
             
+        # 新增PUT路由，匹配前端使用的路径格式
+        @app.put("/api/previews/{preview_id}")
+        async def put_update_preview_route(request: Request, preview_id: str):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            # 复用现有的update_preview_content方法
+            return await self.update_preview_content(preview_id, request)
+            
         @app.get("/v1/chat/completions/result/{preview_id}")
         async def preview_result(request: Request, preview_id: str):
             if not await check_user_login(request):

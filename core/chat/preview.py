@@ -1,8 +1,10 @@
 import time
+import logging
 from typing import Dict, Optional
 from fastapi import HTTPException
 from pydantic import BaseModel
 from config import Config
+from data_models.Preview import Preview
 
 class PreviewRequest(BaseModel):
     """预览请求数据模型"""
@@ -59,7 +61,37 @@ class PreviewService:
             raise HTTPException(status_code=404, detail="Preview not found")
         
         preview = self._previews[preview_id]
+        pre_content = preview.generated_content or ""
+        
+        # 更新内存中的内容
         preview.edited_content = edited_content
+        
+        # 将内容持久化到数据库
+        try:
+            preview_model = Preview()
+            
+            # 从request_data中提取最后一个role为user的content
+            last_user_content = ""
+            if preview.request_data and "messages" in preview.request_data:
+                messages = preview.request_data["messages"]
+                # 遍历消息列表，找到最后一个用户消息
+                for msg in reversed(messages):
+                    if isinstance(msg, dict) and msg.get("role") == "user":
+                        last_user_content = msg.get("content", "")
+                        break
+            
+            # 保存到数据库，包括编辑前内容、编辑后内容、请求数据等
+            preview_model.save_preview_content(
+                preview_id=preview_id,
+                edited_content=edited_content,
+                pre_content=pre_content,
+                full_request=preview.request_data,
+                last_request=last_user_content  # 使用最后一个用户消息作为last_request
+            )
+        except Exception as e:
+            # 记录错误但不中断流程，确保即使数据库保存失败，内存中的更新仍然成功
+            logging.error(f"Failed to save preview content to database: {e}")
+        
         return preview
     
     async def get_content(self, preview_id: str) -> str:

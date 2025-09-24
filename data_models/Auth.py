@@ -1,6 +1,5 @@
 import logging
 from typing import Optional, Dict, Any
-import mysql.connector
 from mysql.connector import Error
 from data_models.Model import Model
 

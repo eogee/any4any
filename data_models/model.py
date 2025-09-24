@@ -1,8 +1,7 @@
 import logging
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
-import logging
-import mysql.connector
 from mysql.connector import Error
 from core.database.database import get_db_connection
 
@@ -59,14 +58,14 @@ class Model(ABC):
             # 确保获取有效的数据库连接
             connection = self._get_connection()
             
-            # 如果没有游标或者连接已断开，则重新创建游标
-            if not self.cursor:
-                self.cursor = connection.cursor(dictionary=dictionary)
+            # 不重复使用游标，每次都创建新的游标以避免连接问题
+            self.cursor = connection.cursor(dictionary=dictionary)
             
             return self.cursor
         except Exception as e:
             self.logger.error(f"Failed to get cursor: {e}")
-            # 发生异常时，重新创建游标
+            # 发生异常时，重新获取连接并创建游标
+            self.connection = None  # 重置连接以强制获取新连接
             connection = self._get_connection()
             self.cursor = connection.cursor(dictionary=dictionary)
             return self.cursor

@@ -31,6 +31,7 @@ def get_db_connection():
                     user=Config.MYSQL_USER,
                     password=Config.MYSQL_PASSWORD,
                     database=Config.MYSQL_DATABASE,
+                    charset='utf8mb4',
                     connect_timeout=5
                 )
             except Exception as e:
