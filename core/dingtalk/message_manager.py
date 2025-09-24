@@ -13,13 +13,7 @@ from alibabacloud_tea_util import models as util_models
 _token_cache = {"token": None, "expire": 0}
 
 def setup_logger():
-    logger = logging.getLogger()
-    handler = logging.StreamHandler()
-    handler.setFormatter(
-        logging.Formatter('%(asctime)s %(name)-8s %(levelname)-8s %(message)s [%(filename)s:%(lineno)d]'))
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    return logger
+    return logging.getLogger()
 
 class Options:
     def __init__(self):
@@ -106,8 +100,8 @@ def send_robot_private_message(access_token: str, options, user_ids: list, custo
 class EchoTextHandler(dingtalk_stream.ChatbotHandler):
     def __init__(self, logger: logging.Logger = None, options=None):
         super(dingtalk_stream.ChatbotHandler, self).__init__()
-        self.logger = logger or logging.getLogger(__name__)
-        self.options = options
+        self.logger = logger if logger is not None else logging.getLogger(__name__)
+        self.options = options or Options()
 
     async def process(self, callback: dingtalk_stream.CallbackMessage):
         try:
@@ -135,7 +129,7 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             
             # 构建个性化回复消息
             original_content = getattr(incoming_message.text, 'content', '')
-            reply_content = f"Hello {user_nick}!\nI received your message: {original_content}\n\nThis is an auto-reply: {self.options.msg}"
+            reply_content = f"Hello {user_nick}!\nI received your message: {original_content}\n\nThis is an auto-reply: {self.options.msg if self.options else 'Default message'}"
             
             # 发送回复消息
             result = send_robot_private_message(
