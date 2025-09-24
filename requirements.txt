@@ -10,3 +10,5 @@ FlagEmbedding==1.2.3    # 分块嵌入库
 pydantic>=2.0.0         # 数据模型验证库
 mysql-connector-python>=8.1.0  # MySQL数据库连接器
 FastMCP                 # MPC通信协议库
+dingtalk_stream         # 钉钉机器人SDK
+alibabacloud_dingtalk   # 钉钉机器人API客户端

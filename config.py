@@ -68,3 +68,9 @@ class Config:
 
     # 分词器配置
     TOKENIZERS_PARALLELISM = os.getenv("TOKENIZERS_PARALLELISM", "False").lower() == "true"      # 是否启用多线程分词
+    
+    # 钉钉配置
+    CLIENT_ID = os.getenv("CLIENT_ID", "")
+    CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
+    ROBOT_CODE = os.getenv("ROBOT_CODE", "")
+    DINGTALK_PORT = os.getenv("DINGTALK_PORT", "6666")

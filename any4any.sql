@@ -9,21 +9,24 @@ CREATE TABLE IF NOT EXISTS `users` (
   `password_hash` varchar(50) COLLATE utf8_unicode_ci NOT NULL COMMENT '密码',
   `nickname` varchar(50) CHARACTER SET utf32 COLLATE utf32_unicode_ci DEFAULT NULL COMMENT '昵称',
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='用户表';
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='用户';
 
 -- any4any.users 的数据：~2 rows (大约)
 DELETE FROM `users`;
 INSERT INTO `users` (`id`, `username`, `password_hash`, `nickname`) VALUES
-	(1, 'admin', 'qq110748', 'admin');
+	(1, 'admin', '888888', 'admin');
 
 CREATE TABLE `previews` (
 	`id` INT(11) NOT NULL AUTO_INCREMENT COMMENT 'ID',
 	`preview_id` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '预览ID' COLLATE 'utf8mb4_unicode_ci',
+	`session_id` VARCHAR(100) NULL DEFAULT NULL COMMENT '会话ID' COLLATE 'utf8mb4_unicode_ci',
+	`last_request` MEDIUMTEXT NOT NULL COMMENT '当前请求内容' COLLATE 'utf8mb4_unicode_ci',
 	`edited_content` MEDIUMTEXT NOT NULL COMMENT '编辑保存后的内容' COLLATE 'utf8mb4_unicode_ci',
 	`pre_content` MEDIUMTEXT NOT NULL COMMENT '编辑前的内容' COLLATE 'utf8mb4_unicode_ci',
 	`is_edited` TINYINT(1) NOT NULL DEFAULT '0' COMMENT '是否经过编辑',
 	`full_request` MEDIUMTEXT NOT NULL COMMENT '历史全部请求及响应内容' COLLATE 'utf8mb4_unicode_ci',
-	`last_request` MEDIUMTEXT NOT NULL COMMENT '当前请求内容' COLLATE 'utf8mb4_unicode_ci',
+	`response_time` FLOAT NOT NULL COMMENT '响应用时',
+	`user_id` INT(11) NOT NULL COMMENT '响应人员ID',
 	`created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
 	`updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
 	PRIMARY KEY (`id`) USING BTREE
@@ -31,5 +34,5 @@ CREATE TABLE `previews` (
 COMMENT='预览编辑保存结果'
 COLLATE='utf8mb4_unicode_ci'
 ENGINE=InnoDB
-AUTO_INCREMENT=2
+AUTO_INCREMENT=5
 ;
