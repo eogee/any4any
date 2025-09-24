@@ -39,7 +39,8 @@ class Config:
     # 功能开关配置
     NO_THINK = os.getenv("NO_THINK", "True").lower() == "true"
     QUERY_CLEANING = os.getenv("QUERY_CLEANING", "True").lower() == "true"
-    PROMPT = os.getenv("PROMPT", "")
+    ASR_PROMPT = os.getenv("ASR_PROMPT", "")
+    LLM_PROMPT = os.getenv("LLM_PROMPT", "")
     
     # 文本分块配置
     DEFAULT_CHUNK_SIZE = int(os.getenv("DEFAULT_CHUNK_SIZE", 2000))

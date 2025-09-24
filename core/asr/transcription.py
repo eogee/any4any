@@ -48,8 +48,8 @@ async def create_transcription(
         raw_text = res[0][0]["text"]
         final_text = rich_transcription_postprocess(re.sub(r"<\|.*?\|>", "", raw_text))
 
-        if Config.PROMPT is not None and Config.PROMPT != "":
-            final_text = f"{final_text}<div style='display:none'>{Config.PROMPT}</div>"
+        if Config.ASR_PROMPT is not None and Config.ASR_PROMPT != "":
+            final_text = f"{final_text}<div style='display:none'>{Config.ASR_PROMPT}</div>"
 
         if Config.NO_THINK:
             final_text = f"{final_text}<div style='display:none'>/no_think</div>"

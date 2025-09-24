@@ -186,8 +186,12 @@ class LLMService:
             }
             print(f"Generation task {generation_id} created")
 
-            # 构建提示
-            prompt = f"<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
+            # 构建提示，添加系统提示词
+            system_prompt = getattr(Config, 'LLM_PROMPT', '')
+            if system_prompt:
+                prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
+            else:
+                prompt = f"<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
 
             # 生成输入
             inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.device)
@@ -294,7 +298,11 @@ class LLMService:
             rep_penalty = repetition_penalty if repetition_penalty is not None else Config.REPETITION_PENALTY
             
             # 构建提示
-            prompt = f"<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
+            system_prompt = getattr(Config, 'LLM_PROMPT', '')
+            if system_prompt:
+                prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
+            else:
+                prompt = f"<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
 
             # 生成回复
             inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.device)

@@ -1,8 +1,11 @@
 import logging
 import time
 import dingtalk_stream
+import httpx
 from config import Config
 from dingtalk_stream import AckMessage
+from core.log import setup_logging
+from utils.content_handle.filter import filter_think_content
 from alibabacloud_dingtalk.oauth2_1_0.client import Client as dingtalkoauth2_1_0Client
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_dingtalk.oauth2_1_0 import models as dingtalkoauth_2__1__0_models
@@ -11,9 +14,6 @@ from alibabacloud_dingtalk.robot_1_0 import models as dingtalkrobot__1__0_models
 from alibabacloud_tea_util import models as util_models
 
 _token_cache = {"token": None, "expire": 0}
-
-def setup_logger():
-    return logging.getLogger()
 
 class Options:
     def __init__(self):
@@ -91,7 +91,7 @@ def send_robot_private_message(access_token: str, options, user_ids: list, custo
             batch_send_otoheaders,
             util_models.RuntimeOptions()
         )
-        logging.info(f"Private message sent successfully, target users: {user_ids}, response: {response}")
+        # logging.info(f"Private message sent successfully, target users: {user_ids}, response: {response}")
         return response
     except Exception as err:
         logging.error(f"Failed to send private message: {err}")
@@ -100,17 +100,17 @@ def send_robot_private_message(access_token: str, options, user_ids: list, custo
 class EchoTextHandler(dingtalk_stream.ChatbotHandler):
     def __init__(self, logger: logging.Logger = None, options=None):
         super(dingtalk_stream.ChatbotHandler, self).__init__()
-        self.logger = logger if logger is not None else logging.getLogger(__name__)
-        self.options = options or Options()
+        self.logger = logger or logging.getLogger(__name__)
+        self.options = options
 
     async def process(self, callback: dingtalk_stream.CallbackMessage):
         try:
             incoming_message = dingtalk_stream.ChatbotMessage.from_dict(callback.data)
             
             # 控制台打印收到的消息信息
-            self.logger.info(f"Received message - Sender: {incoming_message.sender_staff_id}, "
-                           f"Nickname: {incoming_message.sender_nick}, "
-                           f"Content: {getattr(incoming_message.text, 'content', 'No text content')}")
+            self.logger.info(f"Received message - Sender: {incoming_message.sender_staff_id}, " )
+                        #    f"Nickname: {incoming_message.sender_nick}, "
+                        #    f"Content: {getattr(incoming_message.text, 'content', 'No text content')}"                          
             
             # 防止消息循环：检查是否是机器人本身发送的消息
             if hasattr(incoming_message, 'chatbot_user_id') and incoming_message.sender_staff_id == incoming_message.chatbot_user_id:
@@ -121,26 +121,87 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             user_id = incoming_message.sender_staff_id
             user_nick = incoming_message.sender_nick
             
-            # 获取access_token
+            # 获取消息内容
+            original_content = getattr(incoming_message.text, 'content', '')
+            
+            # 如果消息为空，直接返回
+            if not original_content:
+                self.logger.info("Empty message content, skipping processing")
+                return AckMessage.STATUS_OK, 'OK'
+            
+            # 构建发送到openai_api.chat_completions的请求体
+            request_body = {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": original_content
+                    }
+                ],
+                "model": "default",
+                "stream": False,
+                "temperature": Config.TEMPERATURE,
+                "max_tokens": Config.MAX_LENGTH,
+                "top_p": Config.TOP_P,
+                "repetition_penalty": Config.REPETITION_PENALTY,
+                "sender_id": user_id,  # 发送者ID作为附加信息
+                "sender_nickname": user_nick  # 发送者昵称作为附加信息
+            }
+            
+            # 发送请求到app.py中的/v1/chat/completions接口
+            self.logger.info(f"Forwarding message to OpenAI API: {original_content}")
+            
+            try:
+                # 使用httpx发送异步HTTP请求
+                async with httpx.AsyncClient() as client:
+                    # 使用配置文件中的端口设置
+                    api_url = f"http://localhost:{getattr(Config, 'PORT', 8000)}/v1/chat/completions"
+                    response = await client.post(
+                        api_url,
+                        json=request_body,
+                        timeout=60  # 设置超时时间为60秒
+                    )
+                    
+                    # 检查响应状态
+                    if response.status_code == 200:
+                        # 解析响应内容
+                        api_response = response.json()
+                        
+                        # 从响应中提取assistant的回复
+                        if api_response and "choices" in api_response and len(api_response["choices"]) > 0:
+                            reply_content = api_response["choices"][0]["message"]["content"]
+                            self.logger.info(f"Received response from OpenAI API: {reply_content[:100]}...")
+                        else:
+                            reply_content = "Sorry, I couldn't generate a response."
+                            self.logger.error(f"Invalid response format from OpenAI API: {api_response}")
+                    else:
+                        reply_content = f"Error: API returned status code {response.status_code}"
+                        self.logger.error(f"API request failed with status {response.status_code}: {response.text}")
+            except Exception as api_err:
+                reply_content = f"Error: {str(api_err)}"
+                self.logger.error(f"Exception occurred while calling OpenAI API: {api_err}")
+            
+            # 获取access_token用于发送钉钉回复
             access_token = get_token(self.options)
             if not access_token:
                 self.logger.error("Failed to get access_token, unable to reply message")
-                return AckMessage.STATUS_OK, 'OK'  # Still return OK to avoid DingTalk retry
+                return AckMessage.STATUS_OK, 'OK'
             
-            # 构建个性化回复消息
-            original_content = getattr(incoming_message.text, 'content', '')
-            reply_content = f"Hello {user_nick}!\nI received your message: {original_content}\n\nThis is an auto-reply: {self.options.msg if self.options else 'Default message'}"
+            # 根据配置中的NO_THINK设置，过滤掉</think>和</think>之间的内容
+            if hasattr(Config, 'NO_THINK') and Config.NO_THINK:
+                # 使用工具函数过滤掉</think>和</think>之间的内容
+                reply_content = filter_think_content(reply_content)
+                self.logger.info(f"Filtered think content, new content length: {len(reply_content)}")
             
             # 发送回复消息
             result = send_robot_private_message(
                 access_token, 
                 self.options, 
                 [user_id], 
-                reply_content  # 使用自定义消息内容
+                reply_content  # 使用API返回的结果作为回复内容
             )
             
             if result:
-                self.logger.info(f"Successfully sent reply to user {user_nick}({user_id})")
+                self.logger.info(f"Successfully sent reply to user")
             else:
                 self.logger.error(f"Failed to send reply to user {user_nick}({user_id})")
                 
@@ -150,7 +211,9 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
         return AckMessage.STATUS_OK, 'OK'
 
 def main():
-    logger = setup_logger()
+    # 使用全局日志配置
+    setup_logging()
+    logger = logging.getLogger(__name__)
     options = define_options()
     
     # 检查配置是否完整
@@ -169,7 +232,7 @@ def main():
     logger.info(f"Starting DingTalk robot, Robot Code: {options.robot_code}, Listening on port: {dingtalk_port}")
     
     credential = dingtalk_stream.Credential(options.client_id, options.client_secret)
-    # 创建钉钉流客户端（注意：dingtalk_stream库不支持通过ws_port参数设置WebSocket端口，使用默认连接方式）
+    # 创建钉钉流客户端
     client = dingtalk_stream.DingTalkStreamClient(
         credential
     )

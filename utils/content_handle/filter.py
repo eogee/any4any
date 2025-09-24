@@ -35,3 +35,11 @@ def filter_special_chars(text: str) -> str:
     text = clean_img_text(text)
     text = clean_video_text(text)
     return text
+
+def filter_think_content(text: str) -> str:
+    """过滤<think>和</think>之间包括这两个标签的内容"""
+    if not text:
+        return text    
+    # 匹配<think>标签（可能包含属性）及其内容
+    cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return cleaned_text.strip()
