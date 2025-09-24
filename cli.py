@@ -8,7 +8,7 @@ from multiprocessing import Process
 from config import Config
 from app import run_mcp_server
 from core.log import setup_logging
-from core.dingtalk.receive_message import main as run_dingtalk_server
+from core.dingtalk.message_manager import main as run_dingtalk_server
 
 warnings.filterwarnings("ignore", message="resource_tracker: There appear to be .* leaked semaphore objects")
 
