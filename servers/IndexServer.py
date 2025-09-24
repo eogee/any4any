@@ -1,8 +1,35 @@
 import os
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from core.chat.preview import preview_service
 from servers.Server import Server
+
+# 用于检查用户是否登录的装饰器
+async def check_user_login(request: Request):
+    """
+    检查用户是否已登录
+    
+    Args:
+        request: FastAPI请求对象
+        
+    Returns:
+        bool: 是否已登录
+    """
+    if hasattr(request, 'session'):
+        # 检查session中是否包含登录信息
+        if request.session.get('logged_in'):
+            return True
+    return False
+
+# 用于获取登录页面的重定向响应
+def get_login_redirect():
+    """
+    获取重定向到登录页面的响应
+    
+    Returns:
+        RedirectResponse: 重定向到登录页面的响应对象
+    """
+    return RedirectResponse(url='/login', status_code=302)
 
 class IndexServer(Server):
     """
@@ -109,27 +136,72 @@ class IndexServer(Server):
         """
         # 首页路由
         @app.get("/", response_class=HTMLResponse)
-        async def read_root():
+        async def read_root(request: Request):
             """
             处理首页请求，返回index.html内容
             """
+            # 检查用户是否已登录
+            if not await check_user_login(request):
+                return get_login_redirect()
+            
             with open(os.path.join("static", "index", "index.html"), "r", encoding="utf-8") as f:
                 html_content = f.read()
             return HTMLResponse(content=html_content)
             
         @app.get("/index", response_class=HTMLResponse)
-        async def read_index():
+        async def read_index(request: Request):
             """
             处理/index请求，返回index.html内容
             """
+            # 检查用户是否已登录
+            if not await check_user_login(request):
+                return get_login_redirect()
+            
             with open(os.path.join("static", "index", "index.html"), "r", encoding="utf-8") as f:
                 html_content = f.read()
             return HTMLResponse(content=html_content)
             
-        # 预览相关路由
-        app.get("/api/pending-previews")(self.get_pending_previews)
-        app.get("/v1/chat/preview/{preview_id}")(self.get_preview)
-        app.post("/v1/chat/confirm/{preview_id}")(self.confirm_preview)
-        app.get("/api/preview/{preview_id}")(self.get_preview_data)
-        app.post("/api/preview/{preview_id}/edit")(self.update_preview_content)
-        app.get("/v1/chat/completions/result/{preview_id}")(self.get_preview_data)
+        # 预览相关路由 - 需要登录才能访问
+        @app.get("/api/pending-previews")
+        async def pending_previews(request: Request):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            return await self.get_pending_previews()
+            
+        @app.get("/v1/chat/preview/{preview_id}")
+        async def preview(request: Request, preview_id: str):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            return await self.get_preview(preview_id)
+            
+        @app.post("/v1/chat/confirm/{preview_id}")
+        async def confirm_preview_route(request: Request, preview_id: str):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            return await self.confirm_preview(preview_id)
+            
+        @app.get("/api/preview/{preview_id}")
+        async def preview_data(request: Request, preview_id: str):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            return await self.get_preview_data(preview_id)
+            
+        @app.post("/api/preview/{preview_id}/edit")
+        async def update_preview_route(request: Request, preview_id: str):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            # 为update_preview_content方法提供request参数
+            return await self.update_preview_content(preview_id, request)
+            
+        @app.get("/v1/chat/completions/result/{preview_id}")
+        async def preview_result(request: Request, preview_id: str):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            return await self.get_preview_data(preview_id)
+            
+        # 保持原始API方法不变，以便其他地方调用
+        self._original_get_pending_previews = self.get_pending_previews
+        self._original_get_preview = self.get_preview
+        self._original_confirm_preview = self.confirm_preview
+        self._original_get_preview_data = self.get_preview_data
+        self._original_update_preview_content = self.update_preview_content

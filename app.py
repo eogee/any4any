@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
 from config import Config
@@ -57,6 +58,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# 会话中间件配置
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=Config.API_KEY or "your-secret-key",  # 使用API_KEY作为会话密钥，如果为空则使用默认值
+    max_age=Config.SESSION_MAX_AGE  # 使用配置文件中的会话有效期设置
 )
 
 # 挂载静态文件目录

@@ -20,6 +20,7 @@ class Config:
     
     # 认证配置
     API_KEY = os.getenv("API_KEY", "EMPTY")
+    SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE", "1800"))  # 会话有效期，单位为秒，默认为30分钟
     
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"

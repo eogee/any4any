@@ -30,12 +30,6 @@
                 </div>
             </div>
             
-            <div class="form-options">
-                <div class="layui-form-item layui-form-text">
-                    <input type="checkbox" name="remember" lay-skin="primary" title="记住我">
-                </div>
-            </div>
-            
             <div class="layui-form-item">
                 <button class="layui-btn login-btn" lay-submit lay-filter="login">
                     <i class="fas fa-sign-in-alt"></i> 登录
@@ -57,20 +51,20 @@
             // 表单验证
             form.verify({
                 username: function(value) {
-                    if (value.length < 3) {
-                        return '用户名至少3个字符';
+                    if (value.length < 3 || value.length > 50) {
+                        return '用户名长度必须在3到50个字符之间';
                     }
                 },
                 password: function(value) {
-                    if (value.length < 6) {
-                        return '密码至少6个字符';
+                    if (value.length < 6 || value.length > 50) {
+                        return '密码长度必须在6到50个字符之间';
                     }
                 }
             });
             
             // 监听表单提交
             form.on('submit(login)', function(data) {
-                // 模拟登录请求
+                // 显示登录中loading
                 const loading = layer.load(2, {
                     shade: [0.3, '#fff'],
                     content: '登录中...',
@@ -82,49 +76,55 @@
                     }
                 });
                 
-                // 模拟请求延迟
-                setTimeout(function() {
+                // 发送登录请求到后端接口
+                fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data.field)
+                })
+                .then(response => {
                     layer.close(loading);
                     
-                    // 这里应该是真实的登录API调用
-                    console.log('登录请求数据:', data.field);
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
                     
-                    // 模拟登录成功
-                    if (data.field.username && data.field.password) {
-                        // 如果选择了记住我，可以保存用户名到localStorage
-                        if (data.field.remember) {
-                            localStorage.setItem('rememberedUsername', data.field.username);
-                        } else {
-                            localStorage.removeItem('rememberedUsername');
-                        }
-                        
+                    return response.json();
+                })
+                .then(result => {
+                    // 处理后端返回结果
+                    console.log('登录响应数据:', result);
+                    
+                    if (result.success) {
                         layer.msg('登录成功', {
                             icon: 1,
                             time: 1500,
                             end: function() {
                                 // 登录成功后跳转到主页面
-                                window.location.href = '/index.html';
+                                window.location.href = '/index';
                             }
                         });
                     } else {
-                        layer.msg('用户名或密码错误', {
+                        layer.msg(result.message || '用户名或密码错误', {
                             icon: 2,
                             time: 1500
                         });
                     }
-                }, 1500);
+                })
+                .catch(error => {
+                    layer.close(loading);
+                    console.error('登录请求异常:', error);
+                    layer.msg('登录失败，请稍后重试', {
+                        icon: 2,
+                        time: 1500
+                    });
+                });
                 
                 // 阻止表单默认提交
                 return false;
             });
-            
-            // 检查是否有记住的用户名
-            const rememberedUsername = localStorage.getItem('rememberedUsername');
-            if (rememberedUsername) {
-                document.querySelector('input[name="username"]').value = rememberedUsername;
-                document.querySelector('input[name="remember"]').checked = true;
-                form.render();
-            }
         });
     </script>
 </body>

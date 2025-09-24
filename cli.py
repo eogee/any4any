@@ -55,7 +55,7 @@ def shutdown_servers(fastapi_process, mcp_process):
     # 执行垃圾回收
     gc.collect()
     
-    print("all resources have been released")
+    print("All resources have been released")
 
 def main():
     # 检查是否已经设置过 start method
@@ -80,11 +80,8 @@ def main():
     except KeyboardInterrupt:
         shutdown_servers(fastapi_process, mcp_process)
     except Exception as e:
-        print(f"error: {str(e)}")
+        print(f"Error: {str(e)}")
         shutdown_servers(fastapi_process, mcp_process)
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()
