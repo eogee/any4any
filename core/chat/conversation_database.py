@@ -137,6 +137,7 @@ class ConversationDatabase(Model):
     def get_latest_conversation(self, sender: str, user_nick: str, platform: str) -> Optional[dict]:
         """
         获取用户在特定平台上的最新活跃会话
+        优化版本：避免重复查询数据库，直接构建完整的会话数据
         
         Args:
             sender: 发送者唯一标识
@@ -159,8 +160,26 @@ class ConversationDatabase(Model):
             if not conversation:
                 return None
             
-            # 获取完整会话信息（包括消息）
-            return self.get_conversation_by_id(conversation['conversation_id'])
+            # 直接获取该会话的消息列表，避免再次调用get_conversation_by_id导致重复查询
+            messages = self.fetch_all(
+                "SELECT * FROM messages WHERE conversation_id = %s ORDER BY sequence_number",
+                (conversation['conversation_id'],)
+            )
+            
+            # 构建完整的会话数据
+            result = conversation.copy()
+            result['messages'] = [
+                {
+                    'message_id': msg['message_id'],
+                    'content': msg['content'],
+                    'sender_type': msg['sender_type'],
+                    'timestamp': msg['timestamp'],
+                    'sequence_number': msg['sequence_number']
+                }
+                for msg in messages
+            ]
+            
+            return result
             
         except Exception as e:
             logger.error(f"Failed to get latest conversation: {e}")

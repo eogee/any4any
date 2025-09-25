@@ -27,6 +27,10 @@ class ChatCompletionRequest(BaseModel):
     stop: Optional[List[str]] = None
     top_p: Optional[float] = Config.TOP_P
     repetition_penalty: Optional[float] = Config.REPETITION_PENALTY
+    # 添加可选的用户信息字段，用于从请求体中提取
+    sender_id: Optional[str] = None
+    sender_nickname: Optional[str] = None
+    platform: Optional[str] = None
 
 class ChatCompletionChoice(BaseModel):
     index: int = 0
@@ -90,11 +94,11 @@ class OpenAIAPI:
                         }
                     })
             
-            # 从请求中提取用户信息（在实际应用中，这些信息应该从请求头或认证信息中获取）
-            # 这里使用默认值作为示例，实际应用中需要根据具体情况修改
-            sender = request.headers.get("X-User-ID", "anonymous_user")
-            user_nick = request.headers.get("X-User-Nick", "Anonymous")
-            platform = request.headers.get("X-Platform", "web")
+            # 从请求体中提取用户信息，如果请求体中没有，则从请求头中获取，最后使用默认值
+            # 优先使用请求体中的sender_id, sender_nickname和platform字段
+            sender = chat_request.sender_id or request.headers.get("X-User-ID", "anonymous_user")
+            user_nick = chat_request.sender_nickname or request.headers.get("X-User-Nick", "Anonymous")
+            platform = chat_request.platform or request.headers.get("X-Platform", "web")
             
             # 获取用户最新消息内容
             user_message_content = ""

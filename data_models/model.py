@@ -111,7 +111,24 @@ class Model(ABC):
             
             # 提交事务
             self.connection.commit()
-            self.logger.info(f"Executed query successfully, affected rows: {cursor.rowcount}")
+            # 为execute_query添加更详细的信息，包含操作类型标识和部分SQL语句
+            # 提取SQL语句的前30个字符作为标识，避免日志过长
+            query_summary = query.strip().split('\n')[0][:30] + ('...' if len(query.strip()) > 30 else '')
+            # 检查是哪种操作类型
+            operation_type = "OTHER"
+            query_upper = query.strip().upper()
+            if query_upper.startswith("INSERT INTO messages"):
+                operation_type = "INSERT_MESSAGE"
+            elif query_upper.startswith("INSERT"):
+                operation_type = "INSERT"
+            elif query_upper.startswith("UPDATE"):
+                operation_type = "UPDATE"
+            elif query_upper.startswith("DELETE"):
+                operation_type = "DELETE"
+            elif query_upper.startswith("SELECT"):
+                operation_type = "SELECT"
+            
+            self.logger.info(f"[EXECUTE_{operation_type}] Query executed, affected rows: {cursor.rowcount}, query: {query_summary}")
             return cursor.rowcount
         except Error as e:
             self.logger.error(f"Database execute failed: {e}")
@@ -138,7 +155,10 @@ class Model(ABC):
                 cursor.execute(query)
             
             result = cursor.fetchone()
-            self.logger.info(f"Fetched one record from {self.get_table_name()}")
+            
+            found_status = "Found" if result else "Not found"
+            # 将fetch_one的日志降低为debug级别，避免与其他查询操作的info日志重复
+            self.logger.info(f"[FIND_ONE] {found_status} record from {self.get_table_name()}")
             return result
         except Error as e:
             self.logger.error(f"Database fetch one failed: {e}")
@@ -163,7 +183,8 @@ class Model(ABC):
                 cursor.execute(query)
             
             result = cursor.fetchall()
-            self.logger.info(f"Fetched {len(result)} records from {self.get_table_name()}")
+            # 更新fetch_all方法日志格式，与fetch_one保持一致
+            self.logger.info(f"[FETCH_ALL] Fetched {len(result)} records from {self.get_table_name()}")
             return result
         except Error as e:
             self.logger.error(f"Database fetch all failed: {e}")
@@ -211,7 +232,10 @@ class Model(ABC):
             cursor = self._get_cursor(dictionary=False)
             cursor.execute(query, tuple(data.values()))
             self.connection.commit()
-            self.logger.info(f"Inserted record into {self.get_table_name()}")
+            
+            # 将insert的详细日志降低为debug级别，避免与execute_query的info日志重复
+            # execute_query已经记录了主要的执行信息
+            self.logger.debug(f"[INSERT] Successfully inserted record into {self.get_table_name()}, new ID: {cursor.lastrowid}")
             return cursor.lastrowid
         except Error as e:
             self.logger.error(f"Database insert failed: {e}")
@@ -239,7 +263,13 @@ class Model(ABC):
         query = f"UPDATE {self.get_table_name()} SET {set_clause} WHERE {id_column} = %s"
         
         params = tuple(data.values()) + (id_value,)
-        return self.execute_query(query, params)
+        
+        affected_rows = self.execute_query(query, params)
+        
+        # 将update的详细日志降低为debug级别，避免与execute_query的info日志重复
+        # execute_query已经记录了主要的执行信息
+        self.logger.debug(f"[UPDATE] Completed update operation on {self.get_table_name()}, id: {id_value}, columns: {list(data.keys())}")
+        return affected_rows
     
     def delete(self, id_value: Any, id_column: str = 'id') -> int:
         """

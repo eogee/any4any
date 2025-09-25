@@ -148,21 +148,29 @@ class LLMService:
     async def initialize_model(self):
         """初始化模型和分词器
         
-        只有在未初始化且当前进程应该加载模型时才加载
-        添加进程检查以避免重复加载
+        确保只在主进程中加载模型，非主进程不会加载实际模型
         """
         # 检查是否已经初始化
         if hasattr(self, '_model_initialized') and self._model_initialized:
             self.logger.info(f"Model already initialized in process {os.getpid()}, skipping...")
             return
         
-        # 检查当前进程是否应该加载模型
+        # 检查当前进程是否为主进程
         import os
+        
+        # 方法1：通过环境变量明确标记（优先级最高）
+        is_main_process = os.environ.get('IS_MAIN_PROCESS') == 'true'
         current_port = os.environ.get('CURRENT_PORT', 'unknown')
         
-        # 只有主FastAPI进程才加载LLM模型
-        if current_port != '8888':
-            self.logger.info(f"Skipping model loading in process {os.getpid()} (port {current_port})")
+        # 方法2：如果没有明确标记，通过端口判断
+        if not is_main_process:
+            # 从日志观察，非主进程使用9999端口
+            is_main_process = current_port != '9999' and current_port != 'unknown'
+        
+        # 方法3：可选：添加其他判断条件
+        
+        if not is_main_process:
+            self.logger.info(f"Skipping model loading in non-main process {os.getpid()} (port {current_port})")
             return
             
         try:
@@ -419,8 +427,8 @@ _llm_service_pid = None
 def get_llm_service():
     """获取全局 LLM 服务实例，实现单例模式
     
-    添加进程ID检查，确保在每个进程中只创建一次实例
-    这在多进程环境下特别重要，可以避免模型重复加载
+    确保LLM服务只在主进程中实例化，避免资源浪费和冲突
+    非主进程将返回一个空壳实例，不会加载实际模型
     """
     import os
     import logging
@@ -428,17 +436,35 @@ def get_llm_service():
     
     current_pid = os.getpid()
     
-    # 检查是否需要创建新实例
-    # 1. 实例不存在
-    # 2. 或者当前进程ID与创建实例的进程ID不同（进程隔离导致的单例失效）
+    # 检查是否为主进程
+    # 方法1：通过环境变量明确标记（优先级最高）
+    is_main_process = os.environ.get('IS_MAIN_PROCESS') == 'true'
+    
+    # 方法2：如果没有明确标记，通过端口判断（如果设置了CURRENT_PORT环境变量）
+    if not is_main_process:
+        current_port = os.environ.get('CURRENT_PORT', 'unknown')
+        # 主进程可能不是固定的8888端口，让我们使用更灵活的判断
+        # 假设非主进程通常使用9999端口（从日志中观察到）
+        is_main_process = current_port != '9999' and current_port != 'unknown'
+    
+    # 方法3：通过是否为初始进程判断（可选）
+    # 可以在程序启动时设置一个环境变量标记主进程
+    
+    # 只在主进程中创建新实例或在实例不存在且当前进程需要实例时创建
     if _global_llm_service is None or _llm_service_pid != current_pid:
         # 记录日志信息
         if _global_llm_service is None:
-            logging.info(f"Creating new LLM service instance for process {current_pid}")
+            if is_main_process:
+                logging.info(f"Creating new LLM service instance for main process {current_pid}")
+            else:
+                logging.info(f"Creating lightweight LLM service instance for non-main process {current_pid}")
         else:
-            logging.info(f"Process {current_pid}: LLM service instance belongs to process {_llm_service_pid}, recreating...")
+            if is_main_process:
+                logging.info(f"Process {current_pid} (main): LLM service instance belongs to process {_llm_service_pid}, recreating...")
+            else:
+                logging.info(f"Process {current_pid} (non-main): LLM service instance belongs to process {_llm_service_pid}, recreating lightweight instance...")
         
-        # 创建新实例 - 不传递model_path参数，使用默认配置
+        # 创建实例
         _global_llm_service = LLMService()
         _llm_service_pid = current_pid
     
