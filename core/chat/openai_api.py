@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from config import Config
 from core.model_manager import ModelManager
 from core.chat.preview import preview_service
+from core.chat.conversation_manager import conversation_manager
 
 class ChatRequest(BaseModel):
     message: str
@@ -89,39 +90,87 @@ class OpenAIAPI:
                         }
                     })
             
+            # 从请求中提取用户信息（在实际应用中，这些信息应该从请求头或认证信息中获取）
+            # 这里使用默认值作为示例，实际应用中需要根据具体情况修改
+            sender = request.headers.get("X-User-ID", "anonymous_user")
+            user_nick = request.headers.get("X-User-Nick", "Anonymous")
+            platform = request.headers.get("X-Platform", "web")
+            
+            # 获取用户最新消息内容
+            user_message_content = ""
+            for msg in reversed(chat_request.messages):
+                if msg.role == "user":
+                    user_message_content = msg.content
+                    break
+            
+            # 检查特殊指令 /a
+            if user_message_content.strip() == "/a":
+                # 使用会话管理器处理新会话创建
+                response, _ = await conversation_manager.process_message(sender, user_nick, platform, user_message_content)
+                
+                # 返回新会话已开启的提示
+                return JSONResponse({
+                    "id": f"new_conversation_{int(time.time())}",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": chat_request.model,
+                    "choices": [{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": response  # "新会话已开启，请输入您的问题。"
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": {
+                        "prompt_tokens": len(user_message_content) // 4,
+                        "completion_tokens": len(response) // 4,
+                        "total_tokens": (len(user_message_content) + len(response)) // 4
+                    }
+                })
+            
             # 检查预览模式是否启用
             preview_mode = Config.PREVIEW_MODE
             
-            # 将messages转换为单一提示
-            user_message = ""
-            system_message = ""
-            for msg in chat_request.messages:
-                if msg.role == "system":
-                    system_message = msg.content
-                    user_message += f"<|im_start|>system\n{msg.content}<|im_end|>\n"
-                elif msg.role == "user":
-                    user_message += f"<|im_start|>user\n{msg.content}<|im_end|>\n"
-                elif msg.role == "assistant":
-                    user_message += f"<|im_start|>assistant\n{msg.content}<|im_end|>\n"
+            # 无论是否是预览模式，都使用会话管理器处理消息
+            # 调用会话管理器处理消息
+            assistant_response, _ = await conversation_manager.process_message(
+                sender, 
+                user_nick, 
+                platform, 
+                user_message_content
+            )
             
-            # 添加最后的assistant标记
-            user_message += "<|im_start|>assistant\n"
+            # 非流式响应直接返回
+            if not chat_request.stream:
+                # 如果是预览模式，创建预览请求并保存生成的内容
+                if preview_mode:
+                    preview = await preview_service.create_preview(chat_request.dict())
+                    await preview_service.set_generated_content(preview.preview_id, assistant_response)
+                
+                return JSONResponse({
+                    "id": f"chatcmpl-{int(time.time())}",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": chat_request.model,
+                    "choices": [{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": assistant_response
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": {
+                        "prompt_tokens": len(user_message_content) // 4,
+                        "completion_tokens": len(assistant_response) // 4,
+                        "total_tokens": (len(user_message_content) + len(assistant_response)) // 4
+                    }
+                })
             
+            # 流式响应的情况下，如果是预览模式，创建预览请求
             if preview_mode:
-                # 预览模式 - 创建预览请求并生成内容
                 preview = await preview_service.create_preview(chat_request.dict())
-                
-                # 生成模型响应
-                response_content = await ModelManager.get_llm_service().generate_response(
-                    user_message,
-                    temperature=chat_request.temperature,
-                    top_p=chat_request.top_p,
-                    max_new_tokens=chat_request.max_tokens,
-                    repetition_penalty=chat_request.repetition_penalty
-                )
-                
-                # 保存生成的内容到预览中
-                await preview_service.set_generated_content(preview.preview_id, response_content)
                 
                 # 等待用户确认（使用配置中的超时时间）
                 timeout = getattr(Config, 'PREVIEW_TIMEOUT', 300)  # 默认5分钟超时
@@ -187,30 +236,23 @@ class OpenAIAPI:
                     start_time = time.time()
                     
                     try:
-                        # 直接使用LLM服务的generate_stream方法，传递请求参数
-                        async for text_chunk in ModelManager.get_llm_service().generate_stream(
-                            user_message, 
-                            generation_id,
-                            temperature=chat_request.temperature,
-                            top_p=chat_request.top_p,
-                            max_new_tokens=chat_request.max_tokens,
-                            repetition_penalty=chat_request.repetition_penalty
+                        # 无论是否是预览模式，都使用会话管理器的流式处理
+                        # 调用会话管理器处理流式消息
+                        async for text_chunk in conversation_manager.process_message_stream(
+                            sender, 
+                            user_nick, 
+                            platform, 
+                            user_message_content,
+                            generation_id
                         ):
-                            # 处理特殊标记
-                            cleaned_chunk = text_chunk
-                            if "<|im_start|>assistant" in cleaned_chunk:
-                                cleaned_chunk = cleaned_chunk.split("<|im_start|>assistant")[-1].strip()
-                            if "<|im_end|>" in cleaned_chunk:
-                                cleaned_chunk = cleaned_chunk.split("<|im_end|>")[0].strip()
-                            
                             # 跳过空文本
-                            if not cleaned_chunk or cleaned_chunk.isspace():
+                            if not text_chunk or text_chunk.isspace():
                                 continue
-                                
+                                  
                             # 累积内容用于调试和token计数
-                            accumulated_content += cleaned_chunk
-                            
-                            # 构建响应数据 - 简化格式，避免不必要的字段
+                            accumulated_content += text_chunk
+                              
+                            # 构建响应数据
                             response_data = {
                                 "id": generation_id,
                                 "object": "chat.completion.chunk",
@@ -219,20 +261,20 @@ class OpenAIAPI:
                                 "choices": [{
                                     "index": 0,
                                     "delta": {
-                                        "content": cleaned_chunk
+                                        "content": text_chunk
                                     },
                                     "finish_reason": None
                                 }]
                             }
-                            
+                              
                             # 如果是第一个chunk，添加role信息
                             if first_chunk:
                                 response_data["choices"][0]["delta"]["role"] = "assistant"
                                 first_chunk = False
-                            
+                              
                             response_str = json.dumps(response_data, ensure_ascii=False)
-                            yield f"data: {response_str}\n\n"  # Dify可能更适应\n\n
-                            
+                            yield f"data: {response_str}\n\n"
+                              
                             # 添加小延迟避免发送过快
                             await asyncio.sleep(0.01)
                         
@@ -254,7 +296,10 @@ class OpenAIAPI:
                         # 发送流结束标记
                         yield "data: [DONE]\n\n"
                         print(f"Streaming response completed, total content length: {len(accumulated_content)}")
-                    
+                        
+                        # 如果是预览模式，保存生成的内容
+                        if preview_mode:
+                            await preview_service.set_generated_content(preview.preview_id, accumulated_content)
                     except Exception as e:
                         print(f"Streaming response error: {str(e)}")
                         # 检查是否为停止生成异常
@@ -293,35 +338,16 @@ class OpenAIAPI:
                     headers=headers
                 )
             else:
-                # 非流式响应
-                response = await ModelManager.get_llm_service().generate_response(
-                    user_message,
-                    temperature=chat_request.temperature,
-                    top_p=chat_request.top_p,
-                    max_new_tokens=chat_request.max_tokens,
-                    repetition_penalty=chat_request.repetition_penalty
-                )
-                
-                # 直接返回JSONResponse确保格式正确
+                # 这个分支理论上不应该被执行，因为我们已经在前面处理了所有情况
+                # 但为了安全起见，保留一个简单的错误响应
+                print("Unexpected code path: Non-streaming response reached after previous handling")
                 return JSONResponse({
-                    "id": f"chatcmpl-{int(time.time())}",
-                    "object": "chat.completion",
-                    "created": int(time.time()),
-                    "model": chat_request.model,
-                    "choices": [{
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": response
-                        },
-                        "finish_reason": "stop"
-                    }],
-                    "usage": {
-                        "prompt_tokens": len(user_message) // 4,
-                        "completion_tokens": len(response) // 4,
-                        "total_tokens": (len(user_message) + len(response)) // 4
+                    "error": {
+                        "message": "Unexpected response path",
+                        "type": "invalid_request_error",
+                        "code": "unexpected_code_path"
                     }
-                })
+                }, status_code=400)
                 
         except Exception as e:
             print(f"OpenAI API err: {str(e)}")

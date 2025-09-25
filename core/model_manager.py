@@ -41,35 +41,58 @@ class ModelManager:
         return cls._instance
 
     @classmethod
-    async def initialize(cls):
-        """初始化所有模型和声音列表"""
+    async def initialize(cls, load_llm=True):
+        """初始化模型和声音列表
+        
+        Args:
+            load_llm: 是否加载LLM模型，默认为True
+        """
         try:
-
+            if not hasattr(cls, '_initialized'):
+                cls._initialized = False
+                
+            if cls._initialized:
+                logger.info("Models already initialized, skipping...")
+                return
+                
             logger.info(f"Loading model from: {Config.ASR_MODEL_DIR}")
             logger.info(f"Using device: {Config.DEVICE}")
-            logger.info("Starting to load ASR model...")
             
-            cls.m, cls.kwargs = SenseVoiceSmall.from_pretrained(
-                model_dir=Config.ASR_MODEL_DIR,
-                device=Config.DEVICE
-            )
-            cls.m.eval()
-            logger.info("ASR model loaded successfully")
+            if not cls.m:
+                logger.info("Starting to load ASR model...")
+                cls.m, cls.kwargs = SenseVoiceSmall.from_pretrained(
+                    model_dir=Config.ASR_MODEL_DIR,
+                    device=Config.DEVICE
+                )
+                cls.m.eval()
+                logger.info("ASR model loaded successfully")
 
-            logger.info("Starting to load voices...")
-            voices_manager = await VoicesManager.create()
-            cls.available_voices = voices_manager.voices
-            logger.info(f"Loaded {len(cls.available_voices)} available voices")
+            if not cls.available_voices:
+                logger.info("Starting to load voices...")
+                voices_manager = await VoicesManager.create()
+                cls.available_voices = voices_manager.voices
+                logger.info(f"Loaded {len(cls.available_voices)} available voices")
 
-            logger.info("Starting to load reranker model...")
-            cls.reranker = FlagReranker(Config.RERANK_MODEL_DIR, use_fp16=False)
-            logger.info("Reranker model loaded successfully")
+            if not cls.reranker:
+                logger.info("Starting to load reranker model...")
+                cls.reranker = FlagReranker(Config.RERANK_MODEL_DIR, use_fp16=False)
+                logger.info("Reranker model loaded successfully")
 
-            logger.info("Starting to load LLM model...")
-            cls.llm_service = get_llm_service()
-            logger.info(f"LLM model loaded successfully from: {Config.LLM_MODEL_DIR}")
-
-            logger.info("All models initialized successfully")
+            if load_llm and not cls.llm_service:
+                logger.info("Starting to load LLM model...")
+                cls.llm_service = get_llm_service()
+                # 调用initialize_model方法实际加载模型和分词器
+                init_success = await cls.llm_service.initialize_model()
+                if init_success:
+                    logger.info(f"LLM model loaded successfully from: {Config.LLM_MODEL_DIR}")
+                else:
+                    logger.error(f"Failed to initialize LLM model from: {Config.LLM_MODEL_DIR}")
+            elif not load_llm:
+                logger.info("Skipping LLM model loading as requested")
+                
+            # 标记为已初始化
+            cls._initialized = True
+            logger.info("Models initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize models: {str(e)}")

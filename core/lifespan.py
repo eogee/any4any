@@ -1,16 +1,25 @@
-"""
-Any4Any 应用的生命周期管理器
-"""
-
 import logging
+import os
 from fastapi import FastAPI
 from core.model_manager import ModelManager
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 async def lifespan(app: FastAPI):
     """模型启动加载初始化和资源清理"""
-    await ModelManager.initialize()
+    # 获取当前进程端口
+    current_port = os.environ.get('CURRENT_PORT', str(Config.PORT))
+    
+    # 设置明确的加载LLM条件：只有主FastAPI进程(端口8888)才加载
+    # 避免其他进程重复加载模型
+    load_llm = current_port == str(Config.PORT) and current_port == '8888'  # 硬编码确认
+    
+    # 添加额外日志信息便于调试
+    logger.info(f"Lifespan init - Process: {os.getpid()}, Port: {current_port}, Load LLM: {load_llm}")
+    
+    # 调用初始化方法
+    await ModelManager.initialize(load_llm=load_llm)
     yield
     
     logger.info("Application shutting down...")

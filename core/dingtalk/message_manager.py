@@ -2,6 +2,7 @@ import logging
 import time
 import dingtalk_stream
 import httpx
+import json
 from config import Config
 from dingtalk_stream import AckMessage
 from core.log import setup_logging
@@ -70,7 +71,8 @@ def send_robot_private_message(access_token: str, options, user_ids: list, custo
     robot_code = options.robot_code
     msg_key = 'sampleText'
     msg_content = custom_msg if custom_msg else options.msg
-    msg_param = '{"content":"%s"}' % msg_content
+    # 使用json.dumps安全地序列化消息内容，确保JSON格式正确
+    msg_param = json.dumps({"content": msg_content})
 
     config = open_api_models.Config()
     config.protocol = 'https'
@@ -144,7 +146,8 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
                 "top_p": Config.TOP_P,
                 "repetition_penalty": Config.REPETITION_PENALTY,
                 "sender_id": user_id,  # 发送者ID作为附加信息
-                "sender_nickname": user_nick  # 发送者昵称作为附加信息
+                "sender_nickname": user_nick,  # 发送者昵称作为附加信息
+                "platform": "DingTalk"  # 发送者昵称作为附加信息
             }
             
             # 发送请求到app.py中的/v1/chat/completions接口

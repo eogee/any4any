@@ -78,18 +78,24 @@ class LLMService:
                 offload_state_dict=Config.USE_HALF_PRECISION,  # 半精度时offload状态字典
 
             ).eval()
-    def __init__(self, model_path: str = None):
-        self.model_path = model_path or Config.LLM_MODEL_DIR
+    def __init__(self):
+        # 统一使用Config.LLM_MODEL_DIR作为模型路径
         self.tokenizer = None
         self.model = None
+        self._model_initialized = False
+        self.logger = logging.getLogger(__name__)
         # 自动选择设备：如果CUDA可用且配置为GPU设备，则使用GPU，否则使用CPU
         if torch.cuda.is_available() and Config.DEVICE.startswith("cuda"):
             self.device = Config.DEVICE
         else:
             self.device = "cpu"
-        self.initialize_model()
-        self.active_generations = {}  # 用于跟踪活动的生成任务
-        self.active_queues = []  # 用于跟踪活动的队列，避免资源泄漏
+        self.active_generations = {}
+        self.active_queues = []
+        
+        # 注意：不再自动加载模型，而是由外部控制加载时机
+        # 这样可以确保只有需要的进程才会加载模型
+        import os
+        self.logger.info(f"LLMService initialized in process {os.getpid()}, model loading will be controlled by initialize_model()")  # 用于跟踪活动的队列，避免资源泄漏
         
     def cleanup(self):
         """清理所有资源，避免资源泄漏"""
@@ -139,24 +145,55 @@ class LLMService:
         
         logger.info("LLM service resources cleaned up")
 
-    def initialize_model(self):
-        """初始化模型和分词器"""
+    async def initialize_model(self):
+        """初始化模型和分词器
+        
+        只有在未初始化且当前进程应该加载模型时才加载
+        添加进程检查以避免重复加载
+        """
+        # 检查是否已经初始化
+        if hasattr(self, '_model_initialized') and self._model_initialized:
+            self.logger.info(f"Model already initialized in process {os.getpid()}, skipping...")
+            return
+        
+        # 检查当前进程是否应该加载模型
+        import os
+        current_port = os.environ.get('CURRENT_PORT', 'unknown')
+        
+        # 只有主FastAPI进程才加载LLM模型
+        if current_port != '8888':
+            self.logger.info(f"Skipping model loading in process {os.getpid()} (port {current_port})")
+            return
+            
         try:
             if self.model is not None:
                 return
+                
+            self.logger.info(f"Starting to load model from: {Config.LLM_MODEL_DIR} in process {os.getpid()}")
+            start_time = time.time()
+            
             # 初始化分词器
             self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_path,
+                Config.LLM_MODEL_DIR,
                 trust_remote_code=Config.TRUST_REMOTE_CODE
             )
             # 加载模型并优化
             self.model = self.load_model(
-                self.model_path,
+                Config.LLM_MODEL_DIR,
                 device=self.device
             )
+            
+            # 标记为已初始化
+            self._model_initialized = True
+            
+            end_time = time.time()
+            self.logger.info(f"Model loaded successfully in {end_time - start_time:.2f} seconds in process {os.getpid()}")
+            return True
         except Exception as e:
-            print(f"Model initialization failed: {str(e)}")
-            raise e
+            self.logger.error(f"Failed to load model in process {os.getpid()}: {str(e)}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return False
 
     def stop_generation(self, generation_id: str):
         """停止指定的生成任务"""
@@ -178,6 +215,21 @@ class LLMService:
         print(f"Starting generation task {generation_id}")
 
         try:
+            # 检查模型和分词器是否已加载
+            if not hasattr(self, 'tokenizer') or self.tokenizer is None:
+                error_msg = "Model error: Tokenizer not initialized"
+                self.logger.error(error_msg)
+                print(error_msg)
+                yield "抱歉，处理您的请求时出现错误。模型分词器未初始化。"
+                return
+            
+            if not hasattr(self, 'model') or self.model is None:
+                error_msg = "Model error: LLM model not initialized"
+                self.logger.error(error_msg)
+                print(error_msg)
+                yield "抱歉，处理您的请求时出现错误。语言模型未初始化。"
+                return
+            
             # 创建停止事件
             stop_event = threading.Event()
             self.active_generations[generation_id] = {
@@ -195,7 +247,6 @@ class LLMService:
 
             # 生成输入
             inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.device)
-
             # 创建文本流式生成器和队列
             text_queue = queue.Queue()
             self.active_queues.append(text_queue)
@@ -291,6 +342,19 @@ class LLMService:
     async def generate_response(self, user_message: str, temperature: float = None, top_p: float = None, max_new_tokens: int = None, repetition_penalty: float = None) -> str:
         """生成完整回复（非流式）"""
         try:
+            # 检查模型和分词器是否已加载
+            if not hasattr(self, 'tokenizer') or self.tokenizer is None:
+                error_msg = "Model error: Tokenizer not initialized"
+                self.logger.error(error_msg)
+                print(error_msg)
+                return "抱歉，处理您的请求时出现错误。模型分词器未初始化。"
+            
+            if not hasattr(self, 'model') or self.model is None:
+                error_msg = "Model error: LLM model not initialized"
+                self.logger.error(error_msg)
+                print(error_msg)
+                return "抱歉，处理您的请求时出现错误。语言模型未初始化。"
+            
             # 使用请求参数或默认配置
             temp = temperature if temperature is not None else Config.TEMPERATURE
             top_p_val = top_p if top_p is not None else Config.TOP_P
@@ -337,16 +401,45 @@ class LLMService:
             return response
 
         except Exception as e:
-            print(f"Generation task error: {str(e)}")
+            import traceback
+            error_detail = str(e)
+            error_traceback = traceback.format_exc()
+            print(f"Generation task error: {error_detail}")
+            print(f"Error traceback: {error_traceback}")
+            self.logger.error(f"LLM generation error: {error_detail}")
+            self.logger.error(f"Error traceback: {error_traceback}")
             # 返回默认响应而不是抛出异常
             return "抱歉，处理您的请求时出现错误。请稍后再试。"
 
-# 模块级变量，用于存储模型实例
+# 全局 LLM 服务实例
 _global_llm_service = None
+# 记录创建该实例的进程ID
+_llm_service_pid = None
 
 def get_llm_service():
-    """获取LLM服务实例"""
-    global _global_llm_service
-    if _global_llm_service is None:
+    """获取全局 LLM 服务实例，实现单例模式
+    
+    添加进程ID检查，确保在每个进程中只创建一次实例
+    这在多进程环境下特别重要，可以避免模型重复加载
+    """
+    import os
+    import logging
+    global _global_llm_service, _llm_service_pid
+    
+    current_pid = os.getpid()
+    
+    # 检查是否需要创建新实例
+    # 1. 实例不存在
+    # 2. 或者当前进程ID与创建实例的进程ID不同（进程隔离导致的单例失效）
+    if _global_llm_service is None or _llm_service_pid != current_pid:
+        # 记录日志信息
+        if _global_llm_service is None:
+            logging.info(f"Creating new LLM service instance for process {current_pid}")
+        else:
+            logging.info(f"Process {current_pid}: LLM service instance belongs to process {_llm_service_pid}, recreating...")
+        
+        # 创建新实例 - 不传递model_path参数，使用默认配置
         _global_llm_service = LLMService()
+        _llm_service_pid = current_pid
+    
     return _global_llm_service

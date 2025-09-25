@@ -2,18 +2,36 @@ import signal
 import time
 import warnings
 import gc
+import os
 import multiprocessing
 import uvicorn
 from multiprocessing import Process
 from config import Config
-from app import run_mcp_server
+def run_mcp_server():
+    """运行 MCP 服务"""
+    # 确保环境变量设置正确
+    os.environ['CURRENT_PORT'] = str(Config.MCP_PORT)
+    setup_logging()
+    # 调用 app.py 中的 run_mcp_server 函数
+    from app import run_mcp_server as app_run_mcp_server
+    app_run_mcp_server()
 from core.log import setup_logging
-from core.dingtalk.message_manager import main as run_dingtalk_server
+def run_dingtalk_server():
+    """运行钉钉服务"""
+    # 确保环境变量设置正确
+    os.environ['CURRENT_PORT'] = str(Config.DINGTALK_PORT)
+    setup_logging()
+    # 调用钉钉服务的入口函数
+    from core.dingtalk.message_manager import main as dingtalk_main
+    dingtalk_main()
 
 warnings.filterwarnings("ignore", message="resource_tracker: There appear to be .* leaked semaphore objects")
 
 def run_fastapi_server():
     """运行 FastAPI 服务（Uvicorn）"""
+
+    # 设置环境变量标识当前进程端口
+    os.environ['CURRENT_PORT'] = str(Config.PORT)
     setup_logging()
     uvicorn.run(
         "app:app",
@@ -63,11 +81,13 @@ def shutdown_servers(fastapi_process, mcp_process, dingtalk_process):
     print("All resources have been released")
 
 def main():
+    
     # 检查是否已经设置过 start method
     if multiprocessing.get_start_method(allow_none=True) is None:
         multiprocessing.set_start_method("spawn")
     
     # 三个进程分别运行 Uvicorn、MCP 和钉钉服务
+    # 进程函数内部会设置自己的环境变量
     fastapi_process = Process(target=run_fastapi_server)
     mcp_process = Process(target=run_mcp_server)
     dingtalk_process = Process(target=run_dingtalk_server)
