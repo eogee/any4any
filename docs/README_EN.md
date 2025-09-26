@@ -29,7 +29,7 @@ New Features:
 - **DingTalk Bot Integration**: Supports DingTalk bot message processing, enabling interaction with the system within DingTalk
 - **Enhanced User Authentication**: Added API key-based authentication mechanism to improve system security
 - **Database Conversation Storage**: Stores conversation data in MySQL database, supporting persistence and querying
-- [Conversation Management System Documentation.md](./docs/会话管理系统文档.md)
+- [Conversation Management System Documentation.md](./ConversationManagementSystemDocumentation.md)
 
 Updates:
 - **Restructured Project Architecture**: Added data_models module for managing data models, servers module for managing services, and static directory for managing static files
