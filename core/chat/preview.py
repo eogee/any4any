@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Callable
 from fastapi import HTTPException
 from pydantic import BaseModel
 from config import Config
@@ -20,6 +20,7 @@ class PreviewService:
     """预览服务管理类"""
     _instance = None
     _previews: Dict[str, PreviewRequest] = {}
+    _confirm_callbacks: list[Callable] = []
     
     # 配置参数（直接使用Config中的配置）
     PREVIEW_TIMEOUT = Config.PREVIEW_TIMEOUT  # 预览超时时间
@@ -102,6 +103,12 @@ class PreviewService:
         preview = self._previews[preview_id]
         return preview.edited_content or preview.generated_content or ""
     
+    def register_confirm_callback(self, callback: Callable):
+        """注册预览确认回调函数"""
+        if callback not in self._confirm_callbacks:
+            self._confirm_callbacks.append(callback)
+            logging.info(f"Preview confirm callback registered: {callback.__name__}")
+    
     async def confirm_preview(self, preview_id: str) -> dict:
         """确认预览请求并返回最终响应"""
         if preview_id not in self._previews:
@@ -144,6 +151,14 @@ class PreviewService:
         # 更新预览状态
         preview.confirmed = True
         preview.response_data = response_data
+        
+        # 触发所有注册的回调函数
+        for callback in self._confirm_callbacks:
+            try:
+                # 异步调用回调函数
+                await callback(preview_id, final_content, request_data)
+            except Exception as e:
+                logging.error(f"Error in preview confirm callback {callback.__name__}: {e}")
         
         return response_data
     

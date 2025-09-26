@@ -52,43 +52,29 @@ CREATE TABLE IF NOT EXISTS `messages` (
   CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`conversation_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息表 - 存储所有对话消息内容';
 
--- 正在导出表  any4any.messages 的数据：~0 rows (大约)
-DELETE FROM `messages`;
-
 -- 导出  表 any4any.previews 结构
-CREATE TABLE IF NOT EXISTS `previews` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'ID',
-  `preview_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '预览ID',
-  `session_id` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '会话ID',
-  `last_request` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '当前请求内容',
-  `edited_content` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '编辑保存后的内容',
-  `pre_content` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '编辑前的内容',
-  `is_edited` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否经过编辑',
-  `full_request` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '历史全部请求及响应内容',
-  `response_time` float NOT NULL COMMENT '响应用时',
-  `user_id` int(11) NOT NULL COMMENT '响应人员ID',
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预览编辑保存结果';
+CREATE TABLE `previews` (
+	`id` INT(11) NOT NULL AUTO_INCREMENT COMMENT 'ID',
+	`preview_id` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '预览ID' COLLATE 'utf8mb4_unicode_ci',
+	`conversation_id` VARCHAR(100) NULL DEFAULT NULL COMMENT '会话ID' COLLATE 'utf8mb4_unicode_ci',
+	`message_id` VARCHAR(100) NULL DEFAULT NULL COMMENT '对话ID' COLLATE 'utf8mb4_unicode_ci',
+	`current_request` MEDIUMTEXT NOT NULL COMMENT '当前请求内容' COLLATE 'utf8mb4_unicode_ci',
+	`saved_content` MEDIUMTEXT NOT NULL COMMENT '编辑保存后的内容' COLLATE 'utf8mb4_unicode_ci',
+	`pre_content` MEDIUMTEXT NOT NULL COMMENT '编辑前的内容' COLLATE 'utf8mb4_unicode_ci',
+	`full_request` MEDIUMTEXT NOT NULL COMMENT '历史全部请求及响应内容' COLLATE 'utf8mb4_unicode_ci',
+	`response_time` FLOAT NOT NULL COMMENT '响应用时(秒)',
+	`user_id` INT(11) NOT NULL COMMENT '响应人员ID',
+	`created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+	`updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+	PRIMARY KEY (`id`) USING BTREE
+)
+COMMENT='预览编辑保存结果'
+COLLATE='utf8mb4_unicode_ci'
+ENGINE=InnoDB
+;
 
 -- 正在导出表  any4any.previews 的数据：~0 rows (大约)
 DELETE FROM `previews`;
-
--- 导出  表 any4any.sessions 结构
-CREATE TABLE IF NOT EXISTS `sessions` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'ID',
-  `sender` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '请求用户ID',
-  `user_nick` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '用户昵称',
-  `platform` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '来源平台',
-  `content` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '会话内容',
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='会话';
-
--- 正在导出表  any4any.sessions 的数据：~0 rows (大约)
-DELETE FROM `sessions`;
 
 -- 导出  表 any4any.users 结构
 CREATE TABLE IF NOT EXISTS `users` (

@@ -20,6 +20,13 @@ async def lifespan(app: FastAPI):
     
     # 调用初始化方法
     await ModelManager.initialize(load_llm=load_llm)
+    
+    # 添加预览确认回调注册
+    if Config.PREVIEW_MODE:
+        from core.dingtalk import message_manager
+        message_manager.register_preview_confirm_callback()
+        logger.info("Preview confirm callback registered during startup")
+    
     yield
     
     logger.info("Application shutting down...")

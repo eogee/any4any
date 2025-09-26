@@ -148,11 +148,13 @@ class OpenAIAPI:
             # 非流式响应直接返回
             if not chat_request.stream:
                 # 如果是预览模式，创建预览请求并保存生成的内容
+                preview_id = None
                 if preview_mode:
                     preview = await preview_service.create_preview(chat_request.dict())
-                    await preview_service.set_generated_content(preview.preview_id, assistant_response)
+                    preview_id = preview.preview_id
+                    await preview_service.set_generated_content(preview_id, assistant_response)
                 
-                return JSONResponse({
+                response_data = {
                     "id": f"chatcmpl-{int(time.time())}",
                     "object": "chat.completion",
                     "created": int(time.time()),
@@ -170,11 +172,19 @@ class OpenAIAPI:
                         "completion_tokens": len(assistant_response) // 4,
                         "total_tokens": (len(user_message_content) + len(assistant_response)) // 4
                     }
-                })
+                }
+                
+                # 在预览模式下，将preview_id添加到响应中
+                if preview_mode and preview_id:
+                    response_data["preview_id"] = preview_id
+                
+                return JSONResponse(response_data)
             
             # 流式响应的情况下，如果是预览模式，创建预览请求
+            preview_id = None
             if preview_mode:
                 preview = await preview_service.create_preview(chat_request.dict())
+                preview_id = preview.preview_id
                 
                 # 等待用户确认（使用配置中的超时时间）
                 timeout = getattr(Config, 'PREVIEW_TIMEOUT', 300)  # 默认5分钟超时
@@ -240,7 +250,6 @@ class OpenAIAPI:
                     start_time = time.time()
                     
                     try:
-                        # 无论是否是预览模式，都使用会话管理器的流式处理
                         # 调用会话管理器处理流式消息
                         async for text_chunk in conversation_manager.process_message_stream(
                             sender, 
@@ -280,7 +289,7 @@ class OpenAIAPI:
                             yield f"data: {response_str}\n\n"
                               
                             # 添加小延迟避免发送过快
-                            await asyncio.sleep(0.01)
+                            await asyncio.sleep(0.001)
                         
                         # 发送结束事件（正常完成）
                         end_data = {
@@ -302,8 +311,11 @@ class OpenAIAPI:
                         print(f"Streaming response completed, total content length: {len(accumulated_content)}")
                         
                         # 如果是预览模式，保存生成的内容
-                        if preview_mode:
-                            await preview_service.set_generated_content(preview.preview_id, accumulated_content)
+                        if preview_mode and preview_id:
+                            await preview_service.set_generated_content(preview_id, accumulated_content)
+                            
+                            # 对于流式响应，在响应完成后，将preview_id添加到DONE消息中
+                            yield f"data: {{\"preview_id\": \"{preview_id}\"}}\n\n"
                     except Exception as e:
                         print(f"Streaming response error: {str(e)}")
                         # 检查是否为停止生成异常
@@ -342,8 +354,7 @@ class OpenAIAPI:
                     headers=headers
                 )
             else:
-                # 这个分支理论上不应该被执行，因为我们已经在前面处理了所有情况
-                # 但为了安全起见，保留一个简单的错误响应
+                # 这个分支理论上不应该被执行，为了安全起见，保留一个简单的错误响应
                 print("Unexpected code path: Non-streaming response reached after previous handling")
                 return JSONResponse({
                     "error": {

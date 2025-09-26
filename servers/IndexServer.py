@@ -67,9 +67,18 @@ class IndexServer(Server):
     async def confirm_preview(self, preview_id: str):
         """确认预览请求并返回最终响应"""
         try:
+            # 调用preview_service的confirm_preview方法
+            # 注意：如果message_manager.py中已正确注册了回调，
+            # 这里的调用会自动触发预览确认后的钉钉消息发送
             response = await preview_service.confirm_preview(preview_id)
+            
+            # 添加日志记录，用于调试
+            print(f"Preview confirmed for ID: {preview_id}, response: {response}")
+            
             return JSONResponse(response)
         except Exception as e:
+            # 添加错误日志记录
+            print(f"Error confirming preview {preview_id}: {str(e)}")
             return JSONResponse({
                 "error": str(e),
                 "status": "error"
@@ -174,11 +183,25 @@ class IndexServer(Server):
                 return get_login_redirect()
             return await self.get_preview(preview_id)
             
-        @app.post("/v1/chat/confirm/{preview_id}")
-        async def confirm_preview_route(request: Request, preview_id: str):
+        # 支持GET和POST请求，确保预览确认能够正确处理
+        @app.get("/v1/chat/confirm/{preview_id}")
+        async def confirm_preview_route_get(request: Request, preview_id: str):
             if not await check_user_login(request):
                 return get_login_redirect()
             return await self.confirm_preview(preview_id)
+        
+        @app.post("/v1/chat/confirm/{preview_id}")
+        async def confirm_preview_route_post(request: Request, preview_id: str):
+            if not await check_user_login(request):
+                return get_login_redirect()
+            return await self.confirm_preview(preview_id)
+        
+        # # 添加额外的API端点用于测试和调试
+        # @app.post("/api/confirm-preview/{preview_id}")
+        # async def confirm_preview_api_route(request: Request, preview_id: str):
+        #     if not await check_user_login(request):
+        #         return get_login_redirect()
+        #     return await self.confirm_preview(preview_id)
             
         @app.get("/api/preview/{preview_id}")
         async def preview_data(request: Request, preview_id: str):
@@ -207,9 +230,9 @@ class IndexServer(Server):
                 return get_login_redirect()
             return await self.get_preview_data(preview_id)
             
-        # 保持原始API方法不变，以便其他地方调用
-        self._original_get_pending_previews = self.get_pending_previews
-        self._original_get_preview = self.get_preview
-        self._original_confirm_preview = self.confirm_preview
-        self._original_get_preview_data = self.get_preview_data
-        self._original_update_preview_content = self.update_preview_content
+        # # 保持原始API方法不变，以便其他地方调用
+        # self._original_get_pending_previews = self.get_pending_previews
+        # self._original_get_preview = self.get_preview
+        # self._original_confirm_preview = self.confirm_preview
+        # self._original_get_preview_data = self.get_preview_data
+        # self._original_update_preview_content = self.update_preview_content

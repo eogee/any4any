@@ -560,8 +560,26 @@
         // 确认预览
         async function confirmPreview(previewId) {
             try {
+                // 获取当前预览项的数据
+                const preview = previews.find(p => p.preview_id === previewId);
+                if (!preview) {
+                    throw new Error('未找到预览数据');
+                }
+                
+                // 准备要传输的字段信息
+                const requestBody = {
+                    sender_id: preview.sender_id || preview.user_id || '',
+                    sender_name: preview.sender_name || preview.username || '',
+                    original_content: preview.original_content || '',
+                    request_id: preview.request_id || preview.preview_id
+                };
+                
                 const response = await fetch(`/v1/chat/confirm/${previewId}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
                 });
                 
                 if (response.ok) {
@@ -603,6 +621,20 @@
                 if (!currentPreviewId) return;
                 
                 try {
+                    // 获取当前预览项的数据
+                    const preview = previews.find(p => p.preview_id === currentPreviewId);
+                    if (!preview) {
+                        throw new Error('未找到预览数据');
+                    }
+                    
+                    // 准备要传输的字段信息
+                    const additionalFields = {
+                        sender_id: preview.sender_id || preview.user_id || '',
+                        sender_name: preview.sender_name || preview.username || '',
+                        original_content: preview.original_content || '',
+                        request_id: preview.request_id || preview.preview_id
+                    };
+                    
                     // 先保存内容
                     const saveResponse = await fetch(`/api/previews/${currentPreviewId}`, {
                         method: 'PUT',
@@ -610,7 +642,8 @@
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            content: contentEditor.value
+                            content: contentEditor.value,
+                            ...additionalFields
                         })
                     });
 
@@ -618,9 +651,13 @@
                         throw new Error('保存失败');
                     }
 
-                    // 再确认发送
+                    // 再确认发送，同时传递字段信息
                     const confirmResponse = await fetch(`/v1/chat/confirm/${currentPreviewId}`, {
-                        method: 'POST'
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(additionalFields)
                     });
 
                     if (confirmResponse.ok) {
