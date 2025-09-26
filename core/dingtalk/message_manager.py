@@ -218,51 +218,51 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             if hasattr(Config, 'NO_THINK') and Config.NO_THINK:
                 reply_content = filter_think_content(reply_content)
             
-            # 如果是预览模式，不直接发送回复
-                if Config.PREVIEW_MODE and not self.is_preview_callback:
-                    # 为这个请求生成一个唯一ID
-                    request_id = str(uuid.uuid4())
-                    
-                    # 尝试从API响应中提取preview_id，考虑不同的响应格式
-                    preview_id = None
-                    
-                    # 检查直接在响应根级别是否有preview_id
-                    if isinstance(api_response, dict):
-                        if 'preview_id' in api_response:
-                            preview_id = api_response['preview_id']
-                        # 检查在choices数组中是否有preview_id
-                        elif 'choices' in api_response:
-                            for choice in api_response['choices']:
-                                if isinstance(choice, dict) and 'preview_id' in choice:
-                                    preview_id = choice['preview_id']
-                                    break
-                        # 检查在response对象中是否有preview_id
-                        elif 'response' in api_response:
-                            response_obj = api_response['response']
-                            if isinstance(response_obj, dict) and 'preview_id' in response_obj:
-                                preview_id = response_obj['preview_id']
-                    
-                    # 如仍然没找到preview_id，生成一个并使用
-                    if not preview_id and Config.PREVIEW_MODE:
-                        # 生成一个基于时间戳的预览ID
-                        preview_id = f"preview_{int(time.time())}"
-                        self.logger.warning(f"No preview_id found in response, generating one: {preview_id}")
-                    
-                    if preview_id:                        
-                        # 存储必要的信息到内存中
-                        memory_store.set(preview_id, {
-                            'sender': user_id,             # 发送者ID
-                            'sender_name': user_nick,      # 发送者昵称
-                            'original_content': original_content,  # 原始消息内容
-                            'request_id': request_id,      # 请求ID
-                            'content': reply_content,      # 生成的回复内容
-                            'options': self.options.__dict__,  # 将options对象转换为字典
-                            'timestamp': time.time()       # 时间戳
-                        })
-                        
-                    else:
-                        self.logger.error("Failed to get preview_id")
-                        self.logger.warning(f"Preview mode enabled but no preview_id found in response: {json.dumps(api_response, ensure_ascii=False)[:200]}...")
+            # 检查是否为预览模式
+            if Config.PREVIEW_MODE and not self.is_preview_callback:
+                # 预览模式：不直接发送回复，存储消息等待确认
+                # 为这个请求生成一个唯一ID
+                request_id = str(uuid.uuid4())
+                
+                # 尝试从API响应中提取preview_id，考虑不同的响应格式
+                preview_id = None
+                
+                # 检查直接在响应根级别是否有preview_id
+                if isinstance(api_response, dict):
+                    if 'preview_id' in api_response:
+                        preview_id = api_response['preview_id']
+                    # 检查在choices数组中是否有preview_id
+                    elif 'choices' in api_response:
+                        for choice in api_response['choices']:
+                            if isinstance(choice, dict) and 'preview_id' in choice:
+                                preview_id = choice['preview_id']
+                                break
+                    # 检查在response对象中是否有preview_id
+                    elif 'response' in api_response:
+                        response_obj = api_response['response']
+                        if isinstance(response_obj, dict) and 'preview_id' in response_obj:
+                            preview_id = response_obj['preview_id']
+                
+                # 如仍然没找到preview_id，生成一个并使用
+                if not preview_id and Config.PREVIEW_MODE:
+                    # 生成一个基于时间戳的预览ID
+                    preview_id = f"preview_{int(time.time())}"
+                    self.logger.warning(f"No preview_id found in response, generating one: {preview_id}")
+                
+                if preview_id:                        
+                    # 存储必要的信息到内存中
+                    memory_store.set(preview_id, {
+                        'sender': user_id,             # 发送者ID
+                        'sender_name': user_nick,      # 发送者昵称
+                        'original_content': original_content,  # 原始消息内容
+                        'request_id': request_id,      # 请求ID
+                        'content': reply_content,      # 生成的回复内容
+                        'options': self.options.__dict__,  # 将options对象转换为字典
+                        'timestamp': time.time()       # 时间戳
+                    })
+                else:
+                    self.logger.error("Failed to get preview_id")
+                    self.logger.warning(f"Preview mode enabled but no preview_id found in response: {json.dumps(api_response, ensure_ascii=False)[:200]}...")
             else:
                 # 非预览模式或预览确认后的回调，直接发送回复消息
                 result = send_robot_private_message(

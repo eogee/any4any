@@ -1,4 +1,4 @@
-# any4any:One-stop API service for voice recognition, text-to-speech, document rearrangement, database connection, knowledge base text processing, and MCP services🚀  
+# any4any: One-stop API service for LLM conversations, content preview and editing, voice recognition, text-to-speech, document rearrangement, knowledge base text processing, and MCP services 🚀
 
 <div align="center">  
   <a href="../README.md">中文简体 ·  </a>
@@ -7,23 +7,38 @@
 
 ## ✨Features  
 
-- **Speech-to-Text**: Convert audio files to text.  
-- **Text-to-Speech**: Convert text to speech files (supports multiple voice styles). Default voice: `zh-CN-XiaoyiNeural`.  
-- **Document Reranking**: Sort documents based on relevance to a query.  
-- **MySQL Database API**: Connect to a database and execute SQL queries and updates. 
-- **MCP Service**: Supports building MCP tools, interfaces, and can be invoked by any MCP client. 
-- **Automatic Cleanup**: Temporary audio files are automatically deleted after the response.  
-- **Text Processing**: Text chunking, keyword extraction, text appending, and knowledge base processing.  
-- **API Documentation**: Automatically generated API documentation accessible via browser at: http://localhost:8888/docs#/  
+- **LLM Conversation Management**: Supports multi-platform LLM conversation management, exposing local models as OpenAI-API compatible interfaces that can be added to any model management application, with user conversation history tracking
+- **Preview Mode**: Supports LLM response content preview and editing functionality
+- **DingTalk Bot**: Supports DingTalk bot message processing
+- **Speech-to-Text**: Convert audio files to text (supports multiple languages)
+- **Text-to-Speech**: Convert text to speech files (supports multiple voice styles). Default voice: `zh-CN-XiaoyiNeural`
+- **Document Reranking**: Sort documents based on relevance to a query
+- **MySQL Database API**: Connect to a database and execute SQL queries and updates
+- **MCP Service**: Supports building MCP tools, interfaces, and can be invoked by any MCP client
+- **Automatic Cleanup**: Temporary audio files are automatically deleted after the response
+- **Text Processing**: Text chunking, keyword extraction, text appending, and knowledge base processing
+- **API Documentation**: Automatically generated API documentation accessible via browser at: http://localhost:8888/docs#/
 
 ## 🎉Updates  
+
+**2025.9.26(V0.1.0): Added conversation management and preview mode features**
+
+New Features:
+- **Conversation Management**: Supports multi-platform conversation management, tracking user conversation history, and enabling context-aware continuous dialogue
+- **Preview Mode**: Supports content preview and editing functionality, allowing users to preview and modify generated content. Access via browser: http://localhost:8888/index/
+- **DingTalk Bot Integration**: Supports DingTalk bot message processing, enabling interaction with the system within DingTalk
+- **Enhanced User Authentication**: Added API key-based authentication mechanism to improve system security
+- **Database Conversation Storage**: Stores conversation data in MySQL database, supporting persistence and querying
+
+Updates:
+- **Restructured Project Architecture**: Added data_models module for managing data models, servers module for managing services, and static directory for managing static files
 
 **2025.5.24(V0.0.6): Added support for building MCP services**
 
 New Features:
-- MCP Tool Construction: You can add any MCP tools in `core/mcp_tools.py`. By default, it provides addition, subtraction, multiplication, and division of two integers.
-- MCP Tool Registration: Import the corresponding module in `app.py`, such as `from core.mcp_tools import add, sub, mul, div`, and register them in the `mcp.tool()` function.
-- MCP Service Startup: Run the start command: `python cli.py` or `a4a-run`, and the service will be available at: http://localhost:9999/sse
+- **MCP Tool Construction**: You can add any MCP tools in `core/mcp_tools.py`. By default, it provides addition, subtraction, multiplication, and division of two integers.
+- **MCP Tool Registration**: Import the corresponding module in `app.py`, such as `from core.mcp_tools import add, sub, mul, div`, and register them in the `mcp.tool()` function.
+- **MCP Service Startup**: Run the start command: `python cli.py` or `a4a-run`, and the service will be available at: http://localhost:9999
 
 Example documents for calling in Dify and Cherrystudio can be found at: [mcp_test.md](./docs/mcp_test.md) (to be completed later).
 
@@ -46,6 +61,7 @@ Dify workflow file: [text_add_keywords.yml](./workflows/text_add_keywords.yml).
 - **WSL2 (Windows Subsystem for Linux)**: Required for Windows systems.  
 - **Conda (Anaconda or Miniconda)**: For Python environment management.  
 - **Docker Desktop**: Docker desktop application for Windows to run Dify services.  
+- **MySQL**: For storing conversation data.
 
 ## 📥Installation Guide  
 
@@ -55,7 +71,11 @@ Dify workflow file: [text_add_keywords.yml](./workflows/text_add_keywords.yml).
 git clone https://github.com/eogee/any4any.git  
 # Or  
 git clone https://gitee.com/eogee/any4any.git  
+# Or
+git clone https://gitcode.com/eogee/any4any.git
 ```  
+
+You can also download the project via cloud storage: https://pan.quark.cn/s/ea4434702727
 
 ### 2. Download Models  
 
@@ -66,12 +86,17 @@ git lfs install
 # Download the speech recognition model: SenseVoiceSmall  
 git clone https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall  
 # Or  
-git clone https://hugginface.co/FunAudioLLM/SenseVoiceSmall  
+git clone https://huggingface.co/FunAudioLLM/SenseVoiceSmall  
 
 # Download the reranking model: bge-reranker-base  
 git clone https://hf-mirror.com/BAAI/bge-reranker-base  
 # Or  
-git clone https://hugginface.co/BAAI/bge-reranker-base  
+git clone https://huggingface.co/BAAI/bge-reranker-base  
+
+# Download the LLM model: Qwen3-1.7B  
+git clone https://hf-mirror.com/Qwen/Qwen3-1.7B  
+# Or  
+git clone https://huggingface.co/Qwen/Qwen3-1.7B  
 ```  
 
 ### 3. Create a Conda Environment  
@@ -94,7 +119,21 @@ ffmpeg -version
 pip install -r requirements.txt  
 ```  
 
-### 5. Start the Service  
+### 5. Configure Environment Variables  
+
+Copy the example configuration file and modify as needed:
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file to configure:
+- Database connection information
+- Model paths
+- API keys
+- Other custom configurations
+
+### 6. Start the Service  
 
 ```bash  
 # Start the service directly  
@@ -107,19 +146,23 @@ sudo chmod +x /usr/local/bin/a4a-run
 # After installation, use directly:  
 a4a-run 
 ```  
-The service will run at: http://localhost:8888  
 
-### 6. Add and Call Models in Dify  
+The service will run at the following ports:
+- Main service: http://localhost:8888
+- MCP service: http://localhost:9999
+- DingTalk service: http://localhost:6666
 
-**6.1 Check the Host Machine’s IP Address**  
-Run the `ifconfig` command in WSL to check the host machine’s IP address.  
+### 7. Add and Call Models in Dify  
+
+**7.1 Check the Host Machine's IP Address**  
+Run the `ifconfig` command in WSL to check the host machine's IP address.  
 ```bash  
 eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500  
         inet 172.21.56.14  netmask 255.255.240.0  broadcast 172.21.63.255  
 ```  
-Here, `172.21.56.14` is the host machine’s IP address.  
+Here, `172.21.56.14` is the host machine's IP address.  
 
-**6.2 Import the TTS Model**  
+**7.2 Import the TTS Model**  
 Start Docker and ensure the Dify service is running.  
 Import and install the plugin `langgenius-openai_api_compatible_0.0.16.difypkg` into Dify.  
 Open the `OpenAI-API-compatible` plugin, click `Add Model`, and configure as follows:  
@@ -132,7 +175,7 @@ Available Voices (comma-separated): zh-CN-XiaoyiNeural
 Other fields can be left blank.  
 ```  
 
-**6.3 Import the ASR Model**  
+**7.3 Import the ASR Model**  
 Configure the model path:  
 ```python  
 # config.py  
@@ -147,7 +190,7 @@ API Key: EMPTY
 API Endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:8888/v1`  
 ```  
 
-**6.4 Import the Rerank Model**  
+**7.4 Import the Rerank Model**  
 Configure the model path:  
 ```python  
 # config.py  
@@ -162,29 +205,45 @@ API Key: EMPTY
 API Endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:8888/v1`  
 ```  
 
-**6.5 Set as Default Models**  
+**7.5 Import the LLM Model**  
+Configure the model path:  
+```python  
+# config.py  
+LLM_MODEL_DIR = "/mnt/c/models/Qwen3-1.7B"  # Replace with your local LLM model path  
+```  
+
+Open the `OpenAI-API-compatible` plugin, click `Add Model`, and configure as follows:  
+```
+Model Type: LLM  
+Model Name: Qwen3-1.7B  
+API Key: EMPTY  
+API Endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:8888/v1`  
+```  
+
+**7.6 Set as Default Models**  
 In the top-right `System Model Settings`, set:  
 - **Text-to-Speech Model**: `edge-tts`  
 - **Speech-to-Text Model**: `SenseVoiceSmall`  
 - **Document Rerank Model**: `bge-reranker-base`  
+- **Language Model**: `Qwen3-1.7B`  
 Click `Save Settings`.  
 
-**6.6 Use the Models**  
+**7.7 Use the Models**  
 Add any `chatflow`, enter the workflow, and enable `Text-to-Speech` and `Speech-to-Text` features in the top-right `Functions`. Configure the models you added, turn on `Auto-Play`, and start chatting.  
 
-### 7. Connect to MySQL Database in Dify  
+### 8. Connect to MySQL Database in Dify  
 
-**7.1 Connection Configuration**  
+**8.1 Connection Configuration**  
 Configure MySQL connection details in `config.py`:  
 ```python  
-MYSQL_HOST = "172.17.64.1"  # Replace with your actual IP address (check using `ipconfig | findstr "IPv4"` in cmd)  
+MYSQL_HOST = "172.21.48.1"  # Replace with your actual IP address (check using `ipconfig | findstr "IPv4"` in cmd)  
 MYSQL_PORT = 3306  
 MYSQL_USER = "root"  
 MYSQL_PASSWORD = "root"  
 MYSQL_DATABASE = "any4any"  # Replace with your database name  
 ```  
 
-**7.2 MySQL Database Configuration**  
+**8.2 MySQL Database Configuration**  
 Run the following commands in MySQL to allow host machine access (172.21.56.14):  
 ```mysql  
 -- Allow host machine (172.21.56.14) to access databases as root  
@@ -196,7 +255,7 @@ CREATE USER 'root'@'172.21.56.14' IDENTIFIED BY 'YOUR_PASSWORD';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'172.21.56.14';  
 ```  
 
-**7.3 Build HTTP Request**  
+**8.3 Build HTTP Request**  
 In Dify, add an `HTTP Request Node` to your workflow or chatflow and configure as follows:  
 ```
 Request Method: POST  
@@ -205,110 +264,66 @@ Form-data Parameter Name: query
 Form-data Parameter Value: SELECT * FROM users LIMIT 1  # Example query  
 ```  
 
-## ⚙️Configuration  
+## 📁Project Structure
 
-Modify settings in `config.py`:  
-```python  
-import os  
-import torch  
-
-class Config:  
-    # Server Configuration  
-    HOST = "0.0.0.0"  
-    PORT = 8888  
-
-    # Authentication  
-    API_KEY = "EMPTY"  # Replace with your actual API key  
-
-    # Model Configuration  
-    DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"  
-    ASR_MODEL_DIR = "/mnt/c/models/SenseVoiceSmall"  # Replace with your ASR model path  
-    RERANK_MODEL_DIR = "/mnt/c/models/bge-reranker-base"  # Replace with your rerank model path  
-
-    # MySQL Configuration  
-    MYSQL_HOST = "172.21.48.1"  # Replace with your IP (check via `ipconfig | findstr "IPv4"` in cmd)  
-    MYSQL_PORT = 3306  
-    MYSQL_USER = "root"  
-    MYSQL_PASSWORD = "root"  
-    MYSQL_DATABASE = "any4any"  # Replace with your database name  
-
-    # Feature Toggles  
-    NO_THINK = True  # Enable no-think mode  
-    QUERY_CLEANING = True  # Enable SQL query sanitization  
-    PROMPT = ""  # Custom prompt  
-
-    # Ensure model directories exist  
-    os.makedirs(ASR_MODEL_DIR, exist_ok=True)  
-    os.makedirs(RERANK_MODEL_DIR, exist_ok=True)  
-```  
-
-## 📡API Usage Examples  
-
-### Speech-to-Text  
-```bash  
-curl -X POST "http://localhost:8888/v1/audio/transcriptions" \  
--H "Authorization: Bearer EMPTY" \  
--F "file=@audio.wav" \  
--F "model=whisper-1" \  
--F "language=zh"  
-```  
-
-### Text-to-Speech  
-```bash  
-curl -X POST "http://localhost:8888/v1/audio/speech" \  
--H "Authorization: Bearer EMPTY" \  
--H "Content-Type: application/json" \  
--d '{"input": "Hello, any4any!", "voice": "zh-CN-XiaoyiNeural"}' \  
--o "output.mp3"  
-```  
-
-### Document Reranking  
-```bash  
-curl -X POST "http://localhost:8888/v1/rerank" \  
--H "Authorization: Bearer EMPTY" \  
--H "Content-Type: application/json" \  
--d '{"query": "Hello, any4any!", "documents": ["hello, any4any!", "any4any!", "hello, world!"]}' \  
--o "output.json"  
-```  
-
-### MySQL Database Connection  
-
-**Supported Request Formats**:  
-1. `application/json`  
-2. `multipart/form-data`  
-
-**Security Warning**: The current implementation does not use parameterized queries, posing SQL injection risks.  
-
-**JSON Request**:  
-```bash  
-curl -X POST "http://localhost:8888/v1/db/query" \  
--H "Content-Type: application/json" \  
--d '{"query":"SELECT * FROM users LIMIT 1"}'  
-```  
-
-**Form-data Request**:  
-```bash  
-curl -X POST "http://localhost:8888/v1/db/query" \  
--F "query=SELECT * FROM users LIMIT 1"  
-```  
-
-### Health Check  
-```bash  
-curl http://localhost:8888/health  
-```  
+```
+any4any/
+├── core/                     # Core functionality modules
+│   ├── asr/                  # Speech recognition module
+│   │   └── transcription.py  # Audio transcription implementation
+│   ├── auth/                 # Authentication module
+│   │   └── model_auth.py     # Model authentication implementation
+│   ├── chat/                 # Chat-related modules
+│   │   ├── conversation_database.py  # Conversation database operations
+│   │   ├── conversation_manager.py   # Conversation manager
+│   │   ├── llm.py            # Large language model interface
+│   │   ├── openai_api.py     # OpenAI API compatible interface
+│   │   └── preview.py        # Preview functionality implementation
+│   ├── database/             # Database module
+│   │   └── database.py       # Database connection and query implementation
+│   ├── dingtalk/             # DingTalk bot module
+│   │   └── message_manager.py # DingTalk message processing
+│   ├── mcp/                  # MCP protocol module
+│   │   └── mcp_tools.py      # MCP tools implementation
+│   ├── rerank/               # Document reranking module
+│   │   └── rerank.py         # Document reranking implementation
+│   ├── tts/                  # Text-to-speech module
+│   │   ├── file.py           # Audio file processing
+│   │   └── speech.py         # Speech synthesis implementation
+│   ├── lifespan.py           # Application lifecycle management
+│   └── model_manager.py      # Model manager
+├── data_models/              # Data model definitions
+├── servers/                  # Server modules
+├── static/                   # Static resource files
+├── utils/                    # Utility modules
+├── workflows/                # Workflows and external integration plugins
+├── app.py                    # Application entry file
+├── cli.py                    # Command-line interface
+├── config.py                 # Configuration file
+├── requirements.txt          # Dependency list
+├── any4any.sql               # Database initialization script
+├── a4a-run.sh                # Startup script
+└── .env.example              # Environment variable example file
+```
 
 ## 🌟Related Open-Source Projects  
 
 - edge-tts: https://github.com/rany2/edge-tts  
 - SenseVoice: https://github.com/FunAudioLLM/SenseVoice  
-- bge-reranker-base: https://hf-mirror.com/BAAI/bge-reranker-base  
+- bge-reranker-base: https://huggingface.com/BAAI/bge-reranker-base  
 - Dify: https://github.com/langgenius/dify  
 - FastAPI: https://github.com/fastapi/fastapi  
+- Qwen3-1.7B: https://huggingface.com/Qwen/Qwen3-1.7B  
+- Layui: https://github.com/layui/layui  
+- font-awesome: https://github.com/FortAwesome/Font-Awesome  
 
 ## 🚧Roadmap  
-- Support more TTS and ASR models.  
-- Build a frontend interface for better UX.  
-- Add more APIs and services.  
+- Enhance conversation management functionality
+- Support more large language models
+- Integrate more instant messaging service providers
+- Enhance frontend interface for better user experience
+- Support more TTS and ASR models
+- Add more APIs and services
 
 ## 📞Contact Us  
 - Official Website: https://eogee.com  
