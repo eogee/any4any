@@ -29,6 +29,7 @@
 - 钉钉机器人集成：支持钉钉机器人消息处理，可在钉钉中与系统交互
 - 用户认证增强：增加了基于API密钥的认证机制，提高系统安全性
 - 数据库会话存储：将会话数据存储到MySQL数据库，支持持久化和查询
+- [会话管理系统说明文档.md](./docs/会话管理系统文档.md)
 
 更新：
 - 重塑了项目结构，新增data_models模块用于管理数据模型，新增servers模块用于管理服务，新增static目录用于管理静态文件
@@ -40,9 +41,7 @@
 - MCP工具注册：在`app.py`中引入对应的模块，如`from core.mcp_tools import add, sub, mul, div`，并在`mcp.tool()`函数中注册
 - MCP服务服务启动：运行启动命令：`python cli.py`或`a4a-run`，服务将运行在: http://localhost:9999/sse
 
-在Dify和Cherrystudio中调用的示例文档见:[mcp_test.md](./docs/mcp_test.md)(稍后补全)
-
-dify工作流文件:[mcp_test.yml](./workflows/mcp_test.yml)
+dify工作流文件:[mcp_test.yml](./workflows/dify_workflows/mcp_test.yml)
 
 **2025.5.18(V0.0.5)：新增支持文本添加关键词（text_add_keywords）**
 
