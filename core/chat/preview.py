@@ -72,22 +72,87 @@ class PreviewService:
             preview_model = Preview()
             
             # 从request_data中提取最后一个role为user的content
-            last_user_content = ""
+            current_request = ""
             if preview.request_data and "messages" in preview.request_data:
                 messages = preview.request_data["messages"]
                 # 遍历消息列表，找到最后一个用户消息
                 for msg in reversed(messages):
                     if isinstance(msg, dict) and msg.get("role") == "user":
-                        last_user_content = msg.get("content", "")
+                        current_request = msg.get("content", "")
                         break
+            
+            # 获取conversation_id和message_id
+            # 首先尝试从request_data的messages列表中查找最后一个消息的message_id
+            # 然后从messages表中获取对应的conversation_id
+            message_id = None
+            conversation_id = None
+            
+            # 尝试从request_data中直接获取
+            if preview.request_data:
+                # 优先从request_data中直接获取
+                conversation_id = preview.request_data.get("conversation_id")
+                message_id = preview.request_data.get("message_id")
+                
+                # 如果没有直接获取到，尝试从messages列表中提取
+                if not message_id and "messages" in preview.request_data:
+                    messages = preview.request_data["messages"]
+                    # 找到最后一条消息
+                    if messages and isinstance(messages[-1], dict):
+                        message_id = messages[-1].get("id") or messages[-1].get("message_id")
+                
+                # 如果仍然没有获取到，尝试根据消息内容查询数据库
+                if not conversation_id or not message_id:
+                    try:
+                        # 使用Preview模型的数据库连接来查询
+                        if message_id:
+                            # 如果有message_id，直接查询对应的conversation_id
+                            result = preview_model.fetch_one(
+                                "SELECT conversation_id FROM messages WHERE message_id = %s",
+                                (message_id,)
+                            )
+                            if result:
+                                conversation_id = result.get("conversation_id")
+                        elif current_request:
+                            # 如果没有message_id但有current_request，尝试根据内容查询
+                            result = preview_model.fetch_one(
+                                "SELECT conversation_id, message_id FROM messages WHERE content LIKE %s ORDER BY timestamp DESC LIMIT 1",
+                                (f"%{current_request[:100]}%",)  # 使用内容的前100个字符作为模糊查询条件
+                            )
+                            if result:
+                                conversation_id = result.get("conversation_id")
+                                message_id = result.get("message_id")
+                    except Exception as db_error:
+                        logging.warning(f"Failed to query conversation_id and message_id: {db_error}")
+            
+            # 如果以上方法都没有获取到，才生成默认值
+            # 使用与messages表一致的UUID格式
+            import uuid
+            if not conversation_id:
+                conversation_id = str(uuid.uuid4())
+            if not message_id:
+                message_id = str(uuid.uuid4())
+            
+            # 计算响应时间（如果preview对象有response_time属性则使用，否则计算）
+            if hasattr(preview, 'response_time'):
+                response_time = preview.response_time
+            else:
+                # 估算响应时间：从创建时间到现在
+                response_time = time.time() - preview.created_at
+            
+            # 从request_data中尝试获取user_id，默认为1
+            user_id = preview.request_data.get("user_id", 1)
             
             # 保存到数据库，包括编辑前内容、编辑后内容、请求数据等
             preview_model.save_preview_content(
                 preview_id=preview_id,
-                edited_content=edited_content,
+                saved_content=edited_content,  # 对应数据库中的saved_content
                 pre_content=pre_content,
                 full_request=preview.request_data,
-                last_request=last_user_content  # 使用最后一个用户消息作为last_request
+                current_request=current_request,  # 对应数据库中的current_request
+                conversation_id=conversation_id,
+                message_id=message_id,
+                response_time=response_time,
+                user_id=user_id
             )
         except Exception as e:
             # 记录错误但不中断流程，确保即使数据库保存失败，内存中的更新仍然成功

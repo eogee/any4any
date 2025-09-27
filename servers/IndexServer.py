@@ -1,8 +1,15 @@
 import os
+import logging
+import traceback
+from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from core.chat.preview import preview_service
 from servers.Server import Server
+from core.chat.conversation_database import ConversationDatabase
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 # 用于检查用户是否登录的装饰器
 async def check_user_login(request: Request):
@@ -73,12 +80,12 @@ class IndexServer(Server):
             response = await preview_service.confirm_preview(preview_id)
             
             # 添加日志记录，用于调试
-            print(f"Preview confirmed for ID: {preview_id}, response: {response}")
+            logging.info(f"Preview confirmed for ID: {preview_id}, response: {response}")
             
             return JSONResponse(response)
         except Exception as e:
             # 添加错误日志记录
-            print(f"Error confirming preview {preview_id}: {str(e)}")
+            logging.error(f"Error confirming preview {preview_id}: {str(e)}")
             return JSONResponse({
                 "error": str(e),
                 "status": "error"
@@ -135,6 +142,118 @@ class IndexServer(Server):
                 "error": str(e),
                 "status": "error"
             }, status_code=400)
+            
+    async def get_conversation_messages(self, conversation_id: str):
+        """
+        获取指定conversation_id的所有消息数据
+        从messages表中直接查询数据
+        """
+        logging.info(f"[API] 开始处理请求 - 会话ID: {conversation_id}")
+        
+        # 验证conversation_id参数
+        if not conversation_id or not isinstance(conversation_id, str):
+            error_msg = f"无效的会话ID: {conversation_id} (类型: {type(conversation_id).__name__})"
+            logging.error(f"[ERROR] {error_msg}")
+            return JSONResponse({
+                "status": "error",
+                "error": error_msg,
+                "conversation_id": str(conversation_id) if conversation_id else "None",
+                "error_type": "invalid_parameter"
+            }, status_code=400)
+        
+        try:
+            logging.info(f"[INFO] 尝试获取会话ID: {conversation_id} 的消息数据")
+            
+            # 创建数据库实例
+            logging.info(f"[INFO] 创建数据库连接")
+            db = ConversationDatabase()
+            logging.info(f"[INFO] 数据库实例创建成功，准备查询会话ID: {conversation_id}")
+            
+            # 检查数据库方法是否存在
+            if not hasattr(db, 'get_conversation_by_id'):
+                logging.error(f"[ERROR] 数据库对象没有get_conversation_by_id方法")
+                return JSONResponse({
+                    "status": "error",
+                    "error": "数据库方法未找到: get_conversation_by_id",
+                    "conversation_id": conversation_id,
+                    "error_type": "database_error"
+                }, status_code=500)
+            
+            # 获取完整的会话数据，包括消息列表
+            conversation = db.get_conversation_by_id(conversation_id)
+            logging.info(f"[INFO] 查询结果: {'找到会话' if conversation else '未找到会话'}")
+            
+            if not conversation:
+                logging.error(f"[ERROR] 会话ID {conversation_id} 不存在")
+                return JSONResponse({
+                    "status": "error",
+                    "error": "会话不存在",
+                    "conversation_id": conversation_id,
+                    "error_type": "not_found"
+                }, status_code=404)
+            
+            # 安全获取消息列表
+            messages = []
+            try:
+                if isinstance(conversation, dict):
+                    messages = conversation.get('messages', [])
+                elif hasattr(conversation, 'messages'):
+                    messages = conversation.messages
+                else:
+                    logging.warning(f"[WARNING] 会话对象格式未知，无法提取消息列表: {type(conversation)}")
+            except Exception as msg_extract_error:
+                logging.error(f"[ERROR] 提取消息列表时发生错误: {str(msg_extract_error)}")
+                messages = []
+            
+            logging.info(f"[SUCCESS] 成功获取消息列表，共 {len(messages)} 条消息")
+            
+            # 返回消息列表和会话详情
+            return JSONResponse({
+                "status": "success",
+                "conversation_id": conversation_id,
+                "message_count": len(messages),
+                "conversation": conversation,
+                "messages": messages,
+                "api_info": {
+                    "timestamp": datetime.now().isoformat(),
+                    "version": "1.0"
+                }
+            })
+            
+        except ConnectionError as conn_error:
+            error_message = f"数据库连接错误: {str(conn_error)}"
+            logging.critical(f"[CRITICAL ERROR] {error_message}")
+            logging.error(f"[ERROR] 错误堆栈: {traceback.format_exc()}")
+            return JSONResponse({
+                "status": "error",
+                "error": "数据库连接失败，请检查数据库服务是否运行",
+                "conversation_id": conversation_id,
+                "error_type": "connection_error",
+                "details": str(conn_error)
+            }, status_code=503)
+            
+        except AttributeError as attr_error:
+            error_message = f"属性错误: {str(attr_error)}"
+            logging.error(f"[ERROR] {error_message}")
+            logging.error(f"[ERROR] 错误堆栈: {traceback.format_exc()}")
+            return JSONResponse({
+                "status": "error",
+                "error": "系统错误，请联系管理员",
+                "conversation_id": conversation_id,
+                "error_type": "attribute_error",
+                "details": str(attr_error)
+            }, status_code=500)
+            
+        except Exception as e:
+            logging.error(f"[ERROR] 查询会话消息时发生错误: {str(e)}")
+            logging.error(f"[ERROR] 错误堆栈: {traceback.format_exc()}")
+            return JSONResponse({
+                "error": "服务器内部错误，请稍后重试",
+                "error_type": type(e).__name__,
+                "status": "error",
+                "conversation_id": conversation_id,
+                "details": str(e)
+            }, status_code=500)
         
     def register_routes(self, app: FastAPI):
         """
@@ -195,13 +314,6 @@ class IndexServer(Server):
             if not await check_user_login(request):
                 return get_login_redirect()
             return await self.confirm_preview(preview_id)
-        
-        # # 添加额外的API端点用于测试和调试
-        # @app.post("/api/confirm-preview/{preview_id}")
-        # async def confirm_preview_api_route(request: Request, preview_id: str):
-        #     if not await check_user_login(request):
-        #         return get_login_redirect()
-        #     return await self.confirm_preview(preview_id)
             
         @app.get("/api/preview/{preview_id}")
         async def preview_data(request: Request, preview_id: str):
@@ -221,7 +333,6 @@ class IndexServer(Server):
         async def put_update_preview_route(request: Request, preview_id: str):
             if not await check_user_login(request):
                 return get_login_redirect()
-            # 复用现有的update_preview_content方法
             return await self.update_preview_content(preview_id, request)
             
         @app.get("/v1/chat/completions/result/{preview_id}")
@@ -230,9 +341,9 @@ class IndexServer(Server):
                 return get_login_redirect()
             return await self.get_preview_data(preview_id)
             
-        # # 保持原始API方法不变，以便其他地方调用
-        # self._original_get_pending_previews = self.get_pending_previews
-        # self._original_get_preview = self.get_preview
-        # self._original_confirm_preview = self.confirm_preview
-        # self._original_get_preview_data = self.get_preview_data
-        # self._original_update_preview_content = self.update_preview_content
+        @app.get("/api/conversation/{conversation_id}/messages")
+        async def conversation_messages(request: Request, conversation_id: str):
+            """获取指定会话ID的所有消息"""
+            if not await check_user_login(request):
+                return get_login_redirect()
+            return await self.get_conversation_messages(conversation_id)

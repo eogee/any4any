@@ -18,72 +18,117 @@ class Preview(Model):
         """
         return "previews"
     
-    def save_preview_content(self, preview_id: str, edited_content: str, pre_content: str, 
-                           full_request: dict, last_request: dict) -> int:
+    def save_preview_content(self, preview_id: str, saved_content: str, pre_content: str, 
+                           full_request: dict, current_request: str, conversation_id: str, 
+                           message_id: str, response_time: float, user_id: int) -> int:
         """
         保存预览编辑内容到数据库
+        确保conversation_id和message_id与messages表中的值保持一致
         
         Args:
             preview_id: 预览ID
-            edited_content: 编辑后的内容
+            saved_content: 编辑保存后的内容
             pre_content: 编辑前的内容
             full_request: 历史全部请求及响应内容
-            last_request: 当前请求内容
+            current_request: 当前请求内容
+            conversation_id: 会话ID
+            message_id: 对话ID
+            response_time: 响应用时(秒)
+            user_id: 响应人员ID
         
         Returns:
             int: 插入的ID或更新的行数
         """
+        # 验证conversation_id和message_id是否为有效的UUID格式
+        if not conversation_id or not message_id:
+            raise ValueError("Invalid conversation_id or message_id")
+        
         try:
-            # 检查是否已存在该preview_id的记录
-            existing = self.find_by_id(preview_id, id_column="preview_id")
-            
             # 将字典转换为JSON字符串
             full_request_str = json.dumps(full_request) if isinstance(full_request, dict) else str(full_request)
-            last_request_str = json.dumps(last_request) if isinstance(last_request, dict) else str(last_request)
             
             # 判断内容是否有变化
-            is_edited = 1 if pre_content != edited_content else 0
+            is_edited = 1 if pre_content != saved_content else 0
             
+            # 构建符合数据库表结构的数据字典
             data = {
-                "preview_id": preview_id,
-                "edited_content": edited_content,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+                "current_request": current_request,
+                "saved_content": saved_content,
                 "pre_content": pre_content,
-                "is_edited": is_edited,
                 "full_request": full_request_str,
-                "last_request": last_request_str
+                "response_time": response_time,
+                "user_id": user_id,
+                "preview_id": preview_id  # 保存preview_id，方便追踪
             }
+            
+            # 验证conversation_id和message_id在messages表中是否存在
+            # 确保这两个ID与messages表中的值一致
+            message_exists = self.fetch_one(
+                "SELECT 1 FROM messages WHERE conversation_id = %s AND message_id = %s",
+                (conversation_id, message_id)
+            )
+            
+            # 无论messages表中是否存在，仍然保存preview数据,但会记录日志，以便追踪可能的数据不一致
+            if not message_exists:
+                self.logger.warning(f"Message not found in messages table: conversation_id={conversation_id}, message_id={message_id}")
+            else:
+                self.logger.debug(f"Verified message exists in messages table: conversation_id={conversation_id}, message_id={message_id}")
+            
+            # 在previews表中查找是否存在相同的conversation_id和message_id的记录
+            existing = self.fetch_one(
+                "SELECT * FROM previews WHERE conversation_id = %s AND message_id = %s", 
+                (conversation_id, message_id)
+            )
             
             if existing:
                 # 如果记录已存在，则更新
-                result = self.update(preview_id, data, id_column="preview_id")
-                self.logger.info(f"Updated preview content: {preview_id}")
+                result = self.update(existing['id'], data, id_column="id")
                 return result
             else:
                 # 如果记录不存在，则插入
                 result = self.insert(data)
-                self.logger.info(f"Inserted new preview content: {preview_id}")
                 return result
         except Exception as e:
             self.logger.error(f"Database save failed: {str(e)}")
             # 尝试进行内容清理，移除可能导致问题的特殊字符
             try:
-                # 对于编辑内容进行特殊处理，保留基本文本
-                if edited_content:
-                    # 替换4字节UTF-8字符为占位符
-                    clean_edited_content = ''.join([c if ord(c) < 0x10000 else '[EMOJI]' for c in edited_content])
-                else:
-                    clean_edited_content = edited_content
+                # 确保data字典存在
+                if 'data' not in locals():
+                    data = {}
                 
-                # 更新数据字典中的清理后内容
-                data["edited_content"] = clean_edited_content
+                # 对于保存内容进行特殊处理，保留基本文本
+                if saved_content:
+                    # 替换4字节UTF-8字符为占位符
+                    clean_saved_content = ''.join([c if ord(c) < 0x10000 else '[EMOJI]' for c in saved_content])
+                else:
+                    clean_saved_content = saved_content
+                
+                # 对当前请求内容也进行清理
+                if current_request:
+                    clean_current_request = ''.join([c if ord(c) < 0x10000 else '[EMOJI]' for c in current_request])
+                else:
+                    clean_current_request = current_request
+                
+                # 更新数据字典中的清理后内容和关键ID字段
+                data["saved_content"] = clean_saved_content
+                data["current_request"] = clean_current_request
+                data["conversation_id"] = conversation_id  # 确保ID字段存在
+                data["message_id"] = message_id            # 确保ID字段存在
+                data["preview_id"] = preview_id            # 确保preview_id字段存在
+                
+                # 重新检查是否存在记录
+                existing = self.fetch_one(
+                    "SELECT * FROM previews WHERE conversation_id = %s AND message_id = %s", 
+                    (conversation_id, message_id)
+                )
                 
                 if existing:
-                    result = self.update(preview_id, data, id_column="preview_id")
-                    self.logger.info(f"Successfully saved with cleaned content: {preview_id}")
+                    result = self.update(existing['id'], data, id_column="id")
                     return result
                 else:
                     result = self.insert(data)
-                    self.logger.info(f"Successfully inserted with cleaned content: {preview_id}")
                     return result
             except Exception as inner_e:
                 self.logger.error(f"Failed even with content cleaning: {str(inner_e)}")
