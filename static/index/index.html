@@ -359,6 +359,27 @@
                 }
             }
             
+            // 尝试获取最后一个助手消息的is_timeout值
+            let lastAssistantMessage = null;
+            if (messages && Array.isArray(messages)) {
+                // 查找最后一个role为assistant的消息
+                for (let i = messages.length - 1; i >= 0; i--) {
+                    if (messages[i].role === 'assistant') {
+                        lastAssistantMessage = messages[i];
+                        break;
+                    }
+                }
+            }
+            
+            // 如果没有从requestData获取到，尝试直接从preview获取
+            if (!lastAssistantMessage && preview.messages && Array.isArray(preview.messages)) {
+                // 查找最后一个sender_type为assistant的消息
+                const assistantMessages = preview.messages.filter(msg => msg.sender_type === 'assistant');
+                if (assistantMessages.length > 0) {
+                    lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+                }
+            }
+            
             previewContent.innerHTML = `
                 <div class="preview-section">
                     <h3><i class="fas fa-question-circle"></i> 当前问题</h3>
@@ -390,13 +411,36 @@
                 </div>
                 
                 <div class="preview-actions">
-                    <button class="layui-btn layui-btn-normal" id="editBtn">
-                        <i class="fas fa-edit"></i> 编辑
-                    </button>
-                    <button class="layui-btn layui-btn-primary" id="confirmBtnDetail">
-                        <i class="fas fa-check"></i> 确认发送
-                    </button>
+                    ${lastAssistantMessage && lastAssistantMessage.is_timeout === 1 ? 
+                        `<button class="layui-btn layui-btn-warm" id="confirmTimeoutBtn">
+                            <i class="fas fa-warning"></i> 已超时自动回复, 确认
+                        </button>` : 
+                        `<button class="layui-btn layui-btn-normal" id="editBtn">
+                            <i class="fas fa-edit"></i> 编辑
+                        </button>
+                        <button class="layui-btn layui-btn-primary" id="confirmBtnDetail">
+                            <i class="fas fa-check"></i> 确认发送
+                        </button>`
+                    }
                 </div>`;
+            
+            // 添加事件监听器
+            const editBtn = document.getElementById('editBtn');
+            const confirmBtnDetail = document.getElementById('confirmBtnDetail');
+            const confirmTimeoutBtn = document.getElementById('confirmTimeoutBtn');
+            
+            if (editBtn) {
+                editBtn.onclick = () => startEditMode(preview);
+            }
+            if (confirmBtnDetail) {
+                confirmBtnDetail.onclick = () => confirmPreview(preview.preview_id);
+            }
+            if (confirmTimeoutBtn) {
+                // 超时自动发送确认按钮的点击事件
+                confirmTimeoutBtn.onclick = () => {
+                    confirmPreview(preview.preview_id);
+                };
+            }
             
             // 如果有conversation_id，则加载对话历史
             const conversationId = requestData.conversation_id;
@@ -406,6 +450,7 @@
                 const tableBody = document.getElementById('requestTableBody');
                 tableBody.innerHTML = '<tr><td colspan="2" class="empty-state">无对话历史数据</td></tr>';
             }
+        }
         
         // 加载对话历史数据
         async function loadConversationHistory(conversationId) {
@@ -417,6 +462,9 @@
                     // 将消息数组倒序，使最新的消息显示在前面
                     const reversedMessages = [...data.messages].reverse();
                     renderConversationMessages(reversedMessages);
+                    
+                    // 检查最后一个助手消息的is_timeout值并更新按钮
+                    updateButtonsByTimeoutStatus(data.messages);
                 } else {
                     console.error('获取对话历史失败:', data.error);
                     const tableBody = document.getElementById('requestTableBody');
@@ -426,6 +474,38 @@
                 console.error('获取对话历史时发生错误:', error);
                 const tableBody = document.getElementById('requestTableBody');
                 tableBody.innerHTML = '<tr><td colspan="2" class="error-state">网络错误，请稍后重试</td></tr>';
+            }
+        }
+        
+        // 根据is_timeout状态更新按钮显示
+        function updateButtonsByTimeoutStatus(messages) {
+            if (!messages || !Array.isArray(messages)) return;
+            
+            // 查找最后一个sender_type为assistant的消息
+            let lastAssistantMessage = null;
+            for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].sender_type === 'assistant') {
+                    lastAssistantMessage = messages[i];
+                    break;
+                }
+            }
+            
+            // 如果找到符合条件的消息且is_timeout为1，更新按钮显示
+            if (lastAssistantMessage && lastAssistantMessage.is_timeout === 1) {
+                const previewActions = document.querySelector('.preview-actions');
+                if (previewActions) {
+                    previewActions.innerHTML = `
+                        <button class="layui-btn layui-btn-warm" id="confirmTimeoutBtn">
+                            <i class="fas fa-warning"></i> 已超时自动回复，确认
+                        </button>
+                    `;
+                    
+                    // 添加点击事件
+                    const confirmTimeoutBtn = document.getElementById('confirmTimeoutBtn');
+                    if (confirmTimeoutBtn && currentPreviewId) {
+                        confirmTimeoutBtn.onclick = () => confirmPreview(currentPreviewId);
+                    }
+                }
             }
         }
         
@@ -570,24 +650,6 @@
                     }
                 });
             }
-        }
-            
-            // 添加事件监听器
-            const editBtn = document.getElementById('editBtn');
-            const confirmBtnDetail = document.getElementById('confirmBtnDetail');
-            
-            if (editBtn) {
-                editBtn.onclick = () => startEditMode(preview);
-            }
-            if (confirmBtnDetail) {
-                confirmBtnDetail.onclick = () => confirmPreview(preview.preview_id);
-            }
-            
-            // 生成请求表格数据
-            generateRequestTable(requestData);
-            
-            // 滚动到顶部
-            previewDetail.scrollTop = 0;
         }
         
         // 生成请求表格数据
