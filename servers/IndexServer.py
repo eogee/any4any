@@ -155,7 +155,9 @@ class IndexServer(Server):
         try:
             data = await request.json()
             edited_content = data.get("content", "")
-            await preview_service.update_content(preview_id, edited_content)
+            # 从request中获取session
+            session = request.session or {}
+            await preview_service.update_content(preview_id, edited_content, session)
             return JSONResponse({
                 "status": "success",
                 "message": "Content updated successfully"

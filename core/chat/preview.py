@@ -56,7 +56,7 @@ class PreviewService:
         preview.generated_content = content
         return preview
     
-    async def update_content(self, preview_id: str, edited_content: str):
+    async def update_content(self, preview_id: str, edited_content: str, session: dict = None):
         """更新预览内容（用户编辑后）"""
         if preview_id not in self._previews:
             raise HTTPException(status_code=404, detail="Preview not found")
@@ -139,8 +139,8 @@ class PreviewService:
                 # 估算响应时间：从创建时间到现在
                 response_time = time.time() - preview.created_at
             
-            # 从request_data中尝试获取user_id，默认为1
-            user_id = preview.request_data.get("user_id", 1)
+            # 从session中尝试获取user_id，默认为1
+            user_id = session.get("user_id", 1) if session else 1
             
             # 保存到数据库，包括编辑前内容、编辑后内容、请求数据等
             preview_model.save_preview_content(
