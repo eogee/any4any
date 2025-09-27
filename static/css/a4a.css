@@ -580,7 +580,14 @@ body::before {
     text-align: left;
     font-weight: 600;
     font-size: 14px;
-    width: 50%;
+}
+
+.request-table th:first-child {
+    width: 25%;
+}
+
+.request-table th:nth-child(2) {
+    width: 75%;
 }
 
 .request-table td {
@@ -588,8 +595,7 @@ body::before {
     border-bottom: 1px solid #eee;
     font-size: 13px;
     vertical-align: top;
-    width: 50%;
-    max-width: 400px;
+    max-width: none;
     word-wrap: break-word;
     line-height: 1.5;
 }

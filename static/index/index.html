@@ -439,7 +439,6 @@
                 return;
             }
             
-            // 彻底重写配对逻辑，使用更简单直接的方法
             const pairs = [];
             let currentPair = null;
             
@@ -543,9 +542,9 @@
                 let isExpanded = false;
                 const rows = tableBody.querySelectorAll('tr.message-pair');
                 
-                // 初始只显示第一行，隐藏其他所有行
-                if (rows.length > 1) {
-                    for (let i = 1; i < rows.length; i++) {
+                // 初始只显示前3行，隐藏其他所有行
+                if (rows.length > 3) {
+                    for (let i = 3; i < rows.length; i++) {
                         rows[i].style.display = 'none';
                     }
                     toggleBtn.style.display = 'block';
@@ -563,8 +562,8 @@
                         }
                         toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> 收起';
                     } else {
-                        // 收起多余的行，只保留第一行
-                        for (let i = 1; i < rows.length; i++) {
+                        // 收起多余的行，只保留前3行
+                        for (let i = 3; i < rows.length; i++) {
                             rows[i].style.display = 'none';
                         }
                         toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> 显示更多';
