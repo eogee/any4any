@@ -70,17 +70,18 @@ class ConversationDatabase(Model):
                         'conversation_id': conversation_info['conversation_id'],
                         'content': message['content'],
                         'sender_type': message['sender_type'],
+                        'is_timeout': message.get('is_timeout', 0),
                         'timestamp': message['timestamp'],
                         'sequence_number': message.get('sequence_number', 0)
                     }
                     
-                    # 插入消息
+                    # 插入消息，添加is_timeout字段支持
                     self.execute_query(
-                        "INSERT INTO messages (message_id, conversation_id, content, sender_type, timestamp, sequence_number) "
-                        "VALUES (%s, %s, %s, %s, %s, %s)",
+                        "INSERT INTO messages (message_id, conversation_id, content, sender_type, is_timeout, timestamp, sequence_number) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                         (message_data['message_id'], message_data['conversation_id'], 
                          message_data['content'], message_data['sender_type'], 
-                         message_data['timestamp'], message_data['sequence_number'])
+                         message_data['is_timeout'], message_data['timestamp'], message_data['sequence_number'])
                     )
             
             # 提交事务
@@ -138,7 +139,8 @@ class ConversationDatabase(Model):
                                 'content': msg.get('content', ''),
                                 'sender_type': msg.get('sender_type', ''),
                                 'timestamp': timestamp,
-                                'sequence_number': msg.get('sequence_number', 0)
+                                'sequence_number': msg.get('sequence_number', 0),
+                                'is_timeout': msg.get('is_timeout', 0)
                             }
                             formatted_messages.append(formatted_message)
                         except Exception as item_error:
@@ -232,18 +234,18 @@ class ConversationDatabase(Model):
         
         Args:
             conversation_id: 会话ID
-            message: 消息数据
+            message: 消息数据，包含可选的is_timeout字段
             
         Returns:
             bool: 保存是否成功
         """
         try:
-            # 保存消息
+            # 保存消息，添加is_timeout字段支持
             self.execute_query(
-                "INSERT INTO messages (message_id, conversation_id, content, sender_type, timestamp, sequence_number) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
+                "INSERT INTO messages (message_id, conversation_id, content, sender_type, is_timeout, timestamp, sequence_number) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 (message['message_id'], conversation_id, message['content'], 
-                 message['sender_type'], message['timestamp'], message.get('sequence_number', 0))
+                 message['sender_type'], message.get('is_timeout', 0), message['timestamp'], message.get('sequence_number', 0))
             )
             
             # 更新会话的最后活跃时间和消息计数

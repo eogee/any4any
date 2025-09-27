@@ -363,8 +363,3 @@ class IndexServer(Server):
         async def conversation_messages(request: Request, conversation_id: str):
             """获取指定会话ID的所有消息"""
             return await _handle_conversation_messages(request, conversation_id)
-            
-        @app.get("/api/conversation-messages/{conversation_id}")
-        async def conversation_messages_alt(request: Request, conversation_id: str):
-            """获取指定会话ID的所有消息（兼容前端路由）"""
-            return await _handle_conversation_messages(request, conversation_id)

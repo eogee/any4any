@@ -53,7 +53,7 @@ class LLMService:
                 model_path,
                 device_map="cpu",
                 trust_remote_code=Config.TRUST_REMOTE_CODE,
-                dtype=torch.float32,  # CPU上不使用半精度
+                dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
                 low_cpu_mem_usage=Config.LOW_CPU_MEM_USAGE
             ).eval()
         else:

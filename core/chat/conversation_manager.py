@@ -120,7 +120,7 @@ class ConversationManager:
             })
         return messages
     
-    async def process_message(self, sender: str, user_nick: str, platform: str, content: str) -> tuple:
+    async def process_message(self, sender: str, user_nick: str, platform: str, content: str, is_timeout: bool = False) -> tuple:
         """
         处理用户消息的核心方法
         
@@ -129,6 +129,7 @@ class ConversationManager:
             user_nick: 用户昵称
             platform: 来源平台
             content: 用户消息内容
+            is_timeout: 是否为超时自动回复
             
         Returns:
             tuple: (响应内容, 会话ID)
@@ -194,6 +195,8 @@ class ConversationManager:
             # 创建助手消息
             assistant_message = self._create_assistant_message(llm_response)
             assistant_message['sequence_number'] = user_message['sequence_number'] + 1
+            # 设置是否为超时自动回复
+            assistant_message['is_timeout'] = 1 if is_timeout else 0
             
             # 保存助手消息
             if not self.db.save_message(conversation['conversation_id'], assistant_message):
@@ -212,13 +215,15 @@ class ConversationManager:
             # 创建错误回复的助手消息
             error_assistant_message = self._create_assistant_message(error_message)
             error_assistant_message['sequence_number'] = user_message['sequence_number'] + 1
+            # 设置是否为超时自动回复
+            error_assistant_message['is_timeout'] = 1 if is_timeout else 0
             
             # 尝试保存错误消息
             self.db.save_message(conversation['conversation_id'], error_assistant_message)
             
             return error_message, conversation['conversation_id']
             
-    async def process_message_stream(self, sender: str, user_nick: str, platform: str, content: str, generation_id: str):
+    async def process_message_stream(self, sender: str, user_nick: str, platform: str, content: str, generation_id: str, is_timeout: bool = False):
         """
         流式处理用户消息的方法
         
@@ -228,6 +233,7 @@ class ConversationManager:
             platform: 来源平台
             content: 用户消息内容
             generation_id: 生成ID，用于标识当前流式生成
+            is_timeout: 是否为超时自动回复
             
         Yields:
             str: 生成的文本块
@@ -316,6 +322,8 @@ class ConversationManager:
         # 创建助手消息
         assistant_message = self._create_assistant_message(accumulated_response)
         assistant_message['sequence_number'] = user_message['sequence_number'] + 1
+        # 设置是否为超时自动回复
+        assistant_message['is_timeout'] = 1 if is_timeout else 0
         
         # 保存助手消息
         if not self.db.save_message(conversation['conversation_id'], assistant_message):

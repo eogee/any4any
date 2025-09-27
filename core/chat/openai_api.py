@@ -197,6 +197,10 @@ class OpenAIAPI:
                 
                 # 超时后自动返回原始内容
                 logging.info(f"Preview confirmation timeout after {timeout} seconds, returning original content")
+                # 重新调用会话管理器处理消息，并标记为超时自动回复
+                assistant_response, _ = await conversation_manager.process_message(
+                    sender, user_nick, platform, user_message_content, is_timeout=True
+                )
                 response_data = OpenAIAPI._build_response_data(
                     chat_request, user_message_content, assistant_response
                 )
@@ -234,7 +238,7 @@ class OpenAIAPI:
             try:
                 # 调用流式处理
                 async for text_chunk in conversation_manager.process_message_stream(
-                    sender, user_nick, platform, user_message_content, generation_id
+                    sender, user_nick, platform, user_message_content, generation_id, is_timeout=timeout_reached
                 ):
                     if not text_chunk or text_chunk.isspace():
                         continue
