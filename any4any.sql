@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `conversation_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属会话ID',
   `content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '消息内容',
   `sender_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '发送者类型(user-用户, assistant-助手)',
+  `is_timeout` tinyint(4) DEFAULT '0' COMMENT '是否为超时自动回复',
   `timestamp` datetime NOT NULL COMMENT '消息发送时间',
   `sequence_number` int(11) NOT NULL COMMENT '消息在会话中的顺序号',
   PRIMARY KEY (`message_id`),
