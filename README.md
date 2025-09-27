@@ -70,7 +70,7 @@ git clone https://gitee.com/eogee/any4any.git
 git clone https://gitcode.com/eogee/any4any.git
 ```
 
-你也可以通过网盘下载本项目：https://pan.quark.cn/s/ea4434702727
+你也可以通过网盘下载本项目：https://pan.quark.cn/s/cb3bae2560c6
 
 ### 2.下载模型
 
