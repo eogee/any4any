@@ -58,6 +58,7 @@ DELETE FROM `messages`;
 -- 导出  表 any4any.previews 结构
 CREATE TABLE IF NOT EXISTS `previews` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `preview_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '请求预览ID',
   `conversation_id` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '会话ID',
   `message_id` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '对话ID',
   `current_request` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '当前请求内容',
@@ -69,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `previews` (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预览编辑保存结果';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预览编辑保存结果表';
 
 -- 正在导出表  any4any.previews 的数据：~0 rows (大约)
 DELETE FROM `previews`;
@@ -81,12 +82,13 @@ CREATE TABLE IF NOT EXISTS `users` (
   `password_hash` varchar(50) COLLATE utf8_unicode_ci NOT NULL COMMENT '密码',
   `nickname` varchar(50) CHARACTER SET utf32 COLLATE utf32_unicode_ci DEFAULT NULL COMMENT '昵称',
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='用户';
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='用户表';
 
--- 正在导出表  any4any.users 的数据：~1 rows (大约)
+-- 正在导出表  any4any.users 的数据：~2 rows (大约)
 DELETE FROM `users`;
 INSERT INTO `users` (`id`, `username`, `password_hash`, `nickname`) VALUES
-	(1, 'admin', '888888', 'admin');
+	(1, 'admin', '888888', 'admin'),
+	(2, 'eogee', '888888', 'eogee');
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

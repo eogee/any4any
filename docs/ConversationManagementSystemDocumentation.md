@@ -226,9 +226,6 @@ Key configuration items for the conversation management system:
 |--------------------|-------------|---------------|
 | PREVIEW_MODE | Whether to enable preview mode | Configurable |
 | PREVIEW_TIMEOUT | Preview timeout time | Configurable |
-| CLEANUP_INTERVAL | Preview cleanup interval | Configurable |
-| MAX_PREVIEW_COUNT | Maximum number of previews | Configurable |
-| cache_ttl | Conversation cache expiration time | 3600 seconds (1 hour) |
 
 ## 8. API Interfaces
 

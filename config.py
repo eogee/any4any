@@ -64,9 +64,7 @@ class Config:
 
     # 预览服务配置
     PREVIEW_TIMEOUT = int(os.getenv("PREVIEW_TIMEOUT", "300"))                      # 预览超时时间（秒），默认5分钟
-    CLEANUP_INTERVAL = int(os.getenv("CLEANUP_INTERVAL", "3600"))                   # 预览清理间隔（秒），默认1小时
-    MAX_PREVIEW_COUNT = int(os.getenv("MAX_PREVIEW_COUNT", "100"))                  # 最大预览数量
-
+    
     # 分词器配置
     TOKENIZERS_PARALLELISM = os.getenv("TOKENIZERS_PARALLELISM", "False").lower() == "true"      # 是否启用多线程分词
     

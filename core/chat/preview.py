@@ -24,8 +24,6 @@ class PreviewService:
     
     # 配置参数（直接使用Config中的配置）
     PREVIEW_TIMEOUT = Config.PREVIEW_TIMEOUT  # 预览超时时间
-    CLEANUP_INTERVAL = Config.CLEANUP_INTERVAL  # 清理间隔
-    MAX_PREVIEW_COUNT = Config.MAX_PREVIEW_COUNT  # 最大预览数量
     
     def __new__(cls):
         if cls._instance is None:

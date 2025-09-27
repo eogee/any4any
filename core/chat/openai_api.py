@@ -1,6 +1,7 @@
 import time
 import json
 import asyncio
+import logging
 from typing import List, Optional, Literal
 from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -27,7 +28,6 @@ class ChatCompletionRequest(BaseModel):
     stop: Optional[List[str]] = None
     top_p: Optional[float] = Config.TOP_P
     repetition_penalty: Optional[float] = Config.REPETITION_PENALTY
-    # 添加可选的用户信息字段，用于从请求体中提取
     sender_id: Optional[str] = None
     sender_nickname: Optional[str] = None
     platform: Optional[str] = None
@@ -65,12 +65,13 @@ class OpenAIAPI:
     async def chat_completions(request: Request, chat_request: ChatCompletionRequest):
         """OpenAI API兼容的聊天完成接口"""
         try:
-            # 特殊处理：检查是否为特定的摘要请求格式，直接返回null（由于astrbot会有系统自动发起的请求）
+            # 特殊处理：检查是否为特定的摘要请求格式
             for msg in chat_request.messages:
                 if ((msg.role == "user" and 
                     "Please summarize the following query of user:" in msg.content and
                     "Only output the summary within" in msg.content and 
-                    "DO NOT INCLUDE any other text" in msg.content) or (msg.role == "user" and 
+                    "DO NOT INCLUDE any other text" in msg.content) or 
+                    (msg.role == "user" and 
                     "You are expert in summarizing user's query." in msg.content)):
                     
                     print(f"Detected summary request format, returning null response")
@@ -94,8 +95,7 @@ class OpenAIAPI:
                         }
                     })
             
-            # 从请求体中提取用户信息，如果请求体中没有，则从请求头中获取，最后使用默认值
-            # 优先使用请求体中的sender_id, sender_nickname和platform字段
+            # 提取用户信息
             sender = chat_request.sender_id or request.headers.get("X-User-ID", "anonymous_user")
             user_nick = chat_request.sender_nickname or request.headers.get("X-User-Nick", "Anonymous")
             platform = chat_request.platform or request.headers.get("X-Platform", "web")
@@ -109,10 +109,7 @@ class OpenAIAPI:
             
             # 检查特殊指令 /a
             if user_message_content.strip() == "/a":
-                # 使用会话管理器处理新会话创建
                 response, _ = await conversation_manager.process_message(sender, user_nick, platform, user_message_content)
-                
-                # 返回新会话已开启的提示
                 return JSONResponse({
                     "id": f"new_conversation_{int(time.time())}",
                     "object": "chat.completion",
@@ -122,7 +119,7 @@ class OpenAIAPI:
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": response  # "新会话已开启，请输入您的问题。"
+                            "content": response
                         },
                         "finish_reason": "stop"
                     }],
@@ -133,239 +130,26 @@ class OpenAIAPI:
                     }
                 })
             
-            # 检查预览模式是否启用
+            # 检查预览模式
             preview_mode = Config.PREVIEW_MODE
             
-            # 无论是否是预览模式，都使用会话管理器处理消息
-            # 调用会话管理器处理消息
-            assistant_response, _ = await conversation_manager.process_message(
-                sender, 
-                user_nick, 
-                platform, 
-                user_message_content
-            )
-            
-            # 非流式响应直接返回
-            if not chat_request.stream:
-                # 如果是预览模式，创建预览请求并保存生成的内容
-                preview_id = None
-                if preview_mode:
-                    preview = await preview_service.create_preview(chat_request.dict())
-                    preview_id = preview.preview_id
-                    await preview_service.set_generated_content(preview_id, assistant_response)
-                
-                response_data = {
-                    "id": f"chatcmpl-{int(time.time())}",
-                    "object": "chat.completion",
-                    "created": int(time.time()),
-                    "model": chat_request.model,
-                    "choices": [{
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": assistant_response
-                        },
-                        "finish_reason": "stop"
-                    }],
-                    "usage": {
-                        "prompt_tokens": len(user_message_content) // 4,
-                        "completion_tokens": len(assistant_response) // 4,
-                        "total_tokens": (len(user_message_content) + len(assistant_response)) // 4
-                    }
-                }
-                
-                # 在预览模式下，将preview_id添加到响应中
-                if preview_mode and preview_id:
-                    response_data["preview_id"] = preview_id
-                
-                return JSONResponse(response_data)
-            
-            # 流式响应的情况下，如果是预览模式，创建预览请求
-            preview_id = None
-            if preview_mode:
-                preview = await preview_service.create_preview(chat_request.dict())
-                preview_id = preview.preview_id
-                
-                # 等待用户确认（使用配置中的超时时间）
-                timeout = getattr(Config, 'PREVIEW_TIMEOUT', 300)  # 默认5分钟超时
-                start_time = time.time()
-                
-                while time.time() - start_time < timeout:
-                    # 检查是否已确认
-                    updated_preview = await preview_service.get_preview(preview.preview_id)
-                    if updated_preview.confirmed:
-                        # 返回最终编辑后的内容
-                        final_content = await preview_service.get_content(preview.preview_id)
-                        return JSONResponse({
-                            "id": f"openai_{int(time.time())}",
-                            "object": "chat.completion",
-                            "created": int(time.time()),
-                            "model": chat_request.model,
-                            "choices": [{
-                                "index": 0,
-                                "message": {
-                                    "role": "assistant",
-                                    "content": final_content
-                                },
-                                "finish_reason": "stop"
-                            }],
-                            "usage": {
-                                "prompt_tokens": len(user_message) // 4,
-                                "completion_tokens": len(final_content) // 4,
-                                "total_tokens": (len(user_message) + len(final_content)) // 4
-                            }
-                        })
-                    
-                    # 等待 1 秒后再次检查
-                    await asyncio.sleep(1)
-                
-                # 超时后返回原始内容
-                return JSONResponse({
-                    "id": f"openai_{int(time.time())}",
-                    "object": "chat.completion",
-                    "created": int(time.time()),
-                    "model": chat_request.model,
-                    "choices": [{
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": response_content + "\n\n（注：预览确认超时，返回原始内容）"
-                        },
-                        "finish_reason": "stop"
-                    }],
-                    "usage": {
-                        "prompt_tokens": len(user_message) // 4,
-                        "completion_tokens": len(response_content) // 4,
-                        "total_tokens": (len(user_message) + len(response_content)) // 4
-                    }
-                })
-            
+            # 处理流式和非流式响应
             if chat_request.stream:
-                # 流式响应
-                generation_id = f"chatcmpl-{int(time.time())}"  # 使用OpenAI格式的ID
-                
-                async def openai_stream():
-                    first_chunk = True
-                    accumulated_content = ""
-                    start_time = time.time()
-                    
-                    try:
-                        # 调用会话管理器处理流式消息
-                        async for text_chunk in conversation_manager.process_message_stream(
-                            sender, 
-                            user_nick, 
-                            platform, 
-                            user_message_content,
-                            generation_id
-                        ):
-                            # 跳过空文本
-                            if not text_chunk or text_chunk.isspace():
-                                continue
-                                  
-                            # 累积内容用于调试和token计数
-                            accumulated_content += text_chunk
-                              
-                            # 构建响应数据
-                            response_data = {
-                                "id": generation_id,
-                                "object": "chat.completion.chunk",
-                                "created": int(time.time()),
-                                "model": chat_request.model,
-                                "choices": [{
-                                    "index": 0,
-                                    "delta": {
-                                        "content": text_chunk
-                                    },
-                                    "finish_reason": None
-                                }]
-                            }
-                              
-                            # 如果是第一个chunk，添加role信息
-                            if first_chunk:
-                                response_data["choices"][0]["delta"]["role"] = "assistant"
-                                first_chunk = False
-                              
-                            response_str = json.dumps(response_data, ensure_ascii=False)
-                            yield f"data: {response_str}\n\n"
-                              
-                            # 添加小延迟避免发送过快
-                            await asyncio.sleep(0.001)
-                        
-                        # 发送结束事件（正常完成）
-                        end_data = {
-                            "id": generation_id,
-                            "object": "chat.completion.chunk",
-                            "created": int(time.time()),
-                            "model": chat_request.model,
-                            "choices": [{
-                                "index": 0,
-                                "delta": {},
-                                "finish_reason": "stop"
-                            }]
-                        }
-                        end_str = json.dumps(end_data, ensure_ascii=False)
-                        yield f"data: {end_str}\n\n"
-                        
-                        # 发送流结束标记
-                        yield "data: [DONE]\n\n"
-                        print(f"Streaming response completed, total content length: {len(accumulated_content)}")
-                        
-                        # 如果是预览模式，保存生成的内容
-                        if preview_mode and preview_id:
-                            await preview_service.set_generated_content(preview_id, accumulated_content)
-                            
-                            # 对于流式响应，在响应完成后，将preview_id添加到DONE消息中
-                            yield f"data: {{\"preview_id\": \"{preview_id}\"}}\n\n"
-                    except Exception as e:
-                        print(f"Streaming response error: {str(e)}")
-                        # 检查是否为停止生成异常
-                        error_type = "stop" if "StopGenerationException" in str(e) or "停止" in str(e) or "终止" in str(e) else "error"
-                        
-                        error_data = {
-                            "id": generation_id,
-                            "object": "chat.completion.chunk",
-                            "created": int(time.time()),
-                            "model": chat_request.model,
-                            "choices": [{
-                                "index": 0,
-                                "delta": {} if error_type == "stop" else {
-                                    "content": f"\n\n[错误: {str(e)}]"
-                                },
-                                "finish_reason": error_type
-                            }]
-                        }
-                        error_str = json.dumps(error_data, ensure_ascii=False)
-                        yield f"data: {error_str}\n\n"
-                        yield "data: [DONE]\n\n"
-                
-                # 设置Dify兼容的响应头
-                headers = {
-                    "Content-Type": "text/event-stream; charset=utf-8",
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "*",
-                    "X-Accel-Buffering": "no",  # 防止Nginx缓冲
-                }
-                
-                return StreamingResponse(
-                    openai_stream(), 
-                    media_type="text/event-stream; charset=utf-8", 
-                    headers=headers
+                return await OpenAIAPI._handle_streaming_response(
+                    chat_request, sender, user_nick, platform, 
+                    user_message_content, preview_mode
                 )
             else:
-                # 这个分支理论上不应该被执行，为了安全起见，保留一个简单的错误响应
-                print("Unexpected code path: Non-streaming response reached after previous handling")
-                return JSONResponse({
-                    "error": {
-                        "message": "Unexpected response path",
-                        "type": "invalid_request_error",
-                        "code": "unexpected_code_path"
-                    }
-                }, status_code=400)
+                return await OpenAIAPI._handle_non_streaming_response(
+                    chat_request, sender, user_nick, platform, 
+                    user_message_content, preview_mode
+                )
                 
         except Exception as e:
-            print(f"OpenAI API err: {str(e)}")
+            logging.error(f"OpenAI API error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
             return JSONResponse({
                 "error": {
                     "message": str(e),
@@ -375,12 +159,246 @@ class OpenAIAPI:
             }, status_code=500)
 
     @staticmethod
+    async def _handle_non_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode):
+        """处理非流式响应"""
+        try:
+            # 调用会话管理器处理消息
+            assistant_response, _ = await conversation_manager.process_message(
+                sender, user_nick, platform, user_message_content
+            )
+            
+            # 预览模式处理
+            preview_id = None
+            if preview_mode:
+                preview = await preview_service.create_preview(chat_request.dict())
+                preview_id = preview.preview_id
+                await preview_service.set_generated_content(preview_id, assistant_response)
+                
+                # 等待用户确认，但设置超时后自动返回
+                timeout = getattr(Config, 'PREVIEW_TIMEOUT', 60)  # 使用配置的超时时间，默认60秒
+                start_time = time.time()
+                
+                while time.time() - start_time < timeout:
+                    updated_preview = await preview_service.get_preview(preview_id)
+                    if updated_preview.confirmed:
+                        # 用户确认，返回编辑后的内容
+                        final_content = await preview_service.get_content(preview_id)
+                        response_data = OpenAIAPI._build_response_data(
+                            chat_request, user_message_content, final_content
+                        )
+                        response_data["preview_id"] = preview_id
+                        return JSONResponse(response_data)
+                    
+                    # 检查是否超时
+                    if time.time() - start_time >= timeout:
+                        break
+                        
+                    await asyncio.sleep(1)
+                
+                # 超时后自动返回原始内容
+                logging.info(f"Preview confirmation timeout after {timeout} seconds, returning original content")
+                response_data = OpenAIAPI._build_response_data(
+                    chat_request, user_message_content, assistant_response
+                )
+                response_data["preview_id"] = preview_id
+                # 标记为超时自动发送
+                response_data["timeout_auto_sent"] = True
+                return JSONResponse(response_data)
+            
+            # 非预览模式直接返回
+            response_data = OpenAIAPI._build_response_data(
+                chat_request, user_message_content, assistant_response
+            )
+            return JSONResponse(response_data)
+            
+        except Exception as e:
+            logging.error(f"Non-streaming response error: {str(e)}")
+            raise
+
+    @staticmethod
+    async def _handle_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode):
+        """处理流式响应"""
+        generation_id = f"chatcmpl-{int(time.time())}"
+        preview_id = None
+        
+        # 预览模式处理
+        if preview_mode:
+            preview = await preview_service.create_preview(chat_request.dict())
+            preview_id = preview.preview_id
+        
+        async def openai_stream():
+            accumulated_content = ""
+            first_chunk = True
+            timeout_reached = False
+            
+            try:
+                # 调用流式处理
+                async for text_chunk in conversation_manager.process_message_stream(
+                    sender, user_nick, platform, user_message_content, generation_id
+                ):
+                    if not text_chunk or text_chunk.isspace():
+                        continue
+                        
+                    accumulated_content += text_chunk
+                    
+                    response_data = {
+                        "id": generation_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": chat_request.model,
+                        "choices": [{
+                            "index": 0,
+                            "delta": {
+                                "content": text_chunk
+                            } if not first_chunk else {
+                                "role": "assistant",
+                                "content": text_chunk
+                            },
+                            "finish_reason": None
+                        }]
+                    }
+                    
+                    response_str = json.dumps(response_data, ensure_ascii=False)
+                    yield f"data: {response_str}\n\n"
+                    
+                    if first_chunk:
+                        first_chunk = False
+                    
+                    await asyncio.sleep(0.001)
+                
+                # 如果是预览模式，等待确认或超时
+                if preview_mode and preview_id:
+                    await preview_service.set_generated_content(preview_id, accumulated_content)
+                    
+                    timeout = getattr(Config, 'PREVIEW_TIMEOUT', 60)
+                    start_time = time.time()
+                    
+                    while time.time() - start_time < timeout:
+                        updated_preview = await preview_service.get_preview(preview_id)
+                        if updated_preview.confirmed:
+                            # 用户确认，使用编辑后的内容
+                            final_content = await preview_service.get_content(preview_id)
+                            # 发送最终内容
+                            if final_content != accumulated_content:
+                                # 发送差异内容
+                                diff_content = final_content[len(accumulated_content):]
+                                if diff_content:
+                                    diff_data = {
+                                        "id": generation_id,
+                                        "object": "chat.completion.chunk",
+                                        "created": int(time.time()),
+                                        "model": chat_request.model,
+                                        "choices": [{
+                                            "index": 0,
+                                            "delta": {
+                                                "content": diff_content
+                                            },
+                                            "finish_reason": None
+                                        }]
+                                    }
+                                    diff_str = json.dumps(diff_data, ensure_ascii=False)
+                                    yield f"data: {diff_str}\n\n"
+                            break
+                        
+                        if time.time() - start_time >= timeout:
+                            timeout_reached = True
+                            logging.info(f"Streaming preview timeout after {timeout} seconds")
+                            break
+                            
+                        await asyncio.sleep(1)
+                
+                # 发送结束事件
+                end_data = {
+                    "id": generation_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": chat_request.model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {},
+                        "finish_reason": "stop"
+                    }]
+                }
+                
+                # 如果是预览模式超时，添加标记
+                if timeout_reached:
+                    end_data["timeout_auto_sent"] = True
+                
+                end_str = json.dumps(end_data, ensure_ascii=False)
+                yield f"data: {end_str}\n\n"
+                
+                # 如果是预览模式，发送preview_id
+                if preview_mode and preview_id:
+                    preview_info = {
+                        "preview_id": preview_id,
+                        "timeout_auto_sent": timeout_reached
+                    }
+                    yield f"data: {json.dumps(preview_info, ensure_ascii=False)}\n\n"
+                
+                yield "data: [DONE]\n\n"
+                
+            except Exception as e:
+                logging.error(f"Streaming error: {str(e)}")
+                error_data = {
+                    "id": generation_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": chat_request.model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {},
+                        "finish_reason": "error"
+                    }]
+                }
+                error_str = json.dumps(error_data, ensure_ascii=False)
+                yield f"data: {error_str}\n\n"
+                yield "data: [DONE]\n\n"
+
+        headers = {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "X-Accel-Buffering": "no",
+        }
+        
+        return StreamingResponse(
+            openai_stream(), 
+            media_type="text/event-stream; charset=utf-8", 
+            headers=headers
+        )
+
+    @staticmethod
+    def _build_response_data(chat_request, user_message, assistant_response):
+        """构建响应数据"""
+        return {
+            "id": f"chatcmpl-{int(time.time())}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": chat_request.model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": assistant_response
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": len(user_message) // 4,
+                "completion_tokens": len(assistant_response) // 4,
+                "total_tokens": (len(user_message) + len(assistant_response)) // 4
+            }
+        }
+
+    @staticmethod
     async def list_models():
         """OpenAI API兼容的模型列表接口"""
         return JSONResponse({
             "object": "list",
             "data": [{
-                "id": Config.LLM_MODEL_NAME,  # 使用配置中的模型名称
+                "id": Config.LLM_MODEL_NAME,
                 "object": "model",
                 "created": int(time.time()),
                 "owned_by": "local"
