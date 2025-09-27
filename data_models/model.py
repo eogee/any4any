@@ -158,7 +158,7 @@ class Model(ABC):
             
             found_status = "Found" if result else "Not found"
             # 将fetch_one的日志降低为debug级别，避免与其他查询操作的info日志重复
-            self.logger.info(f"[FIND_ONE] {found_status} record from {self.get_table_name()}")
+            self.logger.debug(f"[FIND_ONE] {found_status} record from {self.get_table_name()}")
             return result
         except Error as e:
             self.logger.error(f"Database fetch one failed: {e}")

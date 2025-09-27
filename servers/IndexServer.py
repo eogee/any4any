@@ -80,7 +80,7 @@ class IndexServer(Server):
             response = await preview_service.confirm_preview(preview_id)
             
             # 添加日志记录，用于调试
-            logging.info(f"Preview confirmed for ID: {preview_id}, response: {response}")
+            logging.info(f"Preview confirmed for ID: {preview_id}")
             
             return JSONResponse(response)
         except Exception as e:

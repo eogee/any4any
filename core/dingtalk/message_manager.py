@@ -273,9 +273,9 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
                 )
                 
                 if result:
-                    self.logger.info(f"Successfully sent reply to user {user_nick}({user_id})")
+                    self.logger.info(f"Successfully sent reply to user")
                 else:
-                    self.logger.error(f"Failed to send reply to user {user_nick}({user_id})")
+                    self.logger.error(f"Failed to send reply to user")
                 
         except Exception as e:
             self.logger.error(f"Exception occurred while processing message: {e}")
@@ -384,9 +384,9 @@ async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: s
         memory_store.delete(preview_id)
         
         if result:
-            logger.info(f"Successfully sent reply to user {sender_name}({sender_id}) after preview confirmation")
+            logger.info(f"Successfully sent reply to user after preview confirmation")
         else:
-            logger.error(f"Failed to send reply to user {sender_name}({sender_id}) after preview confirmation")
+            logger.error(f"Failed to send reply to user after preview confirmation")
         
         return result
     except Exception as e:
