@@ -376,7 +376,7 @@
                                 </tr>
                             </thead>
                             <tbody id="requestTableBody">
-                                <!-- 对话数据在这里动态生成 -->
+                                <tr><td colspan="2" class="loading-state">加载中...</td></tr>
                             </tbody>
                         </table>
                         <button class="table-toggle-btn" id="toggleRequestTable">
@@ -396,8 +396,182 @@
                     <button class="layui-btn layui-btn-primary" id="confirmBtnDetail">
                         <i class="fas fa-check"></i> 确认发送
                     </button>
-                </div>
-            `;
+                </div>`;
+            
+            // 如果有conversation_id，则加载对话历史
+            const conversationId = requestData.conversation_id;
+            if (conversationId) {
+                loadConversationHistory(conversationId);
+            } else {
+                const tableBody = document.getElementById('requestTableBody');
+                tableBody.innerHTML = '<tr><td colspan="2" class="empty-state">无对话历史数据</td></tr>';
+            }
+        
+        // 加载对话历史数据
+        async function loadConversationHistory(conversationId) {
+            try {
+                const response = await fetch(`/api/conversation-messages/${conversationId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 将消息数组倒序，使最新的消息显示在前面
+                    const reversedMessages = [...data.messages].reverse();
+                    renderConversationMessages(reversedMessages);
+                } else {
+                    console.error('获取对话历史失败:', data.error);
+                    const tableBody = document.getElementById('requestTableBody');
+                    tableBody.innerHTML = '<tr><td colspan="2" class="error-state">加载失败: ' + data.error + '</td></tr>';
+                }
+            } catch (error) {
+                console.error('获取对话历史时发生错误:', error);
+                const tableBody = document.getElementById('requestTableBody');
+                tableBody.innerHTML = '<tr><td colspan="2" class="error-state">网络错误，请稍后重试</td></tr>';
+            }
+        }
+        
+        // 渲染对话消息
+        function renderConversationMessages(messages) {
+            const tableBody = document.getElementById('requestTableBody');
+            
+            // 确保有消息数据
+            if (!messages || messages.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="2" class="empty-state">暂无对话消息</td></tr>';
+                return;
+            }
+            
+            // 彻底重写配对逻辑，使用更简单直接的方法
+            const pairs = [];
+            let currentPair = null;
+            
+            for (let j = 0; j < messages.length; j++) {
+                const msg = messages[j];
+                
+                // 如果是用户消息，开始新的配对
+                if (msg.sender_type === 'user') {
+                    if (currentPair) {
+                        // 如果已经有配对，先保存
+                        pairs.push(currentPair);
+                    }
+                    // 开始新配对
+                    currentPair = { user: msg, assistant: null };
+                }
+                // 如果是助手消息，添加到当前配对
+                else if (msg.sender_type === 'assistant' && currentPair) {
+                    currentPair.assistant = msg;
+                    pairs.push(currentPair); // 保存完成的配对
+                    currentPair = null; // 重置配对
+                }
+            }
+            
+            // 处理最后一个未完成的配对
+            if (currentPair) {
+                pairs.push(currentPair);
+            }
+            
+            // 直接创建DOM元素而不是使用innerHTML，避免HTML解析问题
+            // 首先清空表格
+            tableBody.innerHTML = '';
+            
+            // 创建一个助手消息数组，用于下移显示
+            const assistantMessages = pairs.map(pair => pair.assistant ? pair.assistant.content : '');
+            
+            // 为每对消息创建行和单元格
+            for (let k = 0; k < pairs.length; k++) {
+                const pair = pairs[k];
+                
+                // 创建表格行
+                const row = document.createElement('tr');
+                row.className = 'message-pair';
+                row.setAttribute('data-row-index', k.toString());
+                
+                // 创建用户消息单元格
+                const userCell = document.createElement('td');
+                userCell.className = 'user-message';
+                if (pair.user && pair.user.content) {
+                    userCell.innerHTML = escapeHtml(pair.user.content);
+                }
+                
+                // 创建助手消息单元格，实现特殊显示效果
+                const assistantCell = document.createElement('td');
+                assistantCell.className = 'assistant-message';
+                
+                if (k === 0) {
+                    // 第一行第二列显示"待确认回复..."
+                    assistantCell.innerHTML = '待确认回复...';
+                } else {
+                    // 从第二行开始，第二列显示上一行的助手回复（下移一格）
+                    const previousAssistantContent = assistantMessages[k - 1];
+                    if (previousAssistantContent) {
+                        assistantCell.innerHTML = escapeHtml(previousAssistantContent);
+                    }
+                }
+                
+                // 添加单元格到行，添加行到表格
+                row.appendChild(userCell);
+                row.appendChild(assistantCell);
+                tableBody.appendChild(row);
+            }
+            
+            // 设置表格切换功能
+            setupTableToggle();
+        }
+        
+        // 返回完整文本的函数
+        function truncateText(text, maxLength) {
+            // 直接返回原始文本，不进行截断
+            return text || '';
+        }
+        
+        // HTML转义函数
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+                .replace(/\n/g, '<br>');
+        }
+        
+        // 设置表格折叠功能 - 初始只显示第一组数据
+        function setupTableToggle() {
+            const toggleBtn = document.getElementById('toggleRequestTable');
+            const tableBody = document.getElementById('requestTableBody');
+            
+            if (toggleBtn && tableBody) {
+                let isExpanded = false;
+                const rows = tableBody.querySelectorAll('tr.message-pair');
+                
+                // 初始只显示第一行，隐藏其他所有行
+                if (rows.length > 1) {
+                    for (let i = 1; i < rows.length; i++) {
+                        rows[i].style.display = 'none';
+                    }
+                    toggleBtn.style.display = 'block';
+                } else {
+                    toggleBtn.style.display = 'none';
+                }
+                
+                toggleBtn.addEventListener('click', function() {
+                    isExpanded = !isExpanded;
+                    
+                    if (isExpanded) {
+                        // 展开所有行
+                        for (let i = 1; i < rows.length; i++) {
+                            rows[i].style.display = '';
+                        }
+                        toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> 收起';
+                    } else {
+                        // 收起多余的行，只保留第一行
+                        for (let i = 1; i < rows.length; i++) {
+                            rows[i].style.display = 'none';
+                        }
+                        toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> 显示更多';
+                    }
+                });
+            }
+        }
             
             // 添加事件监听器
             const editBtn = document.getElementById('editBtn');

@@ -95,9 +95,51 @@ class IndexServer(Server):
         """获取预览数据"""
         try:
             preview = await preview_service.get_preview(preview_id)
+            
+            # 创建一个request_data的副本，避免直接修改原始数据
+            request_data = preview.request_data.copy() if preview.request_data else {}
+            
+            # 尝试获取或生成conversation_id
+            conversation_id = None
+            
+            # 1. 尝试从request_data中直接获取
+            if 'conversation_id' in request_data:
+                conversation_id = request_data['conversation_id']
+            
+            # 2. 如果没有，尝试从messages列表中查找最后一个用户消息的内容，然后查询对应的conversation_id
+            elif request_data and 'messages' in request_data:
+                # 查找最后一个用户消息
+                last_user_message = None
+                for msg in reversed(request_data['messages']):
+                    if isinstance(msg, dict) and msg.get('role') == 'user':
+                        last_user_message = msg.get('content', '')
+                        break
+                
+                if last_user_message:
+                    try:
+                        # 使用ConversationDatabase查询conversation_id
+                        db = ConversationDatabase()
+                        # 根据消息内容查询最近的conversation_id
+                        result = db.fetch_one(
+                            "SELECT conversation_id FROM messages WHERE content LIKE %s ORDER BY timestamp DESC LIMIT 1",
+                            (f"%{last_user_message[:100]}%",)  # 使用内容的前100个字符作为模糊查询条件
+                        )
+                        if result:
+                            conversation_id = result.get('conversation_id')
+                    except Exception as db_error:
+                        logging.warning(f"Failed to query conversation_id: {db_error}")
+            
+            # 3. 如果仍然没有找到，生成一个新的UUID格式的conversation_id
+            if not conversation_id:
+                import uuid
+                conversation_id = str(uuid.uuid4())
+            
+            # 将conversation_id添加到request_data中
+            request_data['conversation_id'] = conversation_id
+            
             return JSONResponse({
                 "preview_id": preview.preview_id,
-                "request": preview.request_data,
+                "request": request_data,
                 "generated_content": preview.generated_content,
                 "edited_content": preview.edited_content,
                 "status": "preview"
@@ -146,113 +188,81 @@ class IndexServer(Server):
     async def get_conversation_messages(self, conversation_id: str):
         """
         获取指定conversation_id的所有消息数据
-        从messages表中直接查询数据
+        根据需求优化为简洁高效的查询，返回会话信息和按时间排序的消息列表
         """
-        logging.info(f"[API] 开始处理请求 - 会话ID: {conversation_id}")
+        logging.info(f"Start querying conversation messages - conversation_id: {conversation_id}")
         
         # 验证conversation_id参数
         if not conversation_id or not isinstance(conversation_id, str):
-            error_msg = f"无效的会话ID: {conversation_id} (类型: {type(conversation_id).__name__})"
-            logging.error(f"[ERROR] {error_msg}")
+            error_msg = f"Invalid conversation_id: {conversation_id} (type: {type(conversation_id).__name__})"
+            logging.error(f"{error_msg}")
             return JSONResponse({
-                "status": "error",
+                "success": False,
                 "error": error_msg,
-                "conversation_id": str(conversation_id) if conversation_id else "None",
                 "error_type": "invalid_parameter"
             }, status_code=400)
         
         try:
-            logging.info(f"[INFO] 尝试获取会话ID: {conversation_id} 的消息数据")
-            
             # 创建数据库实例
-            logging.info(f"[INFO] 创建数据库连接")
             db = ConversationDatabase()
-            logging.info(f"[INFO] 数据库实例创建成功，准备查询会话ID: {conversation_id}")
             
-            # 检查数据库方法是否存在
-            if not hasattr(db, 'get_conversation_by_id'):
-                logging.error(f"[ERROR] 数据库对象没有get_conversation_by_id方法")
-                return JSONResponse({
-                    "status": "error",
-                    "error": "数据库方法未找到: get_conversation_by_id",
-                    "conversation_id": conversation_id,
-                    "error_type": "database_error"
-                }, status_code=500)
-            
-            # 获取完整的会话数据，包括消息列表
+            # 直接获取完整的会话数据
             conversation = db.get_conversation_by_id(conversation_id)
-            logging.info(f"[INFO] 查询结果: {'找到会话' if conversation else '未找到会话'}")
             
             if not conversation:
-                logging.error(f"[ERROR] 会话ID {conversation_id} 不存在")
+                logging.error(f"Conversation ID {conversation_id} not found")
                 return JSONResponse({
-                    "status": "error",
-                    "error": "会话不存在",
-                    "conversation_id": conversation_id,
+                    "success": False,
+                    "error": "Conversation not found",
                     "error_type": "not_found"
                 }, status_code=404)
             
-            # 安全获取消息列表
-            messages = []
-            try:
-                if isinstance(conversation, dict):
-                    messages = conversation.get('messages', [])
-                elif hasattr(conversation, 'messages'):
-                    messages = conversation.messages
-                else:
-                    logging.warning(f"[WARNING] 会话对象格式未知，无法提取消息列表: {type(conversation)}")
-            except Exception as msg_extract_error:
-                logging.error(f"[ERROR] 提取消息列表时发生错误: {str(msg_extract_error)}")
-                messages = []
+            # 处理会话对象中的datetime字段，确保可以JSON序列化
+            def safe_serialize(value):
+                if hasattr(value, 'isoformat'):
+                    return value.isoformat()
+                return value
+                
+            # 构建所需的返回结构，处理所有可能的datetime字段
+            conversation_info = {
+                "conversation_id": conversation.get("conversation_id"),
+                "user_nick": conversation.get("user_nick"),
+                "platform": conversation.get("platform"),
+                "message_count": conversation.get("message_count", 0)
+            }
             
-            logging.info(f"[SUCCESS] 成功获取消息列表，共 {len(messages)} 条消息")
+            # 检查并序列化可能存在的datetime字段
+            for field in ['created_at', 'updated_at', 'last_message_time']:
+                if field in conversation:
+                    conversation_info[field] = safe_serialize(conversation[field])
             
-            # 返回消息列表和会话详情
+            # 获取并格式化消息列表
+            messages = conversation.get("messages", [])
+            
+            logging.info(f"Successfully retrieved message list, total {len(messages)} messages")
+            
+            # 返回规范化的响应格式
             return JSONResponse({
-                "status": "success",
-                "conversation_id": conversation_id,
-                "message_count": len(messages),
-                "conversation": conversation,
-                "messages": messages,
-                "api_info": {
-                    "timestamp": datetime.now().isoformat(),
-                    "version": "1.0"
-                }
+                "success": True,
+                "conversation_info": conversation_info,
+                "messages": messages
             })
             
         except ConnectionError as conn_error:
-            error_message = f"数据库连接错误: {str(conn_error)}"
-            logging.critical(f"[CRITICAL ERROR] {error_message}")
-            logging.error(f"[ERROR] 错误堆栈: {traceback.format_exc()}")
+            error_message = f"Database connection error: {str(conn_error)}"
+            logging.critical(f"{error_message}")
             return JSONResponse({
-                "status": "error",
-                "error": "数据库连接失败，请检查数据库服务是否运行",
-                "conversation_id": conversation_id,
-                "error_type": "connection_error",
-                "details": str(conn_error)
+                "success": False,
+                "error": "Database connection failed, please check if database service is running",
+                "error_type": "connection_error"
             }, status_code=503)
             
-        except AttributeError as attr_error:
-            error_message = f"属性错误: {str(attr_error)}"
-            logging.error(f"[ERROR] {error_message}")
-            logging.error(f"[ERROR] 错误堆栈: {traceback.format_exc()}")
-            return JSONResponse({
-                "status": "error",
-                "error": "系统错误，请联系管理员",
-                "conversation_id": conversation_id,
-                "error_type": "attribute_error",
-                "details": str(attr_error)
-            }, status_code=500)
-            
         except Exception as e:
-            logging.error(f"[ERROR] 查询会话消息时发生错误: {str(e)}")
-            logging.error(f"[ERROR] 错误堆栈: {traceback.format_exc()}")
+            logging.error(f"Error occurred while querying conversation messages: {str(e)}")
             return JSONResponse({
-                "error": "服务器内部错误，请稍后重试",
-                "error_type": type(e).__name__,
-                "status": "error",
-                "conversation_id": conversation_id,
-                "details": str(e)
+                "success": False,
+                "error": "Internal server error, please try again later",
+                "error_type": type(e).__name__
             }, status_code=500)
         
     def register_routes(self, app: FastAPI):
@@ -341,9 +351,18 @@ class IndexServer(Server):
                 return get_login_redirect()
             return await self.get_preview_data(preview_id)
             
-        @app.get("/api/conversation/{conversation_id}/messages")
-        async def conversation_messages(request: Request, conversation_id: str):
-            """获取指定会话ID的所有消息"""
+        async def _handle_conversation_messages(request: Request, conversation_id: str):
+            """处理会话消息请求的内部函数"""
             if not await check_user_login(request):
                 return get_login_redirect()
             return await self.get_conversation_messages(conversation_id)
+            
+        @app.get("/api/conversation/{conversation_id}/messages")
+        async def conversation_messages(request: Request, conversation_id: str):
+            """获取指定会话ID的所有消息"""
+            return await _handle_conversation_messages(request, conversation_id)
+            
+        @app.get("/api/conversation-messages/{conversation_id}")
+        async def conversation_messages_alt(request: Request, conversation_id: str):
+            """获取指定会话ID的所有消息（兼容前端路由）"""
+            return await _handle_conversation_messages(request, conversation_id)

@@ -1,5 +1,4 @@
 import logging
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
 from mysql.connector import Error
@@ -103,7 +102,7 @@ class Model(ABC):
             Error: 数据库操作错误
         """
         try:
-            cursor = self._get_cursor(dictionary=False)
+            cursor = self._get_cursor()  # 使用默认的dictionary=True以保持一致性
             if params:
                 cursor.execute(query, params)
             else:

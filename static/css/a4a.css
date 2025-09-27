@@ -570,10 +570,11 @@ body::before {
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-size: 14px;
 }
 
 .request-table th {
-    background: var(--primary);
+    background: #0052a3;
     color: white;
     padding: 12px;
     text-align: left;
@@ -582,17 +583,13 @@ body::before {
     width: 50%;
 }
 
-.request-table th {
-    background:  #0052a3;
-}
-
 .request-table td {
     padding: 12px;
     border-bottom: 1px solid #eee;
     font-size: 13px;
     vertical-align: top;
     width: 50%;
-    max-width: 300px;
+    max-width: 400px;
     word-wrap: break-word;
     line-height: 1.5;
 }
@@ -601,14 +598,44 @@ body::before {
     background: rgba(0, 102, 204, 0.05);
 }
 
+.request-table .loading-state {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
+.request-table .empty-state {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+    background-color: #fafafa;
+}
+
+.request-table .error-state {
+    text-align: center;
+    padding: 20px;
+    color: #e74c3c;
+    background-color: #fdf2f2;
+}
+
+.request-table .user-message {
+    background-color: #f8f9fa;
+    font-weight: 500;
+}
+
+.request-table .assistant-message {
+    background-color: #ffffff;
+}
+
 .table-toggle-btn {
     margin-top: 10px;
-    padding: 5px 15px;
+    padding: 10px 15px;
     border: 1px solid #ddd;
     background: #fff;
     cursor: pointer;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 14px;
     color: var(--text-secondary);
     transition: all 0.3s;
 }
@@ -617,6 +644,10 @@ body::before {
     background: #e9ecef;
     border-color: var(--primary);
     color: var(--primary);
+}
+
+.table-toggle-btn i {
+    margin-right: 5px;
 }
 
 /* 登录页面样式 */

@@ -238,13 +238,59 @@ class PreviewService:
         pending = []
         for preview_id, preview in self._previews.items():
             if not preview.confirmed and preview.generated_content:
+                # 创建request_data的副本，避免直接修改原始数据
+                request_data = preview.request_data.copy() if preview.request_data else {}
+                
+                # 尝试获取或生成conversation_id
+                conversation_id = None
+                
+                # 1. 尝试从request_data中直接获取
+                if 'conversation_id' in request_data:
+                    conversation_id = request_data['conversation_id']
+                
+                # 2. 如果没有，尝试从messages列表中查找最后一个用户消息的内容，然后查询对应的conversation_id
+                elif request_data and 'messages' in request_data:
+                    # 查找最后一个用户消息
+                    last_user_message = None
+                    for msg in reversed(request_data['messages']):
+                        if isinstance(msg, dict) and msg.get('role') == 'user':
+                            last_user_message = msg.get('content', '')
+                            break
+                    
+                    if last_user_message:
+                        try:
+                            # 导入必要的模块
+                            from data_models.Preview import Preview
+                            import logging
+                            
+                            # 使用Preview模型查询conversation_id
+                            preview_model = Preview()
+                            # 根据消息内容查询最近的conversation_id
+                            result = preview_model.fetch_one(
+                                "SELECT conversation_id FROM messages WHERE content LIKE %s ORDER BY timestamp DESC LIMIT 1",
+                                (f"%{last_user_message[:100]}%",)  # 使用内容的前100个字符作为模糊查询条件
+                            )
+                            if result:
+                                conversation_id = result.get('conversation_id')
+                        except Exception as db_error:
+                            # 只记录警告级别日志，不影响功能
+                            logging.warning(f"Failed to query conversation_id for preview {preview_id}: {db_error}")
+                
+                # 3. 如果仍然没有找到，生成一个新的UUID格式的conversation_id
+                if not conversation_id:
+                    import uuid
+                    conversation_id = str(uuid.uuid4())
+                
+                # 将conversation_id添加到request_data中
+                request_data['conversation_id'] = conversation_id
+                
                 pending.append({
                     "preview_id": preview_id,
                     "created_at": preview.created_at,
                     "preview_url": f"/preview/{preview_id}",
-                    "request_data": preview.request_data,  # 添加请求数据
+                    "request_data": request_data,  # 使用添加了conversation_id的request_data
                     "generated_content": preview.generated_content,  # 修改为完整内容
-                    "generated_content_preview": preview.generated_content[:100] + "..." if len(preview.generated_content) > 100 else preview.generated_content
+                    "generated_content_preview": preview.generated_content
                 })
         return pending
 

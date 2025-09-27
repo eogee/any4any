@@ -2,7 +2,7 @@ import uuid
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-from data_models.Model import Model
+from data_models.model import Model
 
 logger = logging.getLogger(__name__)
 
@@ -106,29 +106,50 @@ class ConversationDatabase(Model):
         try:
             # 获取会话基本信息
             conversation = self.find_by_id(conversation_id, 'conversation_id')
-            if not conversation:
+            if not conversation or not isinstance(conversation, dict):
+                logger.warning(f"会话不存在或格式不正确，ID: {conversation_id}, 类型: {type(conversation)}")
                 return None
             
             # 获取会话的消息列表
-            messages = self.fetch_all(
-                "SELECT * FROM messages WHERE conversation_id = %s ORDER BY sequence_number",
-                (conversation_id,)
-            )
+            try:
+                messages = self.fetch_all(
+                    "SELECT * FROM messages WHERE conversation_id = %s ORDER BY sequence_number",
+                    (conversation_id,)
+                )
+            except Exception as msg_error:
+                logger.error(f"获取消息列表失败: {msg_error}")
+                messages = []
             
             # 构建完整的会话数据
-            result = conversation.copy()
-            result['messages'] = [
-                {
-                    'message_id': msg['message_id'],
-                    'content': msg['content'],
-                    'sender_type': msg['sender_type'],
-                    'timestamp': msg['timestamp'],
-                    'sequence_number': msg['sequence_number']
-                }
-                for msg in messages
-            ]
-            
-            return result
+            try:
+                result = conversation.copy()
+                # 安全地构建消息列表
+                formatted_messages = []
+                for msg in messages:
+                    if isinstance(msg, dict):
+                        try:
+                            # 处理datetime对象序列化
+                            timestamp = msg.get('timestamp', '')
+                            if hasattr(timestamp, 'isoformat'):
+                                timestamp = timestamp.isoformat()
+                            
+                            formatted_message = {
+                                'message_id': msg.get('message_id', ''),
+                                'content': msg.get('content', ''),
+                                'sender_type': msg.get('sender_type', ''),
+                                'timestamp': timestamp,
+                                'sequence_number': msg.get('sequence_number', 0)
+                            }
+                            formatted_messages.append(formatted_message)
+                        except Exception as item_error:
+                            logger.error(f"格式化消息项失败: {item_error}")
+                
+                result['messages'] = formatted_messages
+                return result
+            except Exception as build_error:
+                logger.error(f"构建会话数据失败: {build_error}")
+                # 返回基本会话信息，即使消息列表无法构建
+                return conversation
             
         except Exception as e:
             logger.error(f"Failed to get conversation by ID: {e}")

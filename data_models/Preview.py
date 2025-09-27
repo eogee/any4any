@@ -1,7 +1,7 @@
 import logging
 import json
 from typing import Dict, Any, Optional
-from data_models.Model import Model
+from data_models.model import Model
 
 class Preview(Model):
     """

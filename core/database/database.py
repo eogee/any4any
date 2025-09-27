@@ -16,9 +16,6 @@ class DatabaseExecuteRequest(BaseModel):
 
 def get_db_connection():
     """创建并返回MySQL数据库连接"""
-    logger.info(f"DBSETTING： - host:{Config.MYSQL_HOST} port:{Config.MYSQL_PORT} "
-               f"user:{Config.MYSQL_USER} db:{Config.MYSQL_DATABASE}")
-    
     max_retries = 3
     retry_delay = 1
     
@@ -41,7 +38,6 @@ def get_db_connection():
                            f"user={Config.MYSQL_USER}, "
                            f"database={Config.MYSQL_DATABASE}")
                 raise
-            logger.info("Successfully connected to MySQL database")
             return connection
         except Error as e:
             logger.error(f"Attempt {attempt + 1} failed to connect to MySQL: {e}")

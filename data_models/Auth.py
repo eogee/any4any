@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Dict, Any
 from mysql.connector import Error
-from data_models.Model import Model
+from data_models.model import Model
 
 class AuthModel(Model):
     """

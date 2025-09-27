@@ -178,6 +178,7 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             # 发送请求到app.py中的/v1/chat/completions接口
             self.logger.info(f"Forwarding message to OpenAI API: {original_content}")
             
+            api_response = None
             try:
                 # 使用httpx发送异步HTTP请求
                 async with httpx.AsyncClient() as client:
