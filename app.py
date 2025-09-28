@@ -62,8 +62,8 @@ app.add_middleware(
 # 会话中间件配置
 app.add_middleware(
     SessionMiddleware,
-    secret_key=Config.API_KEY or "your-secret-key",  # 使用API_KEY作为会话密钥，如果为空则使用默认值
-    max_age=Config.SESSION_MAX_AGE  # 使用配置文件中的会话有效期设置
+    secret_key=Config.API_KEY or "your-secret-key",     # 使用API_KEY作为会话密钥，如果为空则使用默认值
+    max_age=Config.SESSION_MAX_AGE                      # 使用配置文件中的会话有效期设置
 )
 
 # 挂载静态文件目录

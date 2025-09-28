@@ -1,12 +1,7 @@
-"""
-模型管理器-用于初始化所有模型和资源
-"""
-
 import logging
 import time
 import multiprocessing 
 import os
-import logging
 import gc
 from typing import Optional
 from config import Config
@@ -22,12 +17,13 @@ try:
 except RuntimeError:
     pass
 
-# 设置环境变量避免多进程问题
 os.environ['TOKENIZERS_PARALLELISM'] = 'true' if Config.TOKENIZERS_PARALLELISM else 'false'
 
 logger = logging.getLogger(__name__)
 
 class ModelManager:
+    """模型管理器-用于初始化所有模型和资源"""
+    
     _instance = None
     m = None
     kwargs = None
@@ -42,60 +38,53 @@ class ModelManager:
 
     @classmethod
     async def initialize(cls, load_llm=True):
-        """初始化模型和声音列表
-        
-        Args:
-            load_llm: 是否加载LLM模型，默认为True
-        """
+        """初始化模型和声音列表"""
         try:
             if not hasattr(cls, '_initialized'):
                 cls._initialized = False
                 
             if cls._initialized:
-                logger.info("Models already initialized, skipping...")
+                logger.info("Models already initialized")
                 return
                 
             logger.info(f"Loading model from: {Config.ASR_MODEL_DIR}")
-            logger.info(f"Using device: {Config.DEVICE}")
             
             if not cls.m:
-                logger.info("Starting to load ASR model...")
+                logger.info("Loading ASR model...")
                 cls.m, cls.kwargs = SenseVoiceSmall.from_pretrained(
                     model_dir=Config.ASR_MODEL_DIR,
                     device=Config.DEVICE
                 )
                 cls.m.eval()
-                logger.info("ASR model loaded successfully")
+                logger.info("ASR model loaded")
 
             if not cls.available_voices:
-                logger.info("Starting to load voices...")
+                logger.info("Loading voices...")
                 voices_manager = await VoicesManager.create()
                 cls.available_voices = voices_manager.voices
-                logger.info(f"Loaded {len(cls.available_voices)} available voices")
+                logger.info(f"Loaded {len(cls.available_voices)} voices")
 
             if not cls.reranker:
-                logger.info("Starting to load reranker model...")
+                logger.info("Loading reranker model...")
                 cls.reranker = FlagReranker(Config.RERANK_MODEL_DIR, use_fp16=False)
-                logger.info("Reranker model loaded successfully")
+                logger.info("Reranker model loaded")
 
             if load_llm and not cls.llm_service:
-                logger.info("Starting to load LLM model...")
+                logger.info("Loading LLM model...")
                 cls.llm_service = get_llm_service()
-                # 调用initialize_model方法实际加载模型和分词器
                 init_success = await cls.llm_service.initialize_model()
                 if init_success:
-                    logger.info(f"LLM model loaded successfully from: {Config.LLM_MODEL_DIR}")
+                    logger.info(f"LLM model loaded from: {Config.LLM_MODEL_DIR}")
                 else:
-                    logger.error(f"Failed to initialize LLM model from: {Config.LLM_MODEL_DIR}")
+                    logger.error(f"Failed to load LLM model from: {Config.LLM_MODEL_DIR}")
             elif not load_llm:
-                logger.info("Skipping LLM model loading as requested")
+                logger.info("Skipping LLM model loading")
                 
-            # 标记为已初始化
             cls._initialized = True
-            logger.info("Models initialized successfully")
+            logger.info("All models initialized")
 
         except Exception as e:
-            logger.error(f"Failed to initialize models: {str(e)}")
+            logger.error(f"Model initialization failed: {str(e)}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise RuntimeError(f"Model initialization failed: {str(e)}")
@@ -119,42 +108,34 @@ class ModelManager:
     @classmethod
     def cleanup(cls):
         """清理所有模型资源"""
-        logger.info("Starting to clean up model resources...")
+        logger.info("Cleaning up model resources...")
 
         if cls.m is not None:
-            logger.info("Starting to clean up ASR model resources...")
-            # 如果模型在 GPU 上，尝试将其移回 CPU 以释放 GPU 内存
+            logger.info("Cleaning ASR model...")
             if hasattr(cls.m, 'to'):
                 try:
                     cls.m.to('cpu')
                 except Exception as e:
                     logger.error(f"Failed to move ASR model to CPU: {str(e)}")
             cls.m = None
-            logger.info("ASR model reference deleted")
         cls.kwargs = None
 
         cls.reranker = None
-        logger.info("Reranker model reference deleted")
-        
         cls.available_voices = []
-        logger.info("TTS voices list cleaned up")
 
-        if hasattr(cls, 'llm_service') and cls.llm_service is not None:
+        if cls.llm_service is not None:
             try:
                 if hasattr(cls.llm_service, 'cleanup'):
                     cls.llm_service.cleanup()
                 cls.llm_service = None
-                logger.info("LLM service resources confirmed cleaned up")
             except Exception as e:
-                logger.error(f"Error confirming cleanup of LLM service resources: {str(e)}")
+                logger.error(f"Error cleaning LLM service: {str(e)}")
         
-        logger.info("Collecting garbage...")
         gc.collect()
-        logger.info("Garbage collection completed")
-        
-        logger.info("All model resources cleaned up")
+        logger.info("Model cleanup completed")
 
 async def list_models(authorization: Optional[str] = Header(None)):
+    """列出可用模型"""
     try:
         await verify_token(authorization)
     except HTTPException as e:
@@ -168,7 +149,6 @@ async def list_models(authorization: Optional[str] = Header(None)):
         "permissions": ["generate"]
     }]
     
-    # 添加LLM模型信息    
     llm_model_name = Config.LLM_MODEL_NAME
     models.append({
         "id": llm_model_name,
@@ -177,9 +157,7 @@ async def list_models(authorization: Optional[str] = Header(None)):
         "permissions": ["generate"]
     })
     
-    return {
-        "data": models
-    }
+    return {"data": models}
 
 async def health_check():
     """检查模型服务健康状态"""

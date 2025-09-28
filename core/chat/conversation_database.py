@@ -1,35 +1,21 @@
 import uuid
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Optional
 from data_models.model import Model
 
 logger = logging.getLogger(__name__)
 
 class ConversationDatabase(Model):
-    """
-    会话数据库交互类，负责处理会话和消息的存储、查询和删除操作
-    纯数据库操作，不包含业务逻辑
-    """
+    """会话数据库交互类，处理会话和消息的存储、查询和删除"""
     
     def get_table_name(self) -> str:
-        """
-        获取表名，这里返回主表名
-        """
+        """获取表名"""
         return "conversations"
     
     def save_conversation(self, conversation_data: dict) -> bool:
-        """
-        保存完整会话数据，包括会话基本信息和相关消息
-        
-        Args:
-            conversation_data: 会话数据字典，包含会话信息和消息列表
-            
-        Returns:
-            bool: 保存是否成功
-        """
+        """保存完整会话数据，包括会话基本信息和相关消息"""
         try:
-            # 开始事务
             self.begin_transaction()
             
             # 提取会话基本信息
@@ -43,22 +29,18 @@ class ConversationDatabase(Model):
                 'message_count': len(conversation_data.get('messages', []))
             }
             
-            # 检查会话是否已存在
+            # 检查并保存会话
             existing = self.find_by_id(conversation_info['conversation_id'], 'conversation_id')
-            
             if existing:
-                # 更新会话
                 self.update(conversation_info['conversation_id'], conversation_info, 'conversation_id')
                 logger.info(f"Updated conversation: {conversation_info['conversation_id']}")
             else:
-                # 插入新会话
                 self.insert(conversation_info)
                 logger.info(f"Inserted new conversation: {conversation_info['conversation_id']}")
             
-            # 保存消息（如果有）
+            # 保存消息
             messages = conversation_data.get('messages', [])
             for message in messages:
-                # 检查消息是否已存在
                 msg_exists = self.fetch_one(
                     "SELECT * FROM messages WHERE message_id = %s", 
                     (message['message_id'],)
@@ -75,7 +57,7 @@ class ConversationDatabase(Model):
                         'sequence_number': message.get('sequence_number', 0)
                     }
                     
-                    # 插入消息，添加is_timeout字段支持
+                    # 插入消息
                     self.execute_query(
                         "INSERT INTO messages (message_id, conversation_id, content, sender_type, is_timeout, timestamp, sequence_number) "
                         "VALUES (%s, %s, %s, %s, %s, %s, %s)",
@@ -84,47 +66,36 @@ class ConversationDatabase(Model):
                          message_data['is_timeout'], message_data['timestamp'], message_data['sequence_number'])
                     )
             
-            # 提交事务
             self.commit_transaction()
             return True
             
         except Exception as e:
-            # 回滚事务
             self.rollback_transaction()
             logger.error(f"Failed to save conversation: {e}")
             return False
     
     def get_conversation_by_id(self, conversation_id: str) -> Optional[dict]:
-        """
-        根据ID获取会话详情，包括消息列表
-        
-        Args:
-            conversation_id: 会话ID
-            
-        Returns:
-            Optional[dict]: 会话数据字典，包含消息列表；不存在时返回None
-        """
+        """根据ID获取会话详情，包括消息列表"""
         try:
             # 获取会话基本信息
             conversation = self.find_by_id(conversation_id, 'conversation_id')
             if not conversation or not isinstance(conversation, dict):
-                logger.warning(f"会话不存在或格式不正确，ID: {conversation_id}, 类型: {type(conversation)}")
+                logger.warning(f"Conversation not found or invalid format, ID: {conversation_id}")
                 return None
             
-            # 获取会话的消息列表
+            # 获取消息列表
             try:
                 messages = self.fetch_all(
                     "SELECT * FROM messages WHERE conversation_id = %s ORDER BY sequence_number",
                     (conversation_id,)
                 )
             except Exception as msg_error:
-                logger.error(f"获取消息列表失败: {msg_error}")
+                logger.error(f"Failed to fetch messages: {msg_error}")
                 messages = []
             
-            # 构建完整的会话数据
+            # 构建完整会话数据
             try:
                 result = conversation.copy()
-                # 安全地构建消息列表
                 formatted_messages = []
                 for msg in messages:
                     if isinstance(msg, dict):
@@ -144,13 +115,13 @@ class ConversationDatabase(Model):
                             }
                             formatted_messages.append(formatted_message)
                         except Exception as item_error:
-                            logger.error(f"格式化消息项失败: {item_error}")
+                            logger.error(f"Failed to format message: {item_error}")
                 
                 result['messages'] = formatted_messages
                 return result
             except Exception as build_error:
-                logger.error(f"构建会话数据失败: {build_error}")
-                # 返回基本会话信息，即使消息列表无法构建
+                logger.error(f"Failed to build conversation data: {build_error}")
+                # 返回基本会话信息
                 return conversation
             
         except Exception as e:
@@ -158,18 +129,7 @@ class ConversationDatabase(Model):
             return None
     
     def get_latest_conversation(self, sender: str, user_nick: str, platform: str) -> Optional[dict]:
-        """
-        获取用户在特定平台上的最新活跃会话
-        优化版本：避免重复查询数据库，直接构建完整的会话数据
-        
-        Args:
-            sender: 发送者唯一标识
-            user_nick: 用户昵称
-            platform: 来源平台
-            
-        Returns:
-            Optional[dict]: 最新会话数据，不存在时返回None
-        """
+        """获取用户在特定平台上的最新活跃会话"""
         try:
             # 查询最新会话
             query = (
@@ -183,13 +143,13 @@ class ConversationDatabase(Model):
             if not conversation:
                 return None
             
-            # 直接获取该会话的消息列表，避免再次调用get_conversation_by_id导致重复查询
+            # 获取消息列表
             messages = self.fetch_all(
                 "SELECT * FROM messages WHERE conversation_id = %s ORDER BY sequence_number",
                 (conversation['conversation_id'],)
             )
             
-            # 构建完整的会话数据
+            # 构建完整会话数据
             result = conversation.copy()
             result['messages'] = [
                 {
@@ -209,17 +169,9 @@ class ConversationDatabase(Model):
             return None
     
     def delete_conversation(self, conversation_id: str) -> bool:
-        """
-        删除会话及其所有相关消息
-        
-        Args:
-            conversation_id: 会话ID
-            
-        Returns:
-            bool: 删除是否成功
-        """
+        """删除会话及其所有相关消息"""
         try:
-            # 由于外键约束设置了ON DELETE CASCADE，删除会话会自动删除相关消息
+            # 外键约束会自动删除相关消息
             result = self.delete(conversation_id, 'conversation_id')
             logger.info(f"Deleted conversation: {conversation_id}, affected rows: {result}")
             return result > 0
@@ -229,18 +181,9 @@ class ConversationDatabase(Model):
             return False
     
     def save_message(self, conversation_id: str, message: dict) -> bool:
-        """
-        保存单条消息到数据库
-        
-        Args:
-            conversation_id: 会话ID
-            message: 消息数据，包含可选的is_timeout字段
-            
-        Returns:
-            bool: 保存是否成功
-        """
+        """保存单条消息到数据库"""
         try:
-            # 保存消息，添加is_timeout字段支持
+            # 保存消息
             self.execute_query(
                 "INSERT INTO messages (message_id, conversation_id, content, sender_type, is_timeout, timestamp, sequence_number) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s)",
@@ -248,7 +191,7 @@ class ConversationDatabase(Model):
                  message['sender_type'], message.get('is_timeout', 0), message['timestamp'], message.get('sequence_number', 0))
             )
             
-            # 更新会话的最后活跃时间和消息计数
+            # 更新会话信息
             self.execute_query(
                 "UPDATE conversations SET last_active = %s, message_count = message_count + 1 WHERE conversation_id = %s",
                 (message['timestamp'], conversation_id)
@@ -261,18 +204,8 @@ class ConversationDatabase(Model):
             return False
     
     def create_new_conversation(self, sender: str, user_nick: str, platform: str) -> dict:
-        """
-        创建新的会话
-        
-        Args:
-            sender: 发送者唯一标识
-            user_nick: 用户昵称
-            platform: 来源平台
-            
-        Returns:
-            dict: 新创建的会话信息
-        """
-        # 生成唯一会话ID
+        """创建新的会话"""
+        # 生成会话ID
         conversation_id = str(uuid.uuid4())
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         

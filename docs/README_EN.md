@@ -7,7 +7,7 @@
 
 ## ✨Features  
 
-- **LLM Conversation Management**: Supports multi-platform LLM conversation management, exposing local models as OpenAI-API compatible interfaces that can be added to any model management application, with user conversation history tracking
+- **LLM Conversation Management**: Supports multi-platform LLM conversation management, exposing local models as Openai-API compatible interfaces that can be added to any model management application, with user conversation history tracking
 - **Preview Mode**: Supports LLM response content preview and editing functionality
 - **DingTalk Bot**: Supports DingTalk bot message processing
 - **Speech-to-Text**: Convert audio files to text (supports multiple languages)

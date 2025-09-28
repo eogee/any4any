@@ -7,19 +7,16 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from config import Config
-from core.model_manager import ModelManager
 from core.chat.preview import preview_service
 from core.chat.conversation_manager import conversation_manager
 
-class ChatRequest(BaseModel):
-    message: str
-    generation_id: str = None
-
 class ChatMessage(BaseModel):
+    """聊天消息模型"""
     role: Literal["system", "user", "assistant"]
     content: str
 
 class ChatCompletionRequest(BaseModel):
+    """聊天完成请求模型"""
     messages: List[ChatMessage]
     model: str = "default"
     stream: bool = False
@@ -32,40 +29,12 @@ class ChatCompletionRequest(BaseModel):
     sender_nickname: Optional[str] = None
     platform: Optional[str] = None
 
-class ChatCompletionChoice(BaseModel):
-    index: int = 0
-    message: ChatMessage
-    finish_reason: Optional[str] = "stop"
-
-class ChatCompletionUsage(BaseModel):
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-
-class ChatCompletionResponse(BaseModel):
-    id: str
-    object: str = "chat.completion"
-    created: int
-    model: str
-    choices: List[ChatCompletionChoice]
-    usage: ChatCompletionUsage
-
-class ModelData(BaseModel):
-    id: str
-    object: str = "model"
-    created: int
-    owned_by: str = "local"
-
-class ModelListResponse(BaseModel):
-    object: str = "list"
-    data: List[ModelData]
-
 class OpenAIAPI:
     @staticmethod
     async def chat_completions(request: Request, chat_request: ChatCompletionRequest):
-        """OpenAI API兼容的聊天完成接口"""
+        """聊天接口"""
         try:
-            # 特殊处理：检查是否为特定的摘要请求格式
+            # 特殊处理摘要请求格式
             for msg in chat_request.messages:
                 if ((msg.role == "user" and 
                     "Please summarize the following query of user:" in msg.content and
@@ -100,14 +69,14 @@ class OpenAIAPI:
             user_nick = chat_request.sender_nickname or request.headers.get("X-User-Nick", "Anonymous")
             platform = chat_request.platform or request.headers.get("X-Platform", "web")
             
-            # 获取用户最新消息内容
+            # 获取用户最新消息
             user_message_content = ""
             for msg in reversed(chat_request.messages):
                 if msg.role == "user":
                     user_message_content = msg.content
                     break
             
-            # 检查特殊指令 /a
+            # 特殊指令 /a
             if user_message_content.strip() == "/a":
                 response, _ = await conversation_manager.process_message(sender, user_nick, platform, user_message_content)
                 return JSONResponse({
@@ -130,19 +99,16 @@ class OpenAIAPI:
                     }
                 })
             
-            # 检查预览模式
-            preview_mode = Config.PREVIEW_MODE
-            
-            # 处理流式和非流式响应
+            # 处理流式/非流式响应
             if chat_request.stream:
                 return await OpenAIAPI._handle_streaming_response(
                     chat_request, sender, user_nick, platform, 
-                    user_message_content, preview_mode
+                    user_message_content, Config.PREVIEW_MODE
                 )
             else:
                 return await OpenAIAPI._handle_non_streaming_response(
                     chat_request, sender, user_nick, platform, 
-                    user_message_content, preview_mode
+                    user_message_content, Config.PREVIEW_MODE
                 )
                 
         except Exception as e:
@@ -162,34 +128,35 @@ class OpenAIAPI:
     async def _handle_non_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode):
         """处理非流式响应"""
         try:
-            # 调用会话管理器处理消息，传递message_id用于去重
-            # 尝试从chat_request的数据中获取msg_id
-            msg_id = None
-            if hasattr(chat_request, 'msg_id'):
-                msg_id = chat_request.msg_id
-            elif hasattr(chat_request, 'dict'):
-                msg_id = chat_request.dict().get('msg_id')
-            elif isinstance(chat_request, dict):
-                msg_id = chat_request.get('msg_id')
+            # 获取message_id用于去重
+            def get_msg_id(obj):
+                if hasattr(obj, 'msg_id'):
+                    return obj.msg_id
+                elif hasattr(obj, 'dict'):
+                    return obj.dict().get('msg_id')
+                elif isinstance(obj, dict):
+                    return obj.get('msg_id')
+                return None
+            
+            msg_id = get_msg_id(chat_request)
             assistant_response, _ = await conversation_manager.process_message(
                 sender, user_nick, platform, user_message_content, message_id=msg_id
             )
             
             # 预览模式处理
-            preview_id = None
             if preview_mode:
                 preview = await preview_service.create_preview(chat_request.dict())
                 preview_id = preview.preview_id
                 await preview_service.set_generated_content(preview_id, assistant_response)
                 
-                # 等待用户确认，但设置超时后自动返回
-                timeout = getattr(Config, 'PREVIEW_TIMEOUT', 60)  # 使用配置的超时时间，默认60秒
+                # 等待用户确认
+                timeout = getattr(Config, 'PREVIEW_TIMEOUT', 60)
                 start_time = time.time()
                 
                 while time.time() - start_time < timeout:
                     updated_preview = await preview_service.get_preview(preview_id)
                     if updated_preview.confirmed:
-                        # 用户确认，返回编辑后的内容
+                        # 用户确认
                         final_content = await preview_service.get_content(preview_id)
                         response_data = OpenAIAPI._build_response_data(
                             chat_request, user_message_content, final_content
@@ -197,39 +164,26 @@ class OpenAIAPI:
                         response_data["preview_id"] = preview_id
                         return JSONResponse(response_data)
                     
-                    # 检查是否超时
                     if time.time() - start_time >= timeout:
                         break
                         
                     await asyncio.sleep(1)
                 
-                # 超时后自动返回原始内容
-                logging.info(f"Preview confirmation timeout after {timeout} seconds, returning original content")
-                # 不需要重新调用process_message，直接使用之前生成的响应
-                # 但需要标记为超时自动回复
-                # 尝试从chat_request的数据中获取msg_id
-                msg_id = None
-                if hasattr(chat_request, 'msg_id'):
-                    msg_id = chat_request.msg_id
-                elif hasattr(chat_request, 'dict'):
-                    msg_id = chat_request.dict().get('msg_id')
-                elif isinstance(chat_request, dict):
-                    msg_id = chat_request.get('msg_id')
-                
-                # 获取原始会话ID，设置skip_save=True避免重复保存消息
-                _, conversation_id = await conversation_manager.process_message(
-                    sender, user_nick, platform, user_message_content, is_timeout=True, message_id=msg_id, skip_save=True
+                # 超时处理
+                logging.info(f"Preview confirmation timeout after {timeout} seconds")
+                _, _ = await conversation_manager.process_message(
+                    sender, user_nick, platform, user_message_content, is_timeout=True, 
+                    message_id=msg_id, skip_save=True
                 )
-                # 注意：这里不会保存新消息，只是为了标记超时状态
+                
                 response_data = OpenAIAPI._build_response_data(
                     chat_request, user_message_content, assistant_response
                 )
                 response_data["preview_id"] = preview_id
-                # 标记为超时自动发送
                 response_data["timeout_auto_sent"] = True
                 return JSONResponse(response_data)
             
-            # 非预览模式直接返回
+            # 非预览模式
             response_data = OpenAIAPI._build_response_data(
                 chat_request, user_message_content, assistant_response
             )
@@ -245,7 +199,7 @@ class OpenAIAPI:
         generation_id = f"chatcmpl-{int(time.time())}"
         preview_id = None
         
-        # 预览模式处理
+        # 预览模式初始化
         if preview_mode:
             preview = await preview_service.create_preview(chat_request.dict())
             preview_id = preview.preview_id
@@ -256,23 +210,29 @@ class OpenAIAPI:
             timeout_reached = False
             
             try:
-                # 调用流式处理，传递message_id用于去重
-                # 尝试从chat_request的数据中获取msg_id
-                msg_id = None
-                if hasattr(chat_request, 'msg_id'):
-                    msg_id = chat_request.msg_id
-                elif hasattr(chat_request, 'dict'):
-                    msg_id = chat_request.dict().get('msg_id')
-                elif isinstance(chat_request, dict):
-                    msg_id = chat_request.get('msg_id')
+                # 获取message_id
+                def get_msg_id(obj):
+                    if hasattr(obj, 'msg_id'):
+                        return obj.msg_id
+                    elif hasattr(obj, 'dict'):
+                        return obj.dict().get('msg_id')
+                    elif isinstance(obj, dict):
+                        return obj.get('msg_id')
+                    return None
+                
+                msg_id = get_msg_id(chat_request)
+                
+                # 流式生成
                 async for text_chunk in conversation_manager.process_message_stream(
-                    sender, user_nick, platform, user_message_content, generation_id, is_timeout=timeout_reached, message_id=msg_id
+                    sender, user_nick, platform, user_message_content, generation_id, 
+                    is_timeout=timeout_reached, message_id=msg_id
                 ):
                     if not text_chunk or text_chunk.isspace():
                         continue
                         
                     accumulated_content += text_chunk
                     
+                    # 构建响应数据
                     response_data = {
                         "id": generation_id,
                         "object": "chat.completion.chunk",
@@ -298,7 +258,7 @@ class OpenAIAPI:
                     
                     await asyncio.sleep(0.001)
                 
-                # 如果是预览模式，等待确认或超时
+                # 预览模式处理
                 if preview_mode and preview_id:
                     await preview_service.set_generated_content(preview_id, accumulated_content)
                     
@@ -308,11 +268,9 @@ class OpenAIAPI:
                     while time.time() - start_time < timeout:
                         updated_preview = await preview_service.get_preview(preview_id)
                         if updated_preview.confirmed:
-                            # 用户确认，使用编辑后的内容
+                            # 用户确认，发送差异内容
                             final_content = await preview_service.get_content(preview_id)
-                            # 发送最终内容
                             if final_content != accumulated_content:
-                                # 发送差异内容
                                 diff_content = final_content[len(accumulated_content):]
                                 if diff_content:
                                     diff_data = {
@@ -352,14 +310,13 @@ class OpenAIAPI:
                     }]
                 }
                 
-                # 如果是预览模式超时，添加标记
                 if timeout_reached:
                     end_data["timeout_auto_sent"] = True
                 
                 end_str = json.dumps(end_data, ensure_ascii=False)
                 yield f"data: {end_str}\n\n"
                 
-                # 如果是预览模式，发送preview_id
+                # 发送预览信息
                 if preview_mode and preview_id:
                     preview_info = {
                         "preview_id": preview_id,
@@ -426,7 +383,7 @@ class OpenAIAPI:
 
     @staticmethod
     async def list_models():
-        """OpenAI API兼容的模型列表接口"""
+        """模型列表接口"""
         return JSONResponse({
             "object": "list",
             "data": [{

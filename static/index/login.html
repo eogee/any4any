@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - Any4Chat 智能AI客服辅助系统</title>
+    <title>登录 - Any4Chat</title>
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <link rel="stylesheet" href="/static/css/font-awesome.min.css">
     <link rel="stylesheet" href="/static/css/a4a.css">
@@ -19,14 +19,14 @@
             <div class="layui-form-item">
                 <i class="fas fa-user form-icon"></i>
                 <div class="layui-input-block">
-                    <input type="text" name="username" lay-verify="required" placeholder="请输入用户名" class="layui-input">
+                    <input type="text" name="username" lay-verify="required" placeholder="用户名" class="layui-input">
                 </div>
             </div>
             
             <div class="layui-form-item">
                 <i class="fas fa-lock form-icon"></i>
                 <div class="layui-input-block">
-                    <input type="password" name="password" lay-verify="required" placeholder="请输入密码" class="layui-input">
+                    <input type="password" name="password" lay-verify="required" placeholder="密码" class="layui-input">
                 </div>
             </div>
             
@@ -38,7 +38,7 @@
         </form>
         
         <div class="login-footer">
-            <p>© 2025 Any4Chat 智能AI客服辅助系统</p>
+            <p>© 2025 Any4Chat</p>
         </div>
     </div>
     
@@ -48,81 +48,48 @@
             const form = layui.form;
             const layer = layui.layer;
             
-            // 表单验证
             form.verify({
                 username: function(value) {
                     if (value.length < 3 || value.length > 50) {
-                        return '用户名长度必须在3到50个字符之间';
+                        return '用户名长度3-50个字符';
                     }
                 },
                 password: function(value) {
                     if (value.length < 6 || value.length > 50) {
-                        return '密码长度必须在6到50个字符之间';
+                        return '密码长度6-50个字符';
                     }
                 }
             });
             
-            // 监听表单提交
             form.on('submit(login)', function(data) {
-                // 显示登录中loading
                 const loading = layer.load(2, {
                     shade: [0.3, '#fff'],
-                    content: '登录中...',
-                    success: function(layero) {
-                        layero.find('.layui-layer-content').css({
-                            'padding-top': '40px',
-                            'text-align': 'center'
-                        });
-                    }
+                    content: '登录中...'
                 });
                 
-                // 发送登录请求到后端接口
                 fetch('/auth/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data.field)
                 })
                 .then(response => {
                     layer.close(loading);
-                    
-                    if (!response.ok) {
-                        throw new Error('网络响应错误');
-                    }
-                    
+                    if (!response.ok) throw new Error('网络错误');
                     return response.json();
                 })
                 .then(result => {
-                    // 处理后端返回结果
-                    console.log('登录响应数据:', result);
-                    
                     if (result.success) {
-                        layer.msg('登录成功', {
-                            icon: 1,
-                            time: 1500,
-                            end: function() {
-                                // 登录成功后跳转到主页面
-                                window.location.href = '/index';
-                            }
-                        });
+                        layer.msg('登录成功', {icon: 1, time: 1500});
+                        setTimeout(() => window.location.href = '/index', 1500);
                     } else {
-                        layer.msg(result.message || '用户名或密码错误', {
-                            icon: 2,
-                            time: 1500
-                        });
+                        layer.msg(result.message || '登录失败', {icon: 2});
                     }
                 })
                 .catch(error => {
                     layer.close(loading);
-                    console.error('登录请求异常:', error);
-                    layer.msg('登录失败，请稍后重试', {
-                        icon: 2,
-                        time: 1500
-                    });
+                    layer.msg('登录失败，请重试', {icon: 2});
                 });
                 
-                // 阻止表单默认提交
                 return false;
             });
         });

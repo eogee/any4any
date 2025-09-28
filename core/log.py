@@ -1,7 +1,3 @@
-"""
-日志配置模块-提供双输出日志系统(控制台和文件)
-"""
-
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -14,17 +10,17 @@ def setup_logging():
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
     
-    # 控制台Handler（显示标准格式）
+    # 控制台Handler
     console_handler = logging.StreamHandler()
     console_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     console_handler.setFormatter(console_formatter)
     
-    # 文件Handler（持久化存储）
+    # 文件Handler
     file_handler = RotatingFileHandler(
         'api.log',
-        maxBytes=10*1024*1024,  # 单个日志文件最大10MB（字节数计算：10*1024*1024）
+        maxBytes=10*1024*1024,
         backupCount=5,
         encoding='utf-8'
     )
