@@ -8,6 +8,7 @@ import os
 import fcntl
 import tempfile
 import hashlib
+import threading
 from typing import Any, Optional
 from config import Config
 from dingtalk_stream import AckMessage
@@ -139,84 +140,140 @@ class MultiProcessSafeDataStore:
 # 创建全局多进程安全的数据存储实例
 memory_store = MultiProcessSafeDataStore()
 
-# 消息去重管理器（多进程安全）- 改进版本
-class MessageDeduplication:
+# 超时处理状态管理器（新增）
+class TimeoutMessageManager:
     def __init__(self):
-        # 使用配置中的 PREVIEW_TIMEOUT + 300 作为去重窗口
-        config = Config()
-        self.preview_timeout = config.PREVIEW_TIMEOUT
-        self.dedup_window = self.preview_timeout + 300  # PREVIEW_TIMEOUT + 300秒
-        
-        self.dedup_store = MultiProcessSafeDataStore(
-            os.path.join(tempfile.gettempdir(), 'dingtalk_dedup_data.json')
+        self.timeout_processed_messages = set()
+        self.timeout_lock = threading.Lock()
+        # 使用单独的文件存储超时状态，确保多进程间同步
+        self.timeout_store = MultiProcessSafeDataStore(
+            os.path.join(tempfile.gettempdir(), 'dingtalk_timeout_data.json')
         )
-        # 存储正在处理的消息，防止并发处理
-        self.processing_store = MultiProcessSafeDataStore(
-            os.path.join(tempfile.gettempdir(), 'dingtalk_processing_data.json')
-        )
-        
-        logging.info(f"Message deduplication initialized with window: {self.dedup_window} seconds (PREVIEW_TIMEOUT: {self.preview_timeout} + 300)")
+        logging.info("TimeoutMessageManager initialized")
     
-    def generate_message_fingerprint(self, sender_id, content, msg_id=None, session_id=None, timestamp=None):
-        """生成消息指纹用于去重"""
-        # 如果msg_id存在，优先使用msg_id（最准确）
-        if msg_id and msg_id != 'None':
-            return f"msgid_{msg_id}"
+    def mark_message_timeout_processed(self, message_id):
+        """标记消息因超时已处理"""
+        if not message_id:
+            return
         
-        # 否则使用发送者ID、内容、会话ID和时间戳组合
-        fingerprint_data = f"{sender_id}:{content}"
-        if session_id:
-            fingerprint_data += f":{session_id}"
-        if timestamp:
-            fingerprint_data += f":{int(timestamp)}"
-        else:
-            fingerprint_data += f":{int(time.time())}"
-        
-        return hashlib.md5(fingerprint_data.encode('utf-8')).hexdigest()
+        with self.timeout_lock:
+            self.timeout_processed_messages.add(message_id)
+            # 同时存储到文件，确保多进程可见
+            self.timeout_store.set(f"timeout_{message_id}", {
+                'processed': True,
+                'timestamp': time.time(),
+                'process_id': os.getpid()
+            }, expire_seconds=3600)  # 1小时过期
+        logging.info(f"Message {message_id} marked as timeout-processed")
     
-    def is_duplicate_or_processing(self, sender_id, content, msg_id=None, session_id=None, timestamp=None):
-        """检查是否为重复消息或正在处理的消息"""
-        fingerprint = self.generate_message_fingerprint(sender_id, content, msg_id, session_id, timestamp)
+    def is_message_timeout_processed(self, message_id):
+        """检查消息是否因超时已处理"""
+        if not message_id:
+            return False
         
-        # 检查是否正在处理该消息
-        if self.processing_store.get(fingerprint):
-            logging.info(f"Message is already being processed: {fingerprint}")
+        # 先检查内存
+        if message_id in self.timeout_processed_messages:
             return True
         
-        # 检查是否已经处理过该消息
-        existing = self.dedup_store.get(fingerprint)
-        if existing:
-            logging.info(f"Duplicate message detected and ignored: {fingerprint}")
+        # 再检查文件存储
+        timeout_data = self.timeout_store.get(f"timeout_{message_id}")
+        if timeout_data:
+            # 如果文件中有记录，同步到内存
+            with self.timeout_lock:
+                self.timeout_processed_messages.add(message_id)
             return True
-        
-        # 标记该消息为正在处理
-        self.processing_store.set(fingerprint, {
-            'sender_id': sender_id,
-            'content': content,
-            'timestamp': time.time(),
-            'msg_id': msg_id,
-            'session_id': session_id
-        }, expire_seconds=self.dedup_window)  # 处理超时时间大于PREVIEW_TIMEOUT+300秒
         
         return False
     
-    def mark_message_processed(self, sender_id, content, msg_id=None, session_id=None, timestamp=None):
-        """标记消息已处理完成"""
-        fingerprint = self.generate_message_fingerprint(sender_id, content, msg_id, session_id, timestamp)
+    def cleanup_message_state(self, message_id):
+        """清理消息状态"""
+        if not message_id:
+            return
         
-        # 从正在处理列表中移除
-        self.processing_store.delete(fingerprint)
+        with self.timeout_lock:
+            self.timeout_processed_messages.discard(message_id)
+            self.timeout_store.delete(f"timeout_{message_id}")
+
+# 创建全局超时消息管理器
+timeout_manager = TimeoutMessageManager()
+
+# 消息去重管理器（简化版）- 以消息ID为核心
+class MessageDeduplication:
+    def __init__(self):
+        config = Config()
+        self.dedup_window = config.PREVIEW_TIMEOUT + 300  # 去重窗口时间
+        # 合并状态存储，简化管理
+        self.status_store = MultiProcessSafeDataStore(
+            os.path.join(tempfile.gettempdir(), 'dingtalk_message_status.json')
+        )
+        self.lock = threading.Lock()
+        logging.info(f"Message deduplication initialized with window: {self.dedup_window} seconds")
+    
+    def check_and_mark_processing(self, msg_id, sender_id, content):
+        """检查并标记消息状态（原子操作）
         
-        # 记录到去重列表，设置去重窗口
-        self.dedup_store.set(fingerprint, {
-            'sender_id': sender_id,
-            'content': content,
-            'timestamp': time.time(),
-            'msg_id': msg_id,
-            'session_id': session_id
-        }, expire_seconds=self.dedup_window)
+        Args:
+            msg_id: 消息ID
+            sender_id: 发送者ID
+            content: 消息内容
+            
+        Returns:
+            bool: True表示消息已处理或正在处理，False表示可以处理
+        """
+        if not msg_id:
+            return False
+            
+        with self.lock:  # 确保原子操作
+            current_status = self.status_store.get(msg_id)
+            
+            if current_status:
+                status_type = current_status.get('status')
+                # 已最终完成的消息直接拒绝
+                if status_type in ['completed', 'timeout_processed']:
+                    logging.info(f"Message {msg_id} already completed with status: {status_type}")
+                    return True
+                # 处理中的消息检查超时
+                elif status_type == 'processing':
+                    elapsed = time.time() - current_status.get('timestamp', 0)
+                    if elapsed > self.dedup_window:
+                        # 超时标记为失败，允许重新处理
+                        logging.warning(f"Message {msg_id} processing timeout ({elapsed:.2f}s), allowing reprocessing")
+                        self.status_store.set(msg_id, {
+                            'status': 'timeout_failed',
+                            'timestamp': time.time()
+                        }, self.dedup_window)
+                        return False
+                    logging.info(f"Message {msg_id} is already processing")
+                    return True
+            
+            # 标记为处理中
+            self.status_store.set(msg_id, {
+                'status': 'processing',
+                'timestamp': time.time(),
+                'sender_id': sender_id,
+                'content': content[:100]  # 只存部分内容用于日志
+            }, self.dedup_window)
+            logging.info(f"Message {msg_id} marked as processing")
+            return False
+    
+    def mark_final_status(self, msg_id, status='completed'):
+        """标记最终状态
         
-        
+        Args:
+            msg_id: 消息ID
+            status: 最终状态 (completed, timeout_processed, failed, preview_failed)
+        """
+        if not msg_id:
+            return
+            
+        with self.lock:  # 确保原子操作
+            current = self.status_store.get(msg_id) or {}
+            current.update({
+                'status': status,
+                'final_timestamp': time.time()
+            })
+            self.status_store.set(msg_id, current, self.dedup_window)
+            logging.info(f"Message {msg_id} marked as {status}")
 
 # 创建全局消息去重管理器
 message_dedup = MessageDeduplication()
@@ -318,13 +375,11 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
         self.process_id = os.getpid()
 
     async def process(self, callback: dingtalk_stream.CallbackMessage):
-        # 用于标记消息是否已处理
-        message_processed = False
+        # 初始化关键变量
+        msg_id = None
         sender_id = None
         original_content = None
-        msg_id = None
-        session_id = None
-        message_timestamp = None
+        timeout_auto_sent = False
         
         try:
             incoming_message = dingtalk_stream.ChatbotMessage.from_dict(callback.data)
@@ -336,23 +391,19 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             # 获取消息内容
             original_content = getattr(incoming_message.text, 'content', '')
             
-            # 尝试多种方式获取msgId
+            # 严格获取消息ID（关键）
             msg_id = None
+            # 方法1：从原始数据字典获取（优先级最高）
+            if isinstance(callback.data, dict):
+                msg_id = (callback.data.get('msgId') or 
+                         callback.data.get('messageId') or 
+                         callback.data.get('msgid'))
             
-            # 方法1：从消息对象属性获取
-            msg_id = getattr(incoming_message, 'msgId', None)
+            # 方法2：从消息对象属性获取
             if not msg_id:
-                msg_id = getattr(incoming_message, 'messageId', None)
-            
-            # 方法2：从原始数据字典获取
-            if not msg_id and isinstance(callback.data, dict):
-                msg_id = callback.data.get('msgId')
+                msg_id = getattr(incoming_message, 'msgId', None)
                 if not msg_id:
-                    msg_id = callback.data.get('messageId')
-                if not msg_id:
-                    # 尝试深入数据结构查找
-                    if 'message' in callback.data and isinstance(callback.data['message'], dict):
-                        msg_id = callback.data['message'].get('msgId')
+                    msg_id = getattr(incoming_message, 'messageId', None)
             
             # 方法3：从incoming_message的字典表示中获取
             if not msg_id:
@@ -363,31 +414,25 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
                 except Exception as e:
                     pass
             
-            # 获取会话ID和时间戳
-            session_id = getattr(incoming_message, 'conversationId', None)
-            message_timestamp = getattr(incoming_message, 'createAt', None) or getattr(incoming_message, 'timestamp', time.time())
-            
-
-            
             # 如果消息为空，直接返回
             if not original_content:
-                self.logger.info(f"Process {self.process_id} empty message content, skipping processing")
+                self.logger.info(f"Empty message content, skipping processing")
                 return AckMessage.STATUS_OK, 'OK'
             
-            # 消息去重检查 - 在日志记录之前进行
-            if message_dedup.is_duplicate_or_processing(sender_id, original_content, msg_id, session_id, message_timestamp):
-                self.logger.info(f"Process {self.process_id} duplicate or processing message ignored - Sender: {sender_id}, MsgID: {msg_id}")
+            # 严格的消息状态检查（原子操作）
+            if msg_id and message_dedup.check_and_mark_processing(msg_id, sender_id, original_content):
+                self.logger.info(f"Message {msg_id} already processed or processing, skipped")
                 return AckMessage.STATUS_OK, 'OK'
             
             # 控制台打印收到的消息信息
-            self.logger.info(f"Process {self.process_id} received message - Sender: {sender_id}, MsgID: {msg_id}, Session: {session_id}")                       
+            self.logger.info(f"Received message - Sender: {sender_id}, MsgID: {msg_id}")                       
             
             # 防止消息循环：检查是否是机器人本身发送的消息
             if hasattr(incoming_message, 'chatbot_user_id') and incoming_message.sender_staff_id == incoming_message.chatbot_user_id:
-                self.logger.info(f"Process {self.process_id} ignoring message sent by the robot itself to prevent loop")
+                self.logger.info(f"Ignoring message sent by the robot itself to prevent loop")
                 # 标记消息已处理
-                message_dedup.mark_message_processed(sender_id, original_content, msg_id, session_id, message_timestamp)
-                message_processed = True
+                if msg_id:
+                    message_dedup.mark_final_status(msg_id, 'completed')
                 return AckMessage.STATUS_OK, 'OK'
             
             # 构建发送到openai_api.chat_completions的请求体
@@ -406,7 +451,8 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
                 "repetition_penalty": Config.REPETITION_PENALTY,
                 "sender_id": sender_id,
                 "sender_nickname": user_nick,
-                "platform": "DingTalk"
+                "platform": "DingTalk",
+                "msg_id": msg_id  # 添加消息ID用于去重
             }
             
             # 发送请求到app.py中的/v1/chat/completions接口
@@ -462,21 +508,20 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             # 如果回复内容为空，设置默认错误消息
             if not reply_content:
                 reply_content = "Error: No response content received"
-                self.logger.error(f"Process {self.process_id} reply content is empty")
+                self.logger.error(f"Reply content is empty")
             
             # 获取access_token用于发送钉钉回复
             access_token = get_token(self.options)
             if not access_token:
-                self.logger.error(f"Process {self.process_id} failed to get access_token, unable to reply message")
+                self.logger.error(f"Failed to get access_token, unable to reply message")
                 # 标记消息已处理（即使失败也要标记，避免重复处理）
-                message_dedup.mark_message_processed(sender_id, original_content, msg_id, session_id, message_timestamp)
-                message_processed = True
+                if msg_id:
+                    message_dedup.mark_final_status(msg_id, 'failed')
                 return AckMessage.STATUS_OK, 'OK'
             
             # 根据配置中的NO_THINK设置，过滤掉</think>和</think>之间的内容
             if hasattr(Config, 'NO_THINK') and Config.NO_THINK:
-                reply_content = filter_think_content(reply_content)
-    
+                reply_content = filter_think_content(reply_content)    
             
             # 检查是否为预览模式且不是超时自动发送的情况
             if Config.PREVIEW_MODE and not self.is_preview_callback and not timeout_auto_sent:
@@ -514,7 +559,6 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
                         'options': self.options.__dict__,
                         'timestamp': time.time(),
                         'process_id': self.process_id,
-                        'session_id': session_id,
                         'msg_id': msg_id,
                         'message_timestamp': message_timestamp
                     }
@@ -524,8 +568,8 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
                     self.logger.info(f"Process {self.process_id} stored preview data for preview_id: {preview_id}, waiting for confirmation")
                     
                     # 标记消息已处理（预览模式下，等待确认后再发送）
-                    message_dedup.mark_message_processed(sender_id, original_content, msg_id, session_id, message_timestamp)
-                    message_processed = True
+                    if msg_id:
+                        message_dedup.mark_final_status(msg_id, 'preview_pending')
                 else:
                     self.logger.error(f"Process {self.process_id} failed to get preview_id, falling back to direct send")
                     # 如果无法获取preview_id，直接发送回复
@@ -546,6 +590,12 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             else:
                 # 非预览模式、预览确认后的回调、或超时自动发送的情况，直接发送回复消息
                 self.logger.info(f"Process {self.process_id} sending reply directly (preview_mode: {Config.PREVIEW_MODE}, timeout_auto_sent: {timeout_auto_sent})")
+                
+                # 如果是超时自动发送，标记消息为超时已处理
+                if timeout_auto_sent:
+                    timeout_manager.mark_message_timeout_processed(msg_id)
+                    self.logger.info(f"Message marked as timeout-processed: {msg_id}")
+                
                 result = send_robot_private_message(
                     access_token, 
                     self.options, 
@@ -555,25 +605,23 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
                 
                 if result:
                     if timeout_auto_sent:
-                        self.logger.info(f"Process {self.process_id} auto-sent reply to user due to timeout")
+                        self.logger.info(f"Auto-sent reply to user due to timeout")
+                        if msg_id:
+                            message_dedup.mark_final_status(msg_id, 'timeout_processed')
                     else:
-                        self.logger.info(f"Process {self.process_id} successfully sent reply to user")
+                        self.logger.info(f"Successfully sent reply to user")
+                        if msg_id:
+                            message_dedup.mark_final_status(msg_id, 'completed')
                 else:
-                    self.logger.error(f"Process {self.process_id} failed to send reply to user")
-                
-                # 标记消息已处理
-                message_dedup.mark_message_processed(sender_id, original_content, msg_id, session_id, message_timestamp)
-                message_processed = True
+                    self.logger.error(f"Failed to send reply to user")
+                    if msg_id:
+                        message_dedup.mark_final_status(msg_id, 'failed')
                 
         except Exception as e:
-            self.logger.error(f"Process {self.process_id} exception occurred while processing message: {e}")
-        finally:
-            # 确保在异常情况下也标记消息已处理
-            if not message_processed and sender_id and original_content:
-                try:
-                    message_dedup.mark_message_processed(sender_id, original_content, msg_id, session_id, message_timestamp)
-                except Exception as e:
-                    self.logger.error(f"Process {self.process_id} failed to mark message as processed: {e}")
+            self.logger.error(f"Exception occurred while processing message: {e}")
+            # 标记错误状态
+            if msg_id:
+                message_dedup.mark_final_status(msg_id, 'failed')
         
         return AckMessage.STATUS_OK, 'OK'
 
@@ -588,13 +636,79 @@ async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: s
         # 从多进程安全的存储中获取消息数据
         message_data = memory_store.get(preview_id)
         
-        # 如果数据不存在，可能是已经处理过或者过期了
+        # 如果数据不存在，尝试使用request_data中的信息
         if not message_data:
-            logger.error(f"Process {current_process_id} no data found for preview_id: {preview_id}, may have expired or already processed")
-            return False
+            logger.warning(f"Process {current_process_id} no data found in memory for preview_id: {preview_id}")
+            # 尝试从request_data中提取必要信息
+            if request_data and isinstance(request_data, dict):
+                # 构建基本的消息数据
+                message_data = {
+                    'content': confirmed_content,  # 使用确认的内容
+                    'sender': None,  # 稍后填充
+                    'sender_name': 'User',  # 默认值
+                    'full_request': request_data
+                }
+                
+                # 尝试从request_data的不同位置获取sender_id
+                sender_id_sources = [
+                    request_data.get('sender_id'),
+                    request_data.get('user_id'),
+                    request_data.get('sender'),
+                    request_data.get('from_user_id'),
+                    request_data.get('user', {}).get('id')
+                ]
+                
+                # 遍历所有可能的来源，找到非None的sender_id
+                for sender_id in sender_id_sources:
+                    if sender_id:
+                        message_data['sender'] = sender_id
+                        break
+                
+                # 如果没有找到sender_id，尝试从preview_id中提取（格式为preview_timestamp_senderId_processId）
+                if not message_data['sender'] and '_' in preview_id:
+                    parts = preview_id.split('_')
+                    if len(parts) >= 3:
+                        # 尝试从preview_id中提取sender_id（第三个部分）
+                        potential_sender_id = parts[2]
+                        if potential_sender_id and not potential_sender_id.isdigit():
+                            # sender_id通常不是纯数字，而是类似035266212437873268这样的格式
+                            message_data['sender'] = potential_sender_id
+                
+                # 获取sender_name
+                sender_name_sources = [
+                    request_data.get('sender_nickname'),
+                    request_data.get('user_name'),
+                    request_data.get('nickname'),
+                    request_data.get('user', {}).get('name')
+                ]
+                
+                for sender_name in sender_name_sources:
+                    if sender_name:
+                        message_data['sender_name'] = sender_name
+                        break
+                
+                # 如果仍然没有找到sender_id，尝试从预览服务获取
+                if not message_data['sender']:
+                    try:
+                        preview = await preview_service.get_preview(preview_id)
+                        if preview and preview.request_data:
+                            # 再次尝试从preview.request_data中提取sender_id
+                            for sender_id in sender_id_sources:
+                                if sender_id:
+                                    message_data['sender'] = sender_id
+                                    break
+                    except Exception as e:
+                        logger.warning(f"Process {current_process_id} failed to get preview from preview_service: {e}")
+                
+                # 如果仍然没有sender_id，记录错误
+                if not message_data['sender']:
+                    logger.error(f"Process {current_process_id} cannot find sender_id in any source")
+                    return False
+            else:
+                logger.error(f"Process {current_process_id} no data found for preview_id: {preview_id} and no request_data available, cannot process")
+                return False
         
         # 从存储中获取数据
-        
         sender_id = message_data.get('sender')
         sender_name = message_data.get('sender_name')
         original_content = message_data.get('original_content')
@@ -603,29 +717,24 @@ async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: s
         original_process_id = message_data.get('process_id', 'unknown')
         session_id = message_data.get('session_id')
         msg_id = message_data.get('msg_id')
-        message_timestamp = message_data.get('message_timestamp')
-        
-
+        message_timestamp = message_data.get('message_timestamp')       
         
         # 检查是否获取到关键字段
         if not all([sender_id, sender_name]):
-            logger.error(f"Process {current_process_id} missing critical fields for preview_id {preview_id}: sender_id={sender_id}, sender_name={sender_name}")
-            # 清理无效数据
-            memory_store.delete(preview_id)
-            return False
+            # 如果缺少sender_id，尝试其他方式获取
+            if not sender_id and request_data:
+                sender_id = request_data.get('sender_id')
+                sender_name = request_data.get('sender_nickname', 'User')
+                
+            if not sender_id:
+                logger.error(f"Process {current_process_id} missing critical fields for preview_id {preview_id}: sender_id={sender_id}, sender_name={sender_name}")
+                # 从内存中删除数据（如果存在）
+                if preview_id in memory_store._read_data():
+                    memory_store.delete(preview_id)
+                return False
         
-        # 使用默认的options配置，如果没有提供
-        if not options_dict:
-            options_dict = {
-                'robot_code': Config.ROBOT_CODE,
-                'client_id': Config.CLIENT_ID,
-                'client_secret': Config.CLIENT_SECRET
-            }
-        
-        # 创建options对象
+        # 创建默认的options对象，始终使用配置中的值
         options = Options()
-        for key, value in options_dict.items():
-            setattr(options, key, value)
         
         # 确定要发送的内容
         content_to_send = confirmed_content
@@ -634,11 +743,8 @@ async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: s
         
         # 根据配置中的NO_THINK设置，过滤内容
         if hasattr(Config, 'NO_THINK') and Config.NO_THINK:
-            content_to_send = filter_think_content(content_to_send)
+            content_to_send = filter_think_content(content_to_send)      
 
-        
-
-        
         result = False
         try:
             # 获取最新的access_token
@@ -647,29 +753,51 @@ async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: s
                 logger.error(f"Process {current_process_id} failed to get access_token, cannot send message")
                 return False
             
+            # 检查消息是否已有最终状态（简化检查）
+            if msg_id and message_dedup.status_store.get(msg_id):
+                current_status = message_dedup.status_store.get(msg_id)
+                if current_status.get('status') in ['completed', 'timeout_processed']:
+                    logger.warning(f"Message {msg_id} already has final status: {current_status.get('status')}, skipping preview confirmation")
+                    memory_store.delete(preview_id)
+                    return False
+            
+            # 尝试发送消息
             result = send_robot_private_message(
                 current_access_token,
                 options,
                 [sender_id],
                 content_to_send
             )
+            
+            if result is False or result is None:
+                logger.warning(f"Process {current_process_id} send_robot_private_message returned failure or None")
         except Exception as e:
             logger.error(f"Process {current_process_id} exception when sending message: {e}")
             result = False
         
-        # 无论成功与否，都清理存储中的数据，防止重复处理
-        memory_store.delete(preview_id)
+        # 从内存中删除数据（如果存在），防止重复处理
+        if preview_id in memory_store._read_data():
+            memory_store.delete(preview_id)
         
         if result:
-            logger.info(f"Process {current_process_id} successfully sent reply to user after preview confirmation")
+            logger.info(f"Successfully sent reply to user after preview confirmation")
+            # 发送成功后标记最终状态
+            if msg_id:
+                message_dedup.mark_final_status(msg_id, 'completed')
         else:
-            logger.error(f"Process {current_process_id} failed to send reply to user after preview confirmation")
+            logger.error(f"Failed to send reply to user after preview confirmation")
+            # 发送失败标记状态
+            if msg_id:
+                message_dedup.mark_final_status(msg_id, 'preview_failed')
         
         return result
     except Exception as e:
-        logger.error(f"Process {current_process_id} unexpected error in send_reply_after_preview_confirm: {e}")
+        logger.error(f"Unexpected error in send_reply_after_preview_confirm: {e}")
         # 确保异常时也清理数据
         memory_store.delete(preview_id)
+        # 异常时标记失败状态
+        if msg_id:
+            message_dedup.mark_final_status(msg_id, 'preview_failed')
         return False
 
 # 注册预览确认回调

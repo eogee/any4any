@@ -6,6 +6,8 @@ from typing import Dict, List, Optional, Tuple, Any
 from core.chat.conversation_database import ConversationDatabase
 from core.chat.llm import get_llm_service
 from config import Config
+# 引入消息去重管理器
+from core.dingtalk.message_manager import message_dedup
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +122,7 @@ class ConversationManager:
             })
         return messages
     
-    async def process_message(self, sender: str, user_nick: str, platform: str, content: str, is_timeout: bool = False) -> tuple:
+    async def process_message(self, sender: str, user_nick: str, platform: str, content: str, is_timeout: bool = False, message_id: str = None, skip_save: bool = False) -> tuple:
         """
         处理用户消息的核心方法
         
@@ -130,10 +132,31 @@ class ConversationManager:
             platform: 来源平台
             content: 用户消息内容
             is_timeout: 是否为超时自动回复
+            message_id: 可选的消息ID，用于消息去重
+            skip_save: 是否跳过保存消息到数据库
             
         Returns:
             tuple: (响应内容, 会话ID)
         """
+        # 消息去重检查 - 只有当提供了message_id时才进行检查
+        if message_id:
+            # 获取消息去重管理器的状态存储
+            status_store = getattr(message_dedup, 'status_store', None)
+            if status_store:
+                # 检查消息是否已经处理过或正在处理
+                current_status = status_store.get(message_id)
+                if current_status:
+                    status_type = current_status.get('status')
+                    # 如果消息已经完成或正在处理，直接返回错误
+                    if status_type in ['completed', 'timeout_processed']:
+                        logger.info(f"Message {message_id} already processed with status: {status_type}, skipping database operations")
+                        # 返回默认回复，避免重复处理
+                        return "", ""
+                    elif status_type == 'processing':
+                        logger.info(f"Message {message_id} is already processing, skipping database operations")
+                        # 返回默认回复，避免重复处理
+                        return "", ""
+        
         # 检查是否在非主进程中运行
         if not self.is_main_process:
             logger.warning(f"Process message request received in non-main process {os.getpid()}, redirecting to main process")
@@ -172,18 +195,24 @@ class ConversationManager:
         # 创建用户消息
         user_message = self._create_user_message(content)
         
+        # 如果提供了消息ID，使用它作为消息的唯一标识
+        if message_id:
+            user_message['message_id'] = message_id
+        
         # 设置消息的序列号
         user_message['sequence_number'] = len(conversation.get('messages', [])) + 1
         
-        # 保存用户消息
-        if not self.db.save_message(conversation['conversation_id'], user_message):
-            logger.error("Failed to save user message")
-            # 即使保存失败，继续处理以保证用户体验
-        
-        # 更新会话中的消息列表
-        if 'messages' not in conversation:
-            conversation['messages'] = []
-        conversation['messages'].append(user_message)
+        # 如果不跳过保存，才执行数据库操作
+        if not skip_save:
+            # 保存用户消息
+            if not self.db.save_message(conversation['conversation_id'], user_message):
+                logger.error("Failed to save user message")
+                # 即使保存失败，继续处理以保证用户体验
+            
+            # 更新会话中的消息列表
+            if 'messages' not in conversation:
+                conversation['messages'] = []
+            conversation['messages'].append(user_message)
         
         # 生成完整的对话历史文本
         conversation_history = "\n".join([f"{msg['sender_type']}: {msg['content']}" for msg in conversation.get('messages', [])])
@@ -198,12 +227,14 @@ class ConversationManager:
             # 设置是否为超时自动回复
             assistant_message['is_timeout'] = 1 if is_timeout else 0
             
-            # 保存助手消息
-            if not self.db.save_message(conversation['conversation_id'], assistant_message):
-                logger.error("Failed to save assistant message")
-            
-            # 更新会话中的消息列表
-            conversation['messages'].append(assistant_message)
+            # 如果不跳过保存，才执行数据库操作
+            if not skip_save:
+                # 保存助手消息
+                if not self.db.save_message(conversation['conversation_id'], assistant_message):
+                    logger.error("Failed to save assistant message")
+                
+                # 更新会话中的消息列表
+                conversation['messages'].append(assistant_message)
             
             return llm_response, conversation['conversation_id']
             
@@ -218,12 +249,13 @@ class ConversationManager:
             # 设置是否为超时自动回复
             error_assistant_message['is_timeout'] = 1 if is_timeout else 0
             
-            # 尝试保存错误消息
-            self.db.save_message(conversation['conversation_id'], error_assistant_message)
+            # 如果不跳过保存，才尝试保存错误消息
+            if not skip_save:
+                self.db.save_message(conversation['conversation_id'], error_assistant_message)
             
             return error_message, conversation['conversation_id']
             
-    async def process_message_stream(self, sender: str, user_nick: str, platform: str, content: str, generation_id: str, is_timeout: bool = False):
+    async def process_message_stream(self, sender: str, user_nick: str, platform: str, content: str, generation_id: str, is_timeout: bool = False, message_id: str = None):
         """
         流式处理用户消息的方法
         
@@ -234,10 +266,27 @@ class ConversationManager:
             content: 用户消息内容
             generation_id: 生成ID，用于标识当前流式生成
             is_timeout: 是否为超时自动回复
+            message_id: 消息ID，用于去重
             
         Yields:
             str: 生成的文本块
         """
+        # 消息去重检查（如果有message_id）
+        if message_id and message_dedup.status_store:
+            # 检查消息是否已经处理过
+            current_status = message_dedup.status_store.get(message_id)
+            if current_status:
+                status_type = current_status.get('status')
+                # 如果消息已经完成、超时处理或正在处理，直接跳过
+                if status_type in ['completed', 'timeout_processed']:
+                    logger.info(f"Message {message_id} already processed with status: {status_type}, skipping database operations")
+                    yield "消息已处理，跳过重复处理。"
+                    return
+                elif status_type == 'processing':
+                    logger.info(f"Message {message_id} is already processing, skipping database operations")
+                    yield "消息正在处理中，跳过重复处理。"
+                    return
+        
         # 检查是否在非主进程中运行
         if not self.is_main_process:
             logger.warning(f"Stream message request received in non-main process {os.getpid()}, redirecting to main process")
@@ -280,6 +329,10 @@ class ConversationManager:
         
         # 设置消息的序列号
         user_message['sequence_number'] = len(conversation.get('messages', [])) + 1
+        
+        # 添加消息ID（如果有）
+        if message_id:
+            user_message['message_id'] = message_id
         
         # 保存用户消息
         if not self.db.save_message(conversation['conversation_id'], user_message):

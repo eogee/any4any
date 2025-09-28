@@ -94,6 +94,36 @@
         const contentEditor = document.getElementById('contentEditor');
         const contentPreview = document.getElementById('contentPreview');
 
+        // 统一的超时确认处理函数
+        function handleTimeoutConfirm() {
+            if (layer) layer.msg('已确认超时自动回复', {icon: 1, time: 1500});
+            
+            // 立即清除当前预览项
+            if (currentPreviewId) {
+                // 从数组中移除
+                const index = previews.findIndex(p => p.preview_id === currentPreviewId);
+                if (index !== -1) {
+                    previews.splice(index, 1);
+                }
+                
+                // 清空当前选择
+                currentPreviewId = null;
+                
+                // 强制重新渲染界面
+                renderPreviewList();
+                updateStats();
+                
+                // 显示空状态
+                if (emptyState) emptyState.style.display = 'flex';
+                const previewContent = document.getElementById('previewContent');
+                if (previewContent) previewContent.style.display = 'none';
+                if (editorContainer) editorContainer.style.display = 'none';
+            }
+            
+            // 稍后刷新数据
+            setTimeout(pollPreviewData, 200);
+        }
+
         // 去除think标签的内容
         function removeThinkContent(text) {
             if (!text) return '';
@@ -436,10 +466,8 @@
                 confirmBtnDetail.onclick = () => confirmPreview(preview.preview_id);
             }
             if (confirmTimeoutBtn) {
-                // 超时自动发送确认按钮的点击事件
-                confirmTimeoutBtn.onclick = () => {
-                    confirmPreview(preview.preview_id);
-                };
+                // 超时自动发送确认按钮的点击事件 - 使用统一的处理函数
+                confirmTimeoutBtn.onclick = handleTimeoutConfirm;
             }
             
             // 如果有conversation_id，则加载对话历史
@@ -500,10 +528,10 @@
                         </button>
                     `;
                     
-                    // 添加点击事件
+                    // 添加点击事件 - 使用统一的处理函数
                     const confirmTimeoutBtn = document.getElementById('confirmTimeoutBtn');
-                    if (confirmTimeoutBtn && currentPreviewId) {
-                        confirmTimeoutBtn.onclick = () => confirmPreview(currentPreviewId);
+                    if (confirmTimeoutBtn) {
+                        confirmTimeoutBtn.onclick = handleTimeoutConfirm;
                     }
                 }
             }

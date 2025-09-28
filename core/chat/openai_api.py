@@ -162,9 +162,17 @@ class OpenAIAPI:
     async def _handle_non_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode):
         """处理非流式响应"""
         try:
-            # 调用会话管理器处理消息
+            # 调用会话管理器处理消息，传递message_id用于去重
+            # 尝试从chat_request的数据中获取msg_id
+            msg_id = None
+            if hasattr(chat_request, 'msg_id'):
+                msg_id = chat_request.msg_id
+            elif hasattr(chat_request, 'dict'):
+                msg_id = chat_request.dict().get('msg_id')
+            elif isinstance(chat_request, dict):
+                msg_id = chat_request.get('msg_id')
             assistant_response, _ = await conversation_manager.process_message(
-                sender, user_nick, platform, user_message_content
+                sender, user_nick, platform, user_message_content, message_id=msg_id
             )
             
             # 预览模式处理
@@ -197,10 +205,22 @@ class OpenAIAPI:
                 
                 # 超时后自动返回原始内容
                 logging.info(f"Preview confirmation timeout after {timeout} seconds, returning original content")
-                # 重新调用会话管理器处理消息，并标记为超时自动回复
-                assistant_response, _ = await conversation_manager.process_message(
-                    sender, user_nick, platform, user_message_content, is_timeout=True
+                # 不需要重新调用process_message，直接使用之前生成的响应
+                # 但需要标记为超时自动回复
+                # 尝试从chat_request的数据中获取msg_id
+                msg_id = None
+                if hasattr(chat_request, 'msg_id'):
+                    msg_id = chat_request.msg_id
+                elif hasattr(chat_request, 'dict'):
+                    msg_id = chat_request.dict().get('msg_id')
+                elif isinstance(chat_request, dict):
+                    msg_id = chat_request.get('msg_id')
+                
+                # 获取原始会话ID，设置skip_save=True避免重复保存消息
+                _, conversation_id = await conversation_manager.process_message(
+                    sender, user_nick, platform, user_message_content, is_timeout=True, message_id=msg_id, skip_save=True
                 )
+                # 注意：这里不会保存新消息，只是为了标记超时状态
                 response_data = OpenAIAPI._build_response_data(
                     chat_request, user_message_content, assistant_response
                 )
@@ -236,9 +256,17 @@ class OpenAIAPI:
             timeout_reached = False
             
             try:
-                # 调用流式处理
+                # 调用流式处理，传递message_id用于去重
+                # 尝试从chat_request的数据中获取msg_id
+                msg_id = None
+                if hasattr(chat_request, 'msg_id'):
+                    msg_id = chat_request.msg_id
+                elif hasattr(chat_request, 'dict'):
+                    msg_id = chat_request.dict().get('msg_id')
+                elif isinstance(chat_request, dict):
+                    msg_id = chat_request.get('msg_id')
                 async for text_chunk in conversation_manager.process_message_stream(
-                    sender, user_nick, platform, user_message_content, generation_id, is_timeout=timeout_reached
+                    sender, user_nick, platform, user_message_content, generation_id, is_timeout=timeout_reached, message_id=msg_id
                 ):
                     if not text_chunk or text_chunk.isspace():
                         continue
