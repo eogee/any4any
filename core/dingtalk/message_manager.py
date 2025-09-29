@@ -346,6 +346,12 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
             if not reply_content:
                 reply_content = "Error: No response content received"
             
+            # 检查是否是延迟处理中的消息
+            if reply_content == "DELAY_PROCESSING" or api_response and api_response.get("delay_processing"):
+                if msg_id:
+                    message_dedup.mark_final_status(msg_id, 'delay_processing')
+                return AckMessage.STATUS_OK, 'OK'
+            
             # 获取token并发送回复
             access_token = get_token(self.options)
             if not access_token:

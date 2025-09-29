@@ -28,8 +28,12 @@ class ChatCompletionRequest(BaseModel):
     sender_id: Optional[str] = None
     sender_nickname: Optional[str] = None
     platform: Optional[str] = None
+    delay_time: Optional[int] = None  # 新增延迟时间参数
 
 class OpenAIAPI:
+    
+    logger = logging.getLogger(__name__)
+    
     @staticmethod
     async def chat_completions(request: Request, chat_request: ChatCompletionRequest):
         """聊天接口"""
@@ -112,7 +116,7 @@ class OpenAIAPI:
                 )
                 
         except Exception as e:
-            logging.error(f"OpenAI API error: {str(e)}")
+            OpenAIAPI.logger.error(f"OpenAI API error: {str(e)}")
             import traceback
             traceback.print_exc()
             
@@ -139,9 +143,50 @@ class OpenAIAPI:
                 return None
             
             msg_id = get_msg_id(chat_request)
-            assistant_response, _ = await conversation_manager.process_message(
-                sender, user_nick, platform, user_message_content, message_id=msg_id
+            
+            # 检查是否启用延迟模式
+            delay_mode_enabled = getattr(Config, 'DELAY_MODE', False)
+            delay_time = getattr(chat_request, 'delay_time', None) or getattr(Config, 'DELAY_TIME', 10)
+            
+            # 如果是延迟模式且不是预览模式，添加延迟处理标记
+            is_delayed_processing = False
+            if delay_mode_enabled and not preview_mode:
+                # 检查当前请求是否来自延迟处理器的回调
+                is_delayed_processing = getattr(chat_request, '_is_delayed_processing', False)
+            
+            assistant_response, conversation_id = await conversation_manager.process_message(
+                sender, 
+                user_nick, 
+                platform, 
+                user_message_content, 
+                message_id=msg_id,
+                delay_time=delay_time if delay_mode_enabled and not preview_mode else None,
+                is_delayed_processing=is_delayed_processing
             )
+            
+            # 检查是否是延迟处理中的消息
+            if assistant_response == "DELAY_PROCESSING" and conversation_id == "delay_processing":
+                # 对于延迟处理中的后续消息，返回空响应
+                return JSONResponse({
+                    "id": f"delay_processing_{int(time.time())}",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": chat_request.model,
+                    "choices": [{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": ""
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": {
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "total_tokens": 0
+                    },
+                    "delay_processing": True
+                })
             
             # 预览模式处理
             if preview_mode:
@@ -170,7 +215,7 @@ class OpenAIAPI:
                     await asyncio.sleep(1)
                 
                 # 超时处理
-                logging.info(f"Preview confirmation timeout after {timeout} seconds")
+                OpenAIAPI.logger.info(f"Preview confirmation timeout after {timeout} seconds")
                 _, _ = await conversation_manager.process_message(
                     sender, user_nick, platform, user_message_content, is_timeout=True, 
                     message_id=msg_id, skip_save=True
@@ -183,14 +228,24 @@ class OpenAIAPI:
                 response_data["timeout_auto_sent"] = True
                 return JSONResponse(response_data)
             
-            # 非预览模式
+            # 非预览模式 - 检查是否有缓冲消息
+            buffered_count = conversation_manager.get_buffered_message_count(sender)
+            if buffered_count > 0:
+                response_data = OpenAIAPI._build_response_data(
+                    chat_request, user_message_content, assistant_response
+                )
+                response_data["buffered_messages"] = buffered_count
+                response_data["delay_mode"] = True
+                return JSONResponse(response_data)
+            
+            # 普通非预览模式响应
             response_data = OpenAIAPI._build_response_data(
                 chat_request, user_message_content, assistant_response
             )
             return JSONResponse(response_data)
             
         except Exception as e:
-            logging.error(f"Non-streaming response error: {str(e)}")
+            OpenAIAPI.logger.error(f"Non-streaming response error: {str(e)}")
             raise
 
     @staticmethod
@@ -198,6 +253,9 @@ class OpenAIAPI:
         """处理流式响应"""
         generation_id = f"chatcmpl-{int(time.time())}"
         preview_id = None
+        
+        # 检查延迟模式
+        delay_mode_enabled = getattr(Config, 'DELAY_MODE', False)
         
         # 预览模式初始化
         if preview_mode:
@@ -208,6 +266,31 @@ class OpenAIAPI:
             accumulated_content = ""
             first_chunk = True
             timeout_reached = False
+            
+            # 流式响应下的延迟模式提示
+            if delay_mode_enabled and not preview_mode:
+                warning_msg = "\n[注意：流式响应模式下，延迟合并功能不可用，将立即处理您的消息]\n"
+                warning_data = {
+                    "id": generation_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": chat_request.model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {
+                            "content": warning_msg
+                        } if not first_chunk else {
+                            "role": "assistant",
+                            "content": warning_msg
+                        },
+                        "finish_reason": None
+                    }]
+                }
+                warning_str = json.dumps(warning_data, ensure_ascii=False)
+                yield f"data: {warning_str}\n\n"
+                accumulated_content += warning_msg
+                if first_chunk:
+                    first_chunk = False
             
             try:
                 # 获取message_id
@@ -222,10 +305,11 @@ class OpenAIAPI:
                 
                 msg_id = get_msg_id(chat_request)
                 
-                # 流式生成
+                # 流式生成 - 流式模式下不支持延迟，直接处理
                 async for text_chunk in conversation_manager.process_message_stream(
                     sender, user_nick, platform, user_message_content, generation_id, 
-                    is_timeout=timeout_reached, message_id=msg_id
+                    is_timeout=timeout_reached, message_id=msg_id,
+                    is_delayed_processing=True  # 流式模式下强制立即处理
                 ):
                     if not text_chunk or text_chunk.isspace():
                         continue
@@ -327,7 +411,7 @@ class OpenAIAPI:
                 yield "data: [DONE]\n\n"
                 
             except Exception as e:
-                logging.error(f"Streaming error: {str(e)}")
+                OpenAIAPI.logger.error(f"Streaming error: {str(e)}")
                 error_data = {
                     "id": generation_id,
                     "object": "chat.completion.chunk",

@@ -2,6 +2,8 @@ import logging
 import os
 from fastapi import FastAPI
 from core.model_manager import ModelManager
+from core.chat.conversation_manager import conversation_manager
+from core.chat.delay_manager import delay_manager
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -15,6 +17,11 @@ async def lifespan(app: FastAPI):
     
     # 初始化模型管理器
     await ModelManager.initialize(load_llm=load_llm)
+    
+    # 初始化延迟管理器并设置到会话管理器
+    if Config.DELAY_MODE:
+        conversation_manager.set_delay_manager(delay_manager)
+        logger.info("Delay manager initialized and set to conversation manager")
     
     # 预览模式下注册回调
     if Config.PREVIEW_MODE:

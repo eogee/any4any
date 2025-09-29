@@ -7,7 +7,6 @@ from typing import Optional
 from core.chat.conversation_database import ConversationDatabase
 from core.chat.llm import get_llm_service
 from core.dingtalk.message_manager import message_dedup
-from .delay_manager import delay_manager
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -23,20 +22,24 @@ class ConversationManager:
         self.delay_mode_enabled = Config.DELAY_MODE
         self.delay_time = Config.DELAY_TIME
         
-        # 集成延迟消息管理器
-        self.delay_manager = delay_manager
+        # 延迟管理器将在初始化后设置
+        self.delay_manager = None
         self.user_delay_status = {}
         self.pending_request_counts = {}
         
         if self.is_main_process:
             self.db = ConversationDatabase()
             self.llm_service = get_llm_service()
-            # 注册延迟消息处理回调
-            if self.delay_mode_enabled:
-                self.delay_manager.add_processing_callback(self._handle_delayed_messages)
         else:
             self.db = None
             self.llm_service = None
+    
+    def set_delay_manager(self, delay_manager):
+        """设置延迟管理器"""
+        self.delay_manager = delay_manager
+        # 注册延迟消息处理回调
+        if self.delay_mode_enabled and self.delay_manager:
+            self.delay_manager.add_processing_callback(self._handle_delayed_messages)
     
     def _check_main_process(self):
         """检查是否为主进程"""
@@ -69,7 +72,7 @@ class ConversationManager:
                 skip_save=False
             )
             
-            # 存储处理结果到用户状态
+            # 存储处理结果到用户状态 - 所有等待的请求共享同一个结果
             if sender in self.user_delay_status:
                 self.user_delay_status[sender]['result'] = {
                     'response': response,
@@ -129,6 +132,17 @@ class ConversationManager:
     
     async def _process_with_delay(self, sender, user_nick, platform, content, delay_time, message_id):
         """处理带延迟的消息并等待结果"""
+        # 检查延迟管理器是否可用
+        if not self.delay_manager:
+            logger.error("Delay manager not available, processing immediately")
+            return await self._process_immediately(
+                sender=sender,
+                user_nick=user_nick,
+                platform=platform,
+                content=content,
+                message_id=message_id
+            )
+        
         # 检查是否已经有在处理中的延迟请求
         if sender in self.user_delay_status and self.user_delay_status[sender].get('processing'):
             # 增加等待计数
@@ -151,6 +165,9 @@ class ConversationManager:
                 delay_time=delay_time
             )
             
+            # 后续请求，我们返回一个特殊的标记,确保不立即发送响应
+            return "DELAY_PROCESSING", "delay_processing"
+            
         else:
             # 初始化用户延迟状态
             self.user_delay_status[sender] = {
@@ -159,11 +176,17 @@ class ConversationManager:
                 'result': None,
                 'completion_event': asyncio.Event(),
                 'start_time': asyncio.get_event_loop().time(),
-                'completed_count': 0  # 记录已完成请求的数量
+                'completed_count': 0,  # 记录已完成请求的数量
+                'waiting_requests': set(),  # 记录所有等待的请求ID
+                'is_first_request': True  # 标记这是第一个请求
             }
             
             # 初始化等待计数
             self.pending_request_counts[sender] = 1
+            
+            # 记录当前请求
+            if message_id:
+                self.user_delay_status[sender]['waiting_requests'].add(message_id)
             
             request_data = {
                 'sender_id': sender,
@@ -189,7 +212,7 @@ class ConversationManager:
             # 等待处理完成事件
             await asyncio.wait_for(completion_event.wait(), timeout=timeout)
             
-            # 获取处理结果
+            # 获取处理结果 - 所有等待的请求都返回相同的结果
             if (self.user_delay_status.get(sender) and 
                 self.user_delay_status[sender].get('processed') and 
                 self.user_delay_status[sender].get('result')):
@@ -432,11 +455,14 @@ class ConversationManager:
     
     def get_buffered_message_count(self, user_id: str) -> int:
         """获取用户缓冲消息数量"""
-        return self.delay_manager.get_buffered_count(user_id)
+        if self.delay_manager:
+            return self.delay_manager.get_buffered_count(user_id)
+        return 0
     
     def clear_user_buffers(self, user_id: str):
         """清空用户消息缓冲区"""
-        self.delay_manager.clear_buffers(user_id)
+        if self.delay_manager:
+            self.delay_manager.clear_buffers(user_id)
         # 清理用户延迟状态
         if user_id in self.user_delay_status:
             del self.user_delay_status[user_id]
