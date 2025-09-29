@@ -11,6 +11,7 @@ The any4any Conversation Management System is a multi-platform dialogue manageme
 - **Streaming Responses**: Supports LLM streaming generation of response content
 - **Persistent Storage**: Uses MySQL database to store conversation and message data
 - **DingTalk Integration**: Supports DingTalk robot message processing and message sending after preview confirmation
+- **Delay Mode**: Intelligently merges multiple user messages within a short period to reduce API calls and optimize conversation experience
 
 ### 1.2 System Architecture
 
@@ -20,6 +21,7 @@ The system mainly consists of the following core components:
 2. **Conversation Database (ConversationDatabase)**: Responsible for data persistence
 3. **Preview Service (PreviewService)**: Manages preview and editing functionality
 4. **DingTalk Message Manager (EchoTextHandler)**: Handles DingTalk platform-specific logic
+5. **Delay Manager (DelayManager)**: Manages buffering, merging, and processing of delayed messages
 
 ## 2. Conversation Management Process
 
@@ -29,6 +31,7 @@ The system mainly consists of the following core components:
 sequenceDiagram
     participant Client as Client
     participant CM as Conversation Manager
+    participant DM as Delay Manager
     participant DB as Conversation Database
     participant LLM as LLM Service
     participant PS as Preview Service
@@ -44,7 +47,25 @@ sequenceDiagram
             DB-->>CM: Return conversation data
         end
     end
-    CM->>DB: Save user message
+    
+    alt Delay mode enabled
+        CM->>DM: Add message to delay queue
+        DM->>DM: Check for waiting delay tasks
+        alt Waiting delay task exists
+            DM->>DM: Cancel existing task and reschedule
+        else No waiting delay task
+            DM->>DM: Create new delay processing task
+        end
+        DM-->>CM: Return delay processing confirmation
+        
+        Note over DM: Wait for delay time
+        DM->>DM: Merge buffered messages
+        DM->>CM: Process merged message
+        CM->>DB: Save user message(merged)
+    else Delay mode disabled
+        CM->>DB: Save user message
+    end
+    
     CM->>LLM: Generate response
     LLM-->>CM: Return generated content
     
@@ -91,27 +112,37 @@ The system implements a timeout mechanism (PREVIEW_TIMEOUT configuration item). 
 
 ```mermaid
 flowchart TD
-    A[User sends message] --> B[Conversation manager processes]
-    B --> C{Preview mode?}
-    C -->|Yes| D[Create preview request]
-    C -->|No| E[Directly return response]
-    D --> F[Generate content and store in preview service]
-    F --> G[Execute content security processing]
-    G --> H[Intelligently extract/generate session ID]
-    H --> I[Return preview ID and preview URL]
-    I --> J{Preview confirmed?}
+    A[User sends message] --> B{Delay mode enabled?}
+    B -->|Yes| C[Add to delay message buffer]
+    B -->|No| D[Conversation manager directly processes]
+    C --> E{Processing delay task exists?}
+    E -->|Yes| F[Cancel existing task]
+    E -->|No| G[Create new delay processing task]
+    F --> G
+    G --> H[Wait for configured delay time]
+    H --> I[Merge all buffered messages]
+    I --> D
     
-    J -->|Yes| K[User edits through web interface]
-    K --> L[Confirm preview]
-    L --> M[Trigger callback function]
-    M --> N[Send confirmed content]
+    D --> J{Preview mode?}
+    J -->|Yes| K[Create preview request]
+    J -->|No| L[Directly return response]
+    K --> M[Generate content and store in preview service]
+    M --> N[Execute content security processing]
+    N --> O[Intelligently extract/generate session ID]
+    O --> P[Return preview ID and preview URL]
+    P --> Q{Preview confirmed?}
     
-    J -->|No, timeout| O[Trigger timeout handling]
-    O --> P[Mark is_timeout=1]
-    P --> Q[Send original generated content]
+    Q -->|Yes| R[User edits through web interface]
+    R --> S[Confirm preview]
+    S --> T[Trigger callback function]
+    T --> U[Send confirmed content]
     
-    style J fill:#f9f,stroke:#333,stroke-width:2px
-    style O fill:#ff9999,stroke:#333,stroke-width:2px
+    Q -->|No, timeout| V[Trigger timeout handling]
+    V --> W[Mark is_timeout=1]
+    W --> X[Send original generated content]
+    
+    style Q fill:#f9f,stroke:#333,stroke-width:2px
+    style V fill:#ff9999,stroke:#333,stroke-width:2px
 ```
 
 ### 3.3 Preview Service Core Features
@@ -136,6 +167,7 @@ sequenceDiagram
     participant Bot as DingTalk Robot
     participant EH as EchoTextHandler
     participant CM as Conversation Manager
+    participant DM as Delay Manager
     participant PS as Preview Service
     participant DB as Conversation Database
     
@@ -149,7 +181,26 @@ sequenceDiagram
         Bot-->>DD: No reply
     else Message can be processed
         EH->>CM: Process message
-        CM->>DB: Save user message
+        
+        alt Delay mode enabled
+            CM->>DM: Add message to delay queue
+            DM->>DM: Check for waiting delay tasks
+            alt Waiting delay task exists
+                DM->>DM: Cancel existing task and reschedule
+            else No waiting delay task
+                DM->>DM: Create new delay processing task
+            end
+            DM-->>CM: Return delay processing confirmation
+            CM-->>EH: Delay processing confirmation
+            
+            Note over DM: Wait for delay time
+            DM->>DM: Merge buffered messages
+            DM->>CM: Process merged message
+            CM->>DB: Save user message(merged)
+        else Delay mode disabled
+            CM->>DB: Save user message
+        end
+        
         CM->>CM: Generate response
         
         alt Preview mode
@@ -189,9 +240,59 @@ sequenceDiagram
 6. **Loop Message Detection**: Prevents robots from replying to messages they sent themselves, avoiding message loops
 7. **Content Filtering**: Supports filtering think tag content according to configuration (NO_THINK configuration item)
 
-## 5. Database Design
+## 5. Delay Mode Details
 
-### 5.1 Table Structure
+### 5.1 Delay Mode Working Principle
+
+Delay mode is an important new feature of the system that intelligently merges multiple user messages within a short period to reduce unnecessary API calls and optimize user experience and system performance. When delay mode is enabled, the system will merge multiple messages sent by the user within the configured delay time into a single message for unified processing.
+
+Core advantages of delay mode include:
+- **Reduced API Calls**: Avoid frequent sending of similar or related short messages
+- **Optimized Conversation Experience**: Users can send multiple messages consecutively, and the system will reply at once
+- **Improved Context Coherence**: Merged messages provide more complete context information
+- **Reduced System Load**: Decreased unnecessary processing and resource consumption
+
+### 5.2 Delay Mode Processing Flow
+
+```mermaid
+flowchart TD
+    A[User sends message] --> B{Delay mode enabled?}
+    B -->|Yes| C[Add to delay message buffer]
+    B -->|No| D[Process message immediately]
+    C --> E{Processing delay task exists?}
+    E -->|Yes| F[Cancel existing task]
+    E -->|No| G[Create new delay processing task]
+    F --> G
+    G --> H[Wait for configured delay time]
+    H --> I[Merge all buffered messages]
+    I --> J[Process merged message]
+    J --> K[Save processing results]
+    K --> L[Notify all waiting requests]
+```
+
+### 5.3 Delay Manager Core Features
+
+The Delay Manager (DelayManager) is implemented using a singleton pattern and is responsible for managing the entire lifecycle of delayed messages:
+
+- **Message Buffering**: Uses dictionary structure to cache messages received during the delay period by user ID
+- **Delay Processing**: Uses asynchronous tasks to implement scheduled processing, supporting cancellation and rescheduling
+- **Message Merging**: Merges multiple messages from the same user within the delay time into one
+- **Callback Mechanism**: Supports registering multiple processing callback functions for flexible extension of processing logic
+- **Concurrent Safety**: Uses asynchronous locks to ensure thread safety of data access
+- **Status Tracking**: Maintains user message processing status, supporting query of buffered message count
+- **Resource Management**: Provides buffer cleanup functionality to avoid memory leaks
+
+### 5.4 Coordination of Delay Mode with Other Features
+
+Delay mode works in coordination with other system features (such as preview mode, DingTalk integration) to maintain functional consistency:
+
+- **Coordination with Preview Mode**: Merged messages normally create previews in preview mode
+- **Coordination with DingTalk Integration**: DingTalk platform messages also support message deduplication and processing in delay mode
+- **Coordination with Context Management**: Merged messages maintain correct session context association
+
+## 6. Database Design
+
+### 6.1 Table Structure
 
 #### conversations table
 | Field Name | Type | Description |
@@ -203,16 +304,6 @@ sequenceDiagram
 | created_time | datetime | Conversation creation time |
 | last_active | datetime | Conversation last active time |
 | message_count | int(11) | Total number of messages in conversation |
-
-#### messages table
-| Field Name | Type | Description |
-|------------|------|-------------|
-| message_id | varchar(50) | Message unique identifier (primary key) |
-| conversation_id | varchar(50) | Associated conversation ID (foreign key) |
-| content | text | Message content |
-| sender_type | varchar(20) | Sender type (user-assistant) |
-| timestamp | datetime | Message sending time |
-| sequence_number | int(11) | Message sequence number in conversation |
 
 #### previews table
 | Field Name | Type | Description |
@@ -230,7 +321,7 @@ sequenceDiagram
 | created_at | timestamp | Creation time |
 | updated_at | timestamp | Update time |
 
-#### messages table update
+#### messages table
 | Field Name | Type | Description |
 |------------|------|-------------|
 | message_id | varchar(50) | Message unique identifier (primary key) |
@@ -241,16 +332,16 @@ sequenceDiagram
 | timestamp | datetime | Message sending time |
 | sequence_number | int(11) | Message sequence number in conversation |
 
-### 5.2 Index Design
+### 6.2 Index Design
 
 The system establishes multiple indexes on key tables to improve query performance:
 
 - conversations table: User-platform composite index, platform index, last active time index
 - messages table: Conversation ID index, message time index, conversation message sequence index
 
-## 6. Key Technical Solutions
+## 7. Key Technical Solutions
 
-### 6.1 Process-Safe Singleton Pattern
+### 7.1 Process-Safe Singleton Pattern
 
 The conversation manager implements a process-safe singleton pattern to ensure each process has an independent conversation manager instance, avoiding conflicts in multi-process environments. The system adopts a two-level initialization strategy: the main process fully initializes all resources (database connections, LLM services, etc.), while non-main processes use lightweight initialization, loading only necessary attributes.
 
@@ -299,7 +390,7 @@ def get_conversation_manager():
     return _global_conversation_manager
 ```
 
-### 6.2 Preview Content Processing Mechanism
+### 7.2 Preview Content Processing Mechanism
 
 The preview service implements a complete process for content generation, editing, and confirmation, while supporting content persistence and callback notifications. The system implements the preview service using a singleton pattern to ensure only one preview manager instance globally:
 
@@ -311,11 +402,7 @@ The preview service implements a complete process for content generation, editin
 - **Session Association**: Intelligently extract or generate session IDs to ensure correct association between preview content and conversations
 - **Timeout Management**: Implement timeout mechanism for preview confirmation, automatically processing after timeout
 
-### 6.3 Multi-platform Adaptation
-
-The system distinguishes different source platforms through the platform field, implementing a unified conversation management interface while providing customized processing logic for specific platforms (such as DingTalk).
-
-### 6.4 Multi-process Safe Data Storage
+### 7.3 Multi-process Safe Data Storage
 
 The system implements a multi-process safe data storage mechanism based on file locks and file storage, used to safely store preview-related information and message deduplication data in multi-process environments:
 
@@ -323,7 +410,7 @@ The system implements a multi-process safe data storage mechanism based on file 
 - **JSON File Storage**: Serialize data and store it in temporary files
 - **Expiration Time Management**: Support setting expiration time for stored data, automatically cleaning up expired data
 
-### 6.5 Message Deduplication Mechanism
+### 7.4 Message Deduplication Mechanism
 
 The system implements a message fingerprint-based deduplication mechanism to avoid repeated processing of the same message:
 
@@ -331,7 +418,22 @@ The system implements a message fingerprint-based deduplication mechanism to avo
 - **Processing Message Marking**: Mark messages being processed to prevent concurrent processing
 - **Deduplication Window**: Set a reasonable deduplication window (preview timeout time + 300 seconds) to avoid excessive deduplication
 
-## 7. Configuration Items
+### 7.5 Delay Mode Message Processing Mechanism
+
+The system implements an efficient delay message processing mechanism to ensure correctness of message merging and delay processing:
+
+- **Singleton Pattern Implementation**: Uses singleton pattern to ensure only one delay manager instance globally
+- **Asynchronous Task Scheduling**: Uses asyncio.Task to implement message delay processing and task scheduling
+- **Message Merging Logic**: Intelligently merges multiple messages within a short period into one, preserving complete context
+- **Merged Message Identification**: Adds special markers to merged messages for easy tracking and debugging
+- **User State Management**: Maintains each user's processing state and waiting request count
+- **Asynchronous Event Notification**: Uses asyncio.Event to implement notification mechanism after processing completion
+
+### 7.6 Multi-platform Adaptation
+
+The system distinguishes different source platforms through the platform field, implementing a unified conversation management interface while providing customized processing logic for specific platforms (such as DingTalk).
+
+## 8. Configuration Items
 
 Key configuration items for the conversation management system:
 
@@ -347,10 +449,12 @@ Key configuration items for the conversation management system:
 | CLIENT_ID | DingTalk client ID | Configurable |
 | CLIENT_SECRET | DingTalk client secret | Configurable |
 | ROBOT_CODE | DingTalk robot code | Configurable |
+| DELAY_MODE | Whether to enable delay mode | Configurable |
+| DELAY_TIME | Delay processing time (seconds) | Configurable |
 
-## 8. API Interfaces
+## 9. API Interfaces
 
-### 8.1 Conversation Management Interfaces
+### 9.1 Conversation Management Interfaces
 
 - **Process Message**: `process_message(sender, user_nick, platform, content, is_timeout=False)`
   - Parameter Description: sender-Sender ID, user_nick-User nickname, platform-Platform type, content-Message content, is_timeout-Whether it is a timeout auto-reply
@@ -371,7 +475,7 @@ Key configuration items for the conversation management system:
 - **Cleanup Cache**: `cleanup_cache()`
   - Function: Clean up expired cached conversations
 
-### 8.2 Preview-Related Interfaces
+### 9.2 Preview-Related Interfaces
 
 - **Create Preview**: `create_preview(request_data)`
   - Parameter Description: request_data-Request data dictionary
@@ -404,8 +508,8 @@ Key configuration items for the conversation management system:
   - Parameter Description: callback-Callback function
   - Function: Register callback function for preview confirmation
 
-## 9. Summary
+## 10. Summary
 
 The any4any Conversation Management System provides complete multi-platform conversation management functionality, supporting both preview and non-preview modes, with special optimization for DingTalk platform integration experience. The system adopts a modular design, achieving separation between business logic and data access, with good scalability and maintainability.
 
-Through reasonable database design and caching mechanisms, the system can efficiently process conversation data and support contextually continuous dialogue interactions. The implementation of preview mode provides flexible human intervention means for content quality control, especially suitable for scenarios requiring content review.
+Through reasonable database design and caching mechanisms, the system can efficiently process conversation data and support contextually continuous dialogue interactions. The implementation of preview mode provides flexible human intervention means for content quality control, especially suitable for scenarios requiring content review. The newly added delay mode further optimizes user experience by intelligently merging related messages, reducing unnecessary API calls and improving system efficiency.
