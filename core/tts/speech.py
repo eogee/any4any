@@ -1,13 +1,14 @@
 import os
 import time
 import uuid
+import logging
 from fastapi import Request, Header, HTTPException
 from edge_tts import Communicate
 from core.auth.model_auth import verify_token
 from core.model_manager import ModelManager
 from core.tts.file import file_response_with_cleanup
 from utils.content_handle.filter import filter_special_chars
-import logging
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ async def create_speech(
     try:
         data = await request.json()
         text = data.get("input", "")
-        voice = data.get("voice", "zh-CN-XiaoyiNeural")
+        voice = data.get("voice", str(Config.DEFAULT_VOICE))
         
         text = filter_special_chars(text)
         

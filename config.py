@@ -13,6 +13,8 @@ class Config:
     DEV_MODE = os.getenv("DEV_MODE", "False").lower() == "false"                    # 是否启用开发模式，开发模式下，控制台可以显示更多日志内容
     PREVIEW_MODE = os.getenv("PREVIEW_MODE", "True").lower() == "true"              # 是否启用预览模式，预览模式下，大模型响应内容需要人为确认或等待超时自动响应
     PREVIEW_TIMEOUT = int(os.getenv("PREVIEW_TIMEOUT", "60"))                       # 预览超时时间（秒），默认1分钟
+    DELAY_MODE = os.getenv("DELAY_MODE", "False").lower() == "true"                 # 是否启用延迟模式，延迟模式下，系统会累积用户消息并延迟处理
+    DELAY_TIME = int(os.getenv("DELAY_TIME", "3"))                                  # 延迟处理时间（秒），默认3秒，用户停止发送消息超过此时间才处理
 
     # MCP配置
     MCP_PORT = int(os.getenv("MCP_PORT", 9999))
@@ -24,6 +26,7 @@ class Config:
     
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+    DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
     ASR_MODEL_DIR = os.getenv("ASR_MODEL_DIR", "/mnt/c/models/SenseVoiceSmall")
     RERANK_MODEL_DIR = os.getenv("RERANK_MODEL_DIR", "/mnt/c/models/bge-reranker-base")
     LLM_MODEL_DIR = os.getenv("LLM_MODEL_DIR", "/mnt/c/models/Qwen3-1.7B")
