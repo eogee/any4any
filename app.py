@@ -17,6 +17,7 @@ from core.asr.transcription import create_transcription
 from core.tts.speech import create_speech
 from core.rerank.rerank import rerank_documents
 from core.chat.openai_api import openai_api
+from core.embedding.openai_api import get_embedding_router
 from core.mcp.mcp_tools import add,sub,mul,div
 from servers.IndexServer import IndexServer
 from servers.AuthServer import AuthServer
@@ -83,6 +84,10 @@ app.post("/v1/db/execute")(execute_query)
 app.post("/process_text", response_model=ProcessTextResponse)(process_text)
 app.post("/write_content")(write_content)
 app.post("/get_chunk_content")(get_chunk_content)
+
+# 注册Embedding API路由
+embedding_router = get_embedding_router()
+app.include_router(embedding_router)
 
 
 # 初始化IndexServer并注册路由

@@ -24,12 +24,12 @@ def chunk_text(text: str, chunk_size: int = None, overlap: int = None) -> list[s
     """
     将文本分块处理
     :param text: 输入文本
-    :param chunk_size: 每块大小，默认使用Config.DEFAULT_CHUNK_SIZE
+    :param chunk_size: 每块大小，默认使用Config.CHUNK_SIZE
     :param overlap: 重叠部分大小，默认使用Config.DEFAULT_OVERLAP
     :return: 分块后的文本列表
     """
-    chunk_size = chunk_size or Config.DEFAULT_CHUNK_SIZE
-    overlap = overlap or Config.DEFAULT_OVERLAP
+    chunk_size = chunk_size or Config.CHUNK_SIZE
+    overlap = overlap or Config.OVERLAP
     chunks = []
     start = 0
     end = chunk_size
@@ -71,8 +71,8 @@ async def process_text(
     # 构建响应数据
     response_data = {
         "total_chunks": len(chunks),
-        "chunk_size": Config.DEFAULT_CHUNK_SIZE,
-        "overlap": Config.DEFAULT_OVERLAP,
+        "chunk_size": Config.CHUNK_SIZE,
+        "overlap": Config.OVERLAP,
         "chunks": [
             {
                 "chunk_number": i,

@@ -1,6 +1,7 @@
 import os
 import torch
 from dotenv import load_dotenv
+from pathlib import Path
 
 # 加载.env文件
 load_dotenv()
@@ -15,6 +16,7 @@ class Config:
     PREVIEW_TIMEOUT = int(os.getenv("PREVIEW_TIMEOUT", "60"))                       # 预览超时时间（秒），默认1分钟
     DELAY_MODE = os.getenv("DELAY_MODE", "False").lower() == "true"                 # 是否启用延迟模式，延迟模式下，系统会累积用户消息并延迟处理
     DELAY_TIME = int(os.getenv("DELAY_TIME", "3"))                                  # 延迟处理时间（秒），默认3秒，用户停止发送消息超过此时间才处理
+    USE_KNOWLEDGE_BASE = os.getenv("USE_KNOWLEDGE_BASE", "False").lower() == "true" # 是否启用知识库，启用后会根据用户问题从知识库中提取相关内容
 
     # MCP配置
     MCP_PORT = int(os.getenv("MCP_PORT", 9999))
@@ -29,6 +31,7 @@ class Config:
     DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
     ASR_MODEL_DIR = os.getenv("ASR_MODEL_DIR", "/mnt/c/models/SenseVoiceSmall")
     RERANK_MODEL_DIR = os.getenv("RERANK_MODEL_DIR", "/mnt/c/models/bge-reranker-base")
+    EMBEDDING_MODEL_DIR = os.getenv("EMBEDDING_MODEL_DIR", "/mnt/c/models/bge-small-zh-v1.5")
     LLM_MODEL_DIR = os.getenv("LLM_MODEL_DIR", "/mnt/c/models/Qwen3-1.7B")
     LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen3-1.7B")
     NO_THINK = os.getenv("NO_THINK", "True").lower() == "true"
@@ -39,7 +42,17 @@ class Config:
     TRUST_REMOTE_CODE = os.getenv("TRUST_REMOTE_CODE", "True").lower() == "true"    # 是否信任远程代码
     USE_HALF_PRECISION = os.getenv("USE_HALF_PRECISION", "True").lower() == "true"  # 是否使用半精度
     LOW_CPU_MEM_USAGE = os.getenv("LOW_CPU_MEM_USAGE", "True").lower() == "true"    # 是否使用低CPU内存
-    TOKENIZERS_PARALLELISM = os.getenv("TOKENIZERS_PARALLELISM", "False").lower() == "true"      # 是否启用多线程分词
+    TOKENIZERS_PARALLELISM = os.getenv("TOKENIZERS_PARALLELISM", "False").lower() == "true" # 是否启用多线程分词
+    
+    # EMBEDDING模型配置
+    TOP_K = int(os.getenv("TOP_K", "3"))                                            # 取前k个最相似的向量
+    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "2000"))                               # 文本分块大小，单位为字符数
+    OVERLAP = int(os.getenv("OVERLAP", "200"))                                      # 文本分块重叠大小，单位为字符数
+    VECTOR_DB_PATH = "../../" + os.getenv("VECTOR_DB_PATH", "data/vector_db")     # 向量数据库路径
+    DOCS_PATH = "../../" + os.getenv("DOCS_PATH", "data/docs")                    # 文档路径
+    DOC_CHUNK_SIZE = int(os.getenv("DOC_CHUNK_SIZE", "500"))                        # 文档处理器文本分块大小
+    DOC_CHUNK_OVERLAP = int(os.getenv("DOC_CHUNK_OVERLAP", "50"))                   # 文档处理器文本分块重叠大小
+    SUPPORTED_FILE_TYPES = os.getenv("SUPPORTED_FILE_TYPES", "['.pdf', '.docx', '.txt']")  # 支持的文件类型
 
     # LLM模型生成参数配置
     MAX_LENGTH = int(os.getenv("MAX_LENGTH", "4096"))                               # 最大生成长度
@@ -58,17 +71,15 @@ class Config:
     # 数据库功能配置
     QUERY_CLEANING = os.getenv("QUERY_CLEANING", "True").lower() == "true"          # 是否启用数据库查询清理功能
     
-    # 文本分块配置-知识库文本处理
-    DEFAULT_CHUNK_SIZE = int(os.getenv("DEFAULT_CHUNK_SIZE", 2000))
-    DEFAULT_OVERLAP = int(os.getenv("DEFAULT_OVERLAP", 200))
-    
-    # 确保模型目录存在
-    os.makedirs(ASR_MODEL_DIR, exist_ok=True)
-    os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
-    os.makedirs(LLM_MODEL_DIR, exist_ok=True)
-    
     # 钉钉配置
     CLIENT_ID = os.getenv("CLIENT_ID", "")
     CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
     ROBOT_CODE = os.getenv("ROBOT_CODE", "")
     DINGTALK_PORT = os.getenv("DINGTALK_PORT", "6666")
+
+    # 确保模型目录存在
+    os.makedirs(ASR_MODEL_DIR, exist_ok=True)
+    os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
+    os.makedirs(LLM_MODEL_DIR, exist_ok=True)
+    os.makedirs(VECTOR_DB_PATH, exist_ok=True)
+    os.makedirs(DOCS_PATH, exist_ok=True)

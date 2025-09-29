@@ -11,4 +11,10 @@ pydantic>=2.0.0         # 数据模型验证库
 mysql-connector-python>=8.1.0  # MySQL数据库连接器
 FastMCP                 # MPC通信协议库
 dingtalk_stream         # 钉钉机器人SDK
-alibabacloud_dingtalk   # 钉钉机器人API客户端
+alibabacloud_dingtalk   # 钉钉机器人API客户端库
+numpy>=1.21.0           # 数值计算库
+sentence-transformers>=2.2.0  # 文本嵌入库
+requests>=2.25.0        # HTTP请求库
+PyPDF2>=1.27.0          # PDF处理库
+python-docx>=0.8.11     # 读取Word文档库
+chardet>=4.0.0          # 字符编码检测库
