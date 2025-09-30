@@ -1,9 +1,14 @@
+import logging
 import torch
 import torch.nn.functional as F
-from typing import List
 import numpy as np
+from typing import List
 from transformers import AutoTokenizer, AutoModel
 from config import Config
+from core.log import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 class EmbeddingManager:
     def __init__(self, model_name: str = None):
@@ -14,19 +19,17 @@ class EmbeddingManager:
     
     def _load_model(self):
         """加载Embedding模型"""
-        print(f"正在加载Embedding模型: {self.model_name}")
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModel.from_pretrained(self.model_name)
-            print("Embedding模型加载完成")
         except Exception as e:
-            print(f"加载Embedding模型失败: {e}")
+            logger.error(f"Load model failed: {e}")
             raise
     
     def get_embeddings(self, texts: List[str]) -> np.ndarray:
         """获取文本的向量表示"""
         if self.tokenizer is None or self.model is None:
-            raise ValueError("模型未正确加载")
+            raise ValueError("Model not loaded correctly")
         
         # 编码文本
         encoded_input = self.tokenizer(
@@ -34,18 +37,22 @@ class EmbeddingManager:
             padding=True, 
             truncation=True, 
             return_tensors='pt',
-            max_length=512
+            max_length=4096
         )
         
         # 计算嵌入
         with torch.no_grad():
-            model_output = self.model(**encoded_input)
-            # 使用平均池化获取句子嵌入
-            sentence_embeddings = self._mean_pooling(model_output, encoded_input['attention_mask'])
-            # 归一化
-            sentence_embeddings = F.normalize(sentence_embeddings, p=2, dim=1)
+            model_output = self.model(**encoded_input)            
+            sentence_embeddings = self._mean_pooling(model_output, encoded_input['attention_mask']) # 使用平均池化获取句子嵌入            
+            sentence_embeddings = F.normalize(sentence_embeddings, p=2, dim=1)  # 归一化                
         
+        # 返回numpy数组，在kb_tool.py中有转换为列表的逻辑
         return sentence_embeddings.numpy()
+    
+    def get_embeddings_as_list(self, texts: List[str]) -> List[List[float]]:
+        """获取文本的向量表示并返回为Python列表格式（适用于ChromaDB）"""
+        embeddings = self.get_embeddings(texts)
+        return embeddings.tolist()
     
     def _mean_pooling(self, model_output, attention_mask):
         """平均池化"""

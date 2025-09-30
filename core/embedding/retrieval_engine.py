@@ -1,11 +1,17 @@
+import logging
 import requests
 import json
 from typing import List, Dict, Any, Tuple
 from config import Config
 from embedding_manager import EmbeddingManager
 from vector_store import VectorStore
+from core.log import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 class RetrievalEngine:
+    """检索引擎，通过OpenAI兼容的模型API进行知识库查询"""
     def __init__(self, embedding_manager: EmbeddingManager, vector_store: VectorStore):
         self.embedding_manager = embedding_manager
         self.vector_store = vector_store
@@ -45,15 +51,9 @@ class RetrievalEngine:
         """检索相关信息并生成回答"""
         if top_k is None:
             top_k = Config.TOP_K
-        print(f"正在处理问题: {question}")
-        
-        # 1. 将问题转换为向量
-        print("正在生成问题向量...")
-        question_embedding = self.embedding_manager.get_single_embedding(question)
-        
-        # 2. 在向量库中搜索相似内容
-        print("正在检索相似内容...")
-        similar_docs = self.vector_store.search_similar(question_embedding, top_k=top_k)
+
+        question_embedding = self.embedding_manager.get_single_embedding(question) # 将问题转换为向量
+        similar_docs = self.vector_store.search_similar(question_embedding, top_k=top_k)  # 在向量库中搜索相似内容
         
         if not similar_docs:
             return {
@@ -62,7 +62,7 @@ class RetrievalEngine:
                 "question": question
             }
         
-        # 3. 构建上下文
+        # 构建上下文
         context = "以下是从知识库中检索到的相关信息：\n\n"
         sources = []
         
@@ -75,16 +75,12 @@ class RetrievalEngine:
                 "score": float(score)
             })
         
-        # 4. 构建提示词
-        system_prompt = """你是一个专业的助手，请根据提供的上下文信息回答问题。
-        如果上下文中有答案，请基于上下文回答。
-        如果上下文中没有足够的信息，请如实告知，不要编造信息。"""
+        # 构建提示词
+        system_prompt = f"你是一个专业的助手，请根据提供的上下文信息回答问题。\n如果上下文中有答案，请基于上下文回答。\n如果上下文中没有足够的信息，请如实告知，不要编造信息。{context}"
+        prompt = question
         
-        prompt = f"{context}\n问题：{question}\n请根据以上信息回答："
-        
-        # 5. 调用LLM生成回答
-        print("正在生成回答...")
-        answer = self.query(prompt, "qwen3:1.7b", system_prompt)
+        # 调用LLM生成回答
+        answer = self.query(prompt, "default", system_prompt)
         
         return {
             "answer": answer,

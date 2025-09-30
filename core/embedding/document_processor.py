@@ -1,22 +1,24 @@
 import os
-import sys
 import PyPDF2
 import docx
 import chardet
 import re
+import logging
 from config import Config
 from typing import List, Dict, Any
+from core.log import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
     def __init__(self, chunk_size: int = None, chunk_overlap: int = None):
-        # 使用配置文件中的值，如果没有提供参数
         self.chunk_size = chunk_size or Config.DOC_CHUNK_SIZE
         self.chunk_overlap = chunk_overlap or Config.DOC_CHUNK_OVERLAP
     
     def load_documents(self, docs_path: str) -> List[Dict[str, Any]]:
         """加载目录中的所有文档"""
-        documents = []
-        
+        documents = []        
         for filename in os.listdir(docs_path):
             file_path = os.path.join(docs_path, filename)
             if not os.path.isfile(file_path):
@@ -42,10 +44,10 @@ class DocumentProcessor:
                         'content': content,
                         'chunks': []
                     })
-                    print(f"成功加载文档: {filename}")
+                    logger.info(f"Successfully loaded document: {filename}")
                     
             except Exception as e:
-                print(f"加载文档 {filename} 时出错: {e}")
+                logger.error(f"Error loading document {filename}: {e}")
         
         return documents
     
@@ -58,7 +60,7 @@ class DocumentProcessor:
                 for page in pdf_reader.pages:
                     content += page.extract_text() + "\n"
         except Exception as e:
-            print(f"读取PDF文件 {file_path} 时出错: {e}")
+            logger.error(f"Error reading PDF file {file_path}: {e}")
         return content
     
     def _read_docx(self, file_path: str) -> str:
@@ -69,7 +71,7 @@ class DocumentProcessor:
             for paragraph in doc.paragraphs:
                 content += paragraph.text + "\n"
         except Exception as e:
-            print(f"读取DOCX文件 {file_path} 时出错: {e}")
+            logger.error(f"Error reading DOCX file {file_path}: {e}")
         return content
     
     def _read_txt(self, file_path: str) -> str:
@@ -80,7 +82,7 @@ class DocumentProcessor:
                 encoding = chardet.detect(raw_data)['encoding']
                 return raw_data.decode(encoding, errors='ignore')
         except Exception as e:
-            print(f"读取TXT文件 {file_path} 时出错: {e}")
+            logger.error(f"Error reading TXT file {file_path}: {e}")
             return ""
     
     def split_text(self, text: str) -> List[str]:
@@ -88,7 +90,7 @@ class DocumentProcessor:
         if not text.strip():
             return []
         
-        # 简单的按句子和长度分割
+        # 按句子和长度分割-后续可自定义
         sentences = re.split(r'[。！？!?\.\n]', text)
         sentences = [s.strip() for s in sentences if s.strip()]
         
@@ -96,19 +98,15 @@ class DocumentProcessor:
         current_chunk = ""
         
         for sentence in sentences:
-            # 如果当前块加上新句子不会超长，就添加
-            if len(current_chunk) + len(sentence) <= self.chunk_size:
+            if len(current_chunk) + len(sentence) <= self.chunk_size: # 如果当前块加上新句子不会超长，就添加
                 current_chunk += sentence + "。"
-            else:
-                # 如果当前块不为空，保存它
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
+            else:                
+                if current_chunk: # 如果当前块不为空，保存它
+                    chunks.append(current_chunk.strip())                
                 
-                # 开始新块
-                current_chunk = sentence + "。"
+                current_chunk = sentence + "。" # 开始新块        
         
-        # 添加最后一个块
-        if current_chunk:
+        if current_chunk: # 添加最后一个块
             chunks.append(current_chunk.strip())
         
         return chunks

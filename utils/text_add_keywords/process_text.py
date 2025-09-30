@@ -21,15 +21,9 @@ class ProcessTextResponse(BaseModel):
     chunks: List[ChunkResponse]
 
 def chunk_text(text: str, chunk_size: int = None, overlap: int = None) -> list[str]:
-    """
-    将文本分块处理
-    :param text: 输入文本
-    :param chunk_size: 每块大小，默认使用Config.CHUNK_SIZE
-    :param overlap: 重叠部分大小，默认使用Config.DEFAULT_OVERLAP
-    :return: 分块后的文本列表
-    """
-    chunk_size = chunk_size or Config.CHUNK_SIZE
-    overlap = overlap or Config.OVERLAP
+    """将文本分块处理"""
+    chunk_size = chunk_size or Config.DOC_CHUNK_SIZE
+    overlap = overlap or Config.DOC_CHUNK_OVERLAP
     chunks = []
     start = 0
     end = chunk_size
@@ -71,8 +65,8 @@ async def process_text(
     # 构建响应数据
     response_data = {
         "total_chunks": len(chunks),
-        "chunk_size": Config.CHUNK_SIZE,
-        "overlap": Config.OVERLAP,
+        "chunk_size": Config.DOC_CHUNK_SIZE,
+        "overlap": Config.DOC_CHUNK_OVERLAP,
         "chunks": [
             {
                 "chunk_number": i,

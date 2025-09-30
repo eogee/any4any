@@ -89,7 +89,6 @@ app.post("/get_chunk_content")(get_chunk_content)
 embedding_router = get_embedding_router()
 app.include_router(embedding_router)
 
-
 # 初始化IndexServer并注册路由
 index_server = IndexServer()
 index_server.register_routes(app)

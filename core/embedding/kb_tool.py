@@ -1,18 +1,21 @@
 import os
 import sys
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
+import logging
 import argparse
 from config import Config
 from core.embedding.document_processor import DocumentProcessor
 from core.embedding.embedding_manager import EmbeddingManager
 from core.embedding.vector_store import VectorStore
 from core.embedding.retrieval_engine import RetrievalEngine
+from core.log import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 class KnowledgeBaseTool:
+    """本地知识库命令行工具"""
     def __init__(self):
-        # 目录创建已在config.py中自动处理
         self.embedding_manager = None
         self.vector_store = None
         self.retrieval_engine = None
@@ -25,26 +28,39 @@ class KnowledgeBaseTool:
             self.vector_store = VectorStore(Config.VECTOR_DB_PATH)
             self.retrieval_engine = RetrievalEngine(self.embedding_manager, self.vector_store)
         except Exception as e:
-            print(f"初始化组件失败: {e}")
+            logger.error(f"Failed to initialize components: {e}")
             sys.exit(1)
     
     def build_kb(self, force_rebuild=False):
         """构建知识库"""
-        print("开始构建知识库...")
-        
-        if not force_rebuild and len(self.vector_store.vectors) > 0:
-            print("知识库已存在，使用 --force 参数强制重建")
+        # 检查是否已有数据
+        stats = self.vector_store.get_stats()
+        if not force_rebuild and stats['total_vectors'] > 0:
+            logger.info("Knowledge base already exists. Use --force to rebuild.")
             return
         
+        # 如果是强制重建，先清空集合
+        if force_rebuild:
+            try:
+                # 重新创建集合以清空数据
+                self.vector_store.client.delete_collection(name="documents")
+                self.vector_store.collection = self.vector_store.client.create_collection(
+                    name="documents",
+                    metadata={"hnsw:space": "cosine"}
+                )
+                logger.info("Knowledge base collection has been rebuilt.")
+            except Exception as e:
+                logger.error(f"Failed to clear knowledge base collection: {e}")
+        
         processor = DocumentProcessor(
-            chunk_size=Config.CHUNK_SIZE,
-            chunk_overlap=Config.CHUNK_OVERLAP
+            chunk_size=Config.DOC_CHUNK_SIZE,
+            chunk_overlap=Config.DOC_CHUNK_OVERLAP
         )
         
         documents = processor.process_documents(Config.DOCS_PATH)
         
         if not documents:
-            print("没有找到可处理的文档，请将文档放入 ./docs 目录")
+            logger.info("No documents found in data/docs directory. Please add documents.")
             return
         
         # 生成向量并存储
@@ -62,64 +78,66 @@ class KnowledgeBaseTool:
                 })
         
         if all_chunks:
-            print(f"正在为 {len(all_chunks)} 个文本块生成向量...")
-            embeddings = self.embedding_manager.get_embeddings(all_chunks)
+            # 使用专门为ChromaDB设计的方法获取列表格式的向量
+            embeddings = self.embedding_manager.get_embeddings_as_list(all_chunks)
             self.vector_store.add_vectors(embeddings, all_metadata)
             self.vector_store.save_data()
-            print("知识库构建完成！")
+            logger.info("Knowledge base has been built successfully.")
         else:
-            print("没有生成任何文本块")
+            logger.info("No chunks generated. Please check document processing.")
     
     def query(self, question: str, top_k: int = 3):
         """查询知识库"""
-        if len(self.vector_store.vectors) == 0:
-            print("知识库为空，请先构建知识库")
+        stats = self.vector_store.get_stats()
+        if stats['total_vectors'] == 0:
+            logger.info("Knowledge base is empty. Please build the knowledge base first.")
             return
         
         result = self.retrieval_engine.retrieve_and_answer(question, top_k)
         
-        print(f"\n问题: {result['question']}")
-        print(f"\n回答: {result['answer']}")
+        logger.info(f"\nQuery: {result['question']}")
+        logger.info(f"\nAnswer: {result['answer']}")
         
         if result['sources']:
-            print(f"\n参考来源 (共 {len(result['sources'])} 个):")
+            logger.info(f"\nReference sources (total {len(result['sources'])}):")
             for i, source in enumerate(result['sources'], 1):
-                print(f"\n{i}. 文件: {source['file_name']}")
-                print(f"   相似度: {source['score']:.3f}")
-                print(f"   内容: {source['chunk_text'][:200]}...")
+                logger.info(f"\n{i}. File: {source['file_name']}")
+                logger.info(f"   Similarity: {source['score']:.3f}")
+                logger.info(f"   Content: {source['chunk_text'][:200]}...")
     
     def search(self, question: str, top_k: int = 5):
         """只搜索不生成回答"""
-        if len(self.vector_store.vectors) == 0:
-            print("知识库为空，请先构建知识库")
+        stats = self.vector_store.get_stats()
+        if stats['total_vectors'] == 0:
+            logger.info("Knowledge base is empty. Please build the knowledge base first.")    
             return
         
         results = self.retrieval_engine.simple_search(question, top_k)
         
-        print(f"\n搜索查询: {question}")
-        print(f"找到 {len(results)} 个相关结果:\n")
+        logger.info(f"\nSearch query: {question}")
+        logger.info(f"Found {len(results)} relevant results:\n")
         
         for i, (score, metadata) in enumerate(results, 1):
-            print(f"{i}. 文件: {metadata['file_name']}")
-            print(f"   相似度: {score:.3f}")
-            print(f"   内容: {metadata['chunk_text'][:150]}...")
-            print()
+            logger.info(f"{i}. File: {metadata['file_name']}")
+            logger.info(f"   Similarity: {score:.3f}")
+            logger.info(f"   Content: {metadata['chunk_text'][:150]}...")
+            logger.info("")
     
     def stats(self):
         """显示知识库统计信息"""
         stats = self.vector_store.get_stats()
-        print("知识库统计信息:")
-        print(f"  总向量数: {stats['total_vectors']}")
-        print(f"  总文件数: {stats['total_files']}")
-        print(f"  文件列表: {', '.join(stats['files'])}")
+        logger.info("Knowledge base statistics:")
+        logger.info(f"  Total vectors: {stats['total_vectors']}")
+        logger.info(f"  Total files: {stats['total_files']}")
+        logger.info(f"  File list: {', '.join(stats['files'])}")
     
     def delete_file(self, file_name: str):
         """删除指定文件的所有向量"""
         if self.vector_store.delete_file_vectors(file_name):
             self.vector_store.save_data()
-            print(f"已删除文件 '{file_name}' 的所有向量")
+            logger.info(f"Deleted all vectors for file '{file_name}'")
         else:
-            print(f"未找到文件 '{file_name}'")
+            logger.info(f"File '{file_name}' not found in knowledge base")
 
 def main():
     parser = argparse.ArgumentParser(description="本地知识库命令行工具")
@@ -166,9 +184,9 @@ def main():
         elif args.command == 'delete':
             tool.delete_file(args.file_name)
     except KeyboardInterrupt:
-        print("\n操作被用户中断")
+        logger.info("\nOperation interrupted by user")
     except Exception as e:
-        print(f"执行命令时出错: {e}")
+        logger.error(f"Error during command execution: {e}")
 
 if __name__ == "__main__":
     main()
