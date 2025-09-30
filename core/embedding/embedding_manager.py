@@ -16,16 +16,15 @@ class EmbeddingManager:
         self.model_name = model_name or Config.EMBEDDING_MODEL_DIR
         self.tokenizer = None
         self.model = None
-        self._load_model()
+        self._model_loaded = False
         
     def use_global_model(self):
-        """使用ModelManager中全局加载的嵌入模型"""
+        """使用嵌入模型"""
         try:
             model, tokenizer = ModelManager.get_embedding_model()
             if model is not None and tokenizer is not None:
                 self.model = model
                 self.tokenizer = tokenizer
-                logger.info("Using embedding model from ModelManager")
                 return True
             return False
         except Exception as e:
@@ -33,12 +32,11 @@ class EmbeddingManager:
             return False
     
     def _load_model(self):
-        """加载Embedding模型"""
+        """未获取到则本地加载Embedding模型"""
         try:
             if self.use_global_model():
-                return
-                
-            logger.info(f"Loading embedding model locally: {self.model_name}") # 如果全局模型未加载，则自己加载
+                return                
+            logger.info(f"Loading embedding model locally: {self.model_name}")
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModel.from_pretrained(self.model_name)
         except Exception as e:
@@ -47,20 +45,22 @@ class EmbeddingManager:
     
     def get_embeddings(self, texts: List[str]) -> np.ndarray:
         """获取文本的向量表示"""
-        if self.tokenizer is None or self.model is None:
-            raise ValueError("Model not loaded correctly")
+        if not self._model_loaded:
+            self._load_model()
+            self._model_loaded = True
         
-        # 编码文本
-        encoded_input = self.tokenizer(
+        if self.tokenizer is None or self.model is None:
+            raise ValueError("Model not loaded correctly")        
+        
+        encoded_input = self.tokenizer( # 编码文本
             texts, 
             padding=True, 
             truncation=True, 
             return_tensors='pt',
-            max_length=4096
-        )
+            max_length=512
+        )        
         
-        # 计算嵌入
-        with torch.no_grad():
+        with torch.no_grad(): # 计算嵌入
             model_output = self.model(**encoded_input)            
             sentence_embeddings = self._mean_pooling(model_output, encoded_input['attention_mask']) # 使用平均池化获取句子嵌入            
             sentence_embeddings = F.normalize(sentence_embeddings, p=2, dim=1)  # 归一化                

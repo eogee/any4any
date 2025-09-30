@@ -1,8 +1,6 @@
 import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import logging
-import asyncio
+import traceback
 from typing import Dict, Any
 from config import Config
 from core.embedding.document_processor import DocumentProcessor
@@ -22,36 +20,49 @@ class KnowledgeBaseServer:
         self.vector_store = None
         self.retrieval_engine = None
         self._initialized = False
-        self._initialize_components()
     
     def _initialize_components(self):
         """初始化组件"""
         try:
+            # 检查ModelManager是否已经初始化
+            if not hasattr(ModelManager, '_initialized') or not ModelManager._initialized:
+                self._initialized = False
+                return False
+                
             # 初始化嵌入管理器和向量存储
-            self.embedding_manager = EmbeddingManager(Config.EMBEDDING_MODEL_DIR)
-            self.vector_store = VectorStore(Config.VECTOR_DB_PATH)
+            if self.embedding_manager is None:
+                self.embedding_manager = EmbeddingManager(Config.EMBEDDING_MODEL_DIR)
+            if self.vector_store is None:
+                self.vector_store = VectorStore(Config.VECTOR_DB_PATH)
             
-            # 获取ModelManager中的重排序器
             reranker = ModelManager.get_reranker()
             
-            # 创建检索引擎时传入重排序器
+            # 创建或更新检索引擎
             self.retrieval_engine = RetrievalEngine(self.embedding_manager, self.vector_store, reranker=reranker)
-            self._initialized = True
+            self._initialized = True            
+            return True
+
         except Exception as e:
             logger.error(f"Failed to initialize components: {e}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             self._initialized = False
+            return False
     
-    async def _async_initialize_reranker(self):
-        """异步初始化重排序器"""
-        await ModelManager.initialize(load_llm=False, load_asr=False, load_tts=False, load_reranker=True)
+    def ensure_initialized(self):
+        """确保组件已初始化，在每次使用前调用"""
+        if not self._initialized:
+            return self._initialize_components()
+
+        if self.retrieval_engine and not self.retrieval_engine.reranker:
+            return self._initialize_components()
+
+        return True
     
     def build_knowledge_base(self, force_rebuild: bool = False) -> Dict[str, Any]:
         """构建知识库"""
         try:
-            if not self._initialized:
-                return {"success": False, "message": "组件未初始化"}
+            if not self.ensure_initialized():
+                return {"success": False, "message": "组件初始化失败"}
             
             # 检查是否已有数据
             stats = self.vector_store.get_stats()
@@ -62,7 +73,6 @@ class KnowledgeBaseServer:
             # 如果是强制重建，先清空集合
             if force_rebuild:
                 try:
-                    # 重新创建集合以清空数据
                     self.vector_store.client.delete_collection(name="documents")
                     self.vector_store.collection = self.vector_store.client.create_collection(
                         name="documents",
@@ -99,7 +109,7 @@ class KnowledgeBaseServer:
                     })
             
             if all_chunks:
-                # 使用专门为ChromaDB设计的方法获取列表格式的向量
+                # 获取列表格式的向量(ChromaDB)
                 embeddings = self.embedding_manager.get_embeddings_as_list(all_chunks)
                 self.vector_store.add_vectors(embeddings, all_metadata)
                 self.vector_store.save_data()
@@ -116,16 +126,15 @@ class KnowledgeBaseServer:
     def retrieve_documents(self, question: str, top_k: int = 3, use_rerank: bool = True) -> Dict[str, Any]:
         """检索相关文档"""
         try:
-            if not self._initialized:
-                return {"success": False, "message": "组件未初始化"}
+            if not self.ensure_initialized():
+                return {"success": False, "message": "组件初始化失败"}
             
             stats = self.vector_store.get_stats()
             if stats['total_vectors'] == 0:
                 logger.info("Knowledge base is empty. Please build the knowledge base first.")
                 return {"success": False, "message": "知识库为空，请先构建知识库"}
             
-            # 调用检索引擎的retrieve_documents方法
-            result = self.retrieval_engine.retrieve_documents(question, top_k, use_rerank)
+            result = self.retrieval_engine.retrieve_documents(question, top_k, use_rerank) # 执行检索
             
             return {
                 "success": True,
@@ -142,8 +151,8 @@ class KnowledgeBaseServer:
     def simple_search(self, question: str, top_k: int = 5) -> Dict[str, Any]:
         """简单搜索，返回格式化的文档列表"""
         try:
-            if not self._initialized:
-                return {"success": False, "message": "组件未初始化"}
+            if not self.ensure_initialized():
+                return {"success": False, "message": "组件初始化失败"}
             
             stats = self.vector_store.get_stats()
             if stats['total_vectors'] == 0:
@@ -177,8 +186,8 @@ class KnowledgeBaseServer:
     def get_collection_stats(self) -> Dict[str, Any]:
         """获取知识库统计信息"""
         try:
-            if not self._initialized:
-                return {"success": False, "message": "组件未初始化"}
+            if not self.ensure_initialized():
+                return {"success": False, "message": "组件初始化失败"}
             
             stats = self.vector_store.get_stats()
             
@@ -196,8 +205,8 @@ class KnowledgeBaseServer:
     def delete_document_by_file(self, file_name: str) -> Dict[str, Any]:
         """删除指定文件的所有向量"""
         try:
-            if not self._initialized:
-                return {"success": False, "message": "组件未初始化"}
+            if not self.ensure_initialized():
+                return {"success": False, "message": "组件初始化失败"}
             
             success = self.vector_store.delete_file_vectors(file_name)
             if success:
@@ -215,8 +224,8 @@ class KnowledgeBaseServer:
     def add_document(self, file_path: str) -> Dict[str, Any]:
         """添加单个文档到知识库"""
         try:
-            if not self._initialized:
-                return {"success": False, "message": "组件未初始化"}
+            if not self.ensure_initialized():
+                return {"success": False, "message": "组件初始化失败"}
             
             if not os.path.exists(file_path):
                 return {"success": False, "message": f"文件不存在: {file_path}"}
@@ -266,8 +275,8 @@ class KnowledgeBaseServer:
     def search(self, question: str, top_k: int = 3, use_rerank: bool = True) -> Dict[str, Any]:
         """统一的检索API，供外部调用"""
         try:
-            if not self._initialized:
-                return {"success": False, "message": "组件未初始化"}
+            if not self.ensure_initialized():
+                return {"success": False, "message": "组件初始化失败"}
             
             # 调用核心检索方法
             result = self.retrieval_engine.search(question, top_k, use_rerank)
@@ -290,5 +299,13 @@ def get_kb_server() -> KnowledgeBaseServer:
     """获取知识库服务单例"""
     global _kb_server_instance
     if _kb_server_instance is None:
+        # 创建实例但不立即初始化组件
         _kb_server_instance = KnowledgeBaseServer()
     return _kb_server_instance
+
+def initialize_kb_server_after_model():
+    """在ModelManager初始化完成后初始化知识库服务"""
+    global _kb_server_instance
+    if _kb_server_instance is not None:
+        logger.info("Attempting to initialize KnowledgeBaseServer after ModelManager")
+        _kb_server_instance.ensure_initialized()

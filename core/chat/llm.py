@@ -36,6 +36,18 @@ class LLMService:
         self.device = Config.DEVICE if torch.cuda.is_available() and Config.DEVICE.startswith("cuda") else "cpu"
         self.active_generations = {}
         self.active_queues = []
+        self._kb_server = None  # 延迟初始化，不在构造函数中立即获取
+    
+    @property
+    def kb_server(self):
+        """延迟获取知识库服务实例"""
+        if self._kb_server is None and Config.KNOWLEDGE_BASE_ENABLED:
+            try:
+                from core.embedding.kb_server import get_kb_server # 延迟导入，避免循环依赖
+                self._kb_server = get_kb_server()
+            except Exception as e:
+                logger.error(f"Failed to get knowledge base server: {e}")
+        return self._kb_server
 
     def load_model(self, model_path, device=None):
         """加载模型并自动选择设备"""
@@ -115,7 +127,7 @@ class LLMService:
 
         if not self._check_model_initialized():
             yield "抱歉，模型未初始化。"
-            return
+            return        
 
         stop_event = threading.Event()
         self.active_generations[generation_id] = {"stop_event": stop_event}
@@ -124,6 +136,8 @@ class LLMService:
             # 构建提示
             prompt = self._build_prompt(user_message)
             inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.device)
+            
+            logger.info(f"LLM is generating stream...")
             
             text_queue = queue.Queue()
             self.active_queues.append(text_queue)
@@ -159,6 +173,26 @@ class LLMService:
     def _build_prompt(self, user_message: str) -> str:
         """构建提示文本"""
         system_prompt = getattr(Config, 'LLM_PROMPT', '')
+        
+        if Config.KNOWLEDGE_BASE_ENABLED and self.kb_server: # 知识库检索
+            try:
+                retrieval_result = self.kb_server.retrieve_documents(user_message)
+                
+                if retrieval_result.get('success') and retrieval_result.get('has_results'):
+                    
+                    knowledge_content = "\n\n[知识库检索结果]\n"
+                    
+                    for i, doc in enumerate(retrieval_result.get('documents', []), 1):
+                        content = doc.get('chunk_text', '')
+                        file_name = doc.get('file_name', '未知文件')
+                        knowledge_content += f"【资料{i}】来自文件：{file_name}\n"
+                        knowledge_content += f"内容：{content}\n\n"
+                    
+                    system_prompt += knowledge_content # 将知识库内容添加到system_prompt
+
+            except Exception as e:
+                logger.error(f"Knowledge base retrieval error: {str(e)}")
+        
         if system_prompt:
             return f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
         else:
@@ -230,6 +264,9 @@ class LLMService:
 
         try:
             prompt = self._build_prompt(user_message)
+
+            logger.info(f"LLM is generating response...")
+
             inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.device)
             
             outputs = self.model.generate(
@@ -255,7 +292,6 @@ class LLMService:
             logger.error(f"LLM generation error: {str(e)}")
             return "抱歉，处理您的请求时出现错误。"
 
-# 全局 LLM 服务实例管理
 _global_llm_service = None
 _llm_service_pid = None
 

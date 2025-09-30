@@ -14,8 +14,11 @@ class RetrievalEngine:
     def __init__(self, embedding_manager: EmbeddingManager, vector_store: VectorStore, reranker=None):
         self.embedding_manager = embedding_manager
         self.vector_store = vector_store
-        # 如果传入了重排序器，则直接使用；否则通过ModelManager获取
-        self.reranker = reranker if reranker is not None else ModelManager.get_reranker()
+
+        if reranker is not None:
+            self.reranker = reranker
+        else:
+            self.reranker = ModelManager.get_reranker()
     
     def retrieve_documents(self, question: str, top_k: int = None, use_rerank: bool = None) -> Dict[str, Any]:
         """检索相关文档并返回结果，支持重排序功能"""
@@ -24,13 +27,10 @@ class RetrievalEngine:
         
         if use_rerank is None:
             use_rerank = Config.RERANK_ENABLED
-            
-        # 记录是否启用重排序
-        logger.info(f"Retrieval process: use_rerank={use_rerank}, RERANK_ENABLED={Config.RERANK_ENABLED}, reranker_available={self.reranker is not None}")
 
         # 初步检索
         initial_top_k = top_k * Config.RERANK_CANDIDATE_FACTOR if use_rerank and self.reranker else top_k # rerank 候选文档数 默认10倍于top_k
-        logger.info(f"Initial retrieval: top_k={initial_top_k}, final_top_k={top_k}")
+        logger.info(f"Using embedding model to retriavaling...")
         question_embedding = self.embedding_manager.get_single_embedding(question) # 将问题转换为向量
         similar_docs = self.vector_store.search_similar(question_embedding, top_k=initial_top_k)  # 在向量库中搜索相似内容
         
@@ -41,19 +41,18 @@ class RetrievalEngine:
                 "has_results": False
             }
         
-        # 精细排序
-        if use_rerank and self.reranker and Config.RERANK_ENABLED:
-            logger.info("Applying reranking to enhance retrieval quality")
+        # rerank重排序
+        if use_rerank and self.reranker and Config.RERANK_ENABLED:            
+            logger.info(f"Using rerank model to retriavaling...")
             documents = [metadata['chunk_text'] for _, metadata in similar_docs] # 准备重排序所需的数据
             
-            # 批处理重排序以提高性能
+            # 批处理
             all_scores = []
             batch_size = Config.RERANK_BATCH_SIZE
             
             for i in range(0, len(documents), batch_size):
                 batch_docs = documents[i:i + batch_size]                
                 batch_pairs = [[question, doc] for doc in batch_docs] # 为批次中的每个文档创建(query, document)对
-                logger.info(f"Processing batch: {len(batch_docs)} documents")
                 batch_scores = self.reranker.compute_score(batch_pairs) # 计算批次的相关性分数
                 # 如果返回的是单个分数，将其扩展为列表
                 if isinstance(batch_scores, float):
@@ -102,12 +101,10 @@ class RetrievalEngine:
     
     def search(self, question: str, top_k: int = None, use_rerank: bool = None) -> Dict[str, Any]:
         """统一的检索API，供外部调用，返回完整的检索结果信息"""
-        logger.info(f"Search API called with question: {question[:50]}..." if len(question) > 50 else f"Search API called with question: {question}")
         return self.retrieve_documents(question, top_k, use_rerank)
 
     def get_collection_stats(self) -> Dict[str, Any]:
         """获取向量库统计信息，作为向量库的状态查询API"""
-        logger.info("Retrieving collection statistics")
         try:
             return self.vector_store.get_stats()
         except Exception as e:

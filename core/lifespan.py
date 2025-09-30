@@ -5,6 +5,7 @@ from core.model_manager import ModelManager
 from core.chat.conversation_manager import conversation_manager
 from core.chat.delay_manager import delay_manager
 from config import Config
+from core.embedding.kb_server import initialize_kb_server_after_model
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,11 @@ async def lifespan(app: FastAPI):
     
     # 初始化模型管理器
     await ModelManager.initialize(load_llm=load_llm)
+    
+    # 初始化知识库服务
+    if Config.KNOWLEDGE_BASE_ENABLED:
+        initialize_kb_server_after_model()
+        logger.info("KnowledgeBaseServer initialization triggered after ModelManager")
     
     # 初始化延迟管理器并设置到会话管理器
     if Config.DELAY_MODE:

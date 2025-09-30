@@ -1,12 +1,19 @@
 from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
+from fastapi import HTTPException
 from core.embedding.embedding_manager import EmbeddingManager
 
 router = APIRouter(prefix="/v1", tags=["embeddings"])
 
-# 初始化向量管理器
-embedding_manager = EmbeddingManager()
+_embedding_manager = None # 延迟初始化embedding管理器
+
+def get_embedding_manager():
+    """获取embedding管理器实例"""
+    global _embedding_manager
+    if _embedding_manager is None:
+        _embedding_manager = EmbeddingManager()
+    return _embedding_manager
 
 # 定义请求和响应模型
 class EmbeddingRequest(BaseModel):
@@ -36,9 +43,10 @@ async def create_embeddings(request: EmbeddingRequest):
     for i, text in enumerate(inputs):
         if len(text) > 8192:
             raise HTTPException(status_code=400, detail=f"Input {i} is too long")
+        
+    embedding_manager = get_embedding_manager() # 获取embedding管理器    
     
-    # 执行向量表示计算
-    embeddings = embedding_manager.get_embeddings(inputs)
+    embeddings = embedding_manager.get_embeddings(inputs) # 执行向量表示计算
     
     data = [
         Embedding(object="embedding", embedding=emb, index=i)

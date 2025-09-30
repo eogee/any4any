@@ -21,7 +21,9 @@ class KnowledgeBaseTool:
         self.embedding_manager = None
         self.vector_store = None
         self.retrieval_engine = None
-        self._initialize_components()
+        # 仅在作为命令行工具直接运行时初始化，避免被导入时提前初始化
+        if __name__ == '__main__':
+            self._initialize_components()
     
     def _initialize_components(self):
         """初始化组件"""
@@ -129,17 +131,18 @@ class KnowledgeBaseTool:
             logger.info("Knowledge base is empty. Please build the knowledge base first.")
             return
         
-        result = self.retrieval_engine.retrieve_and_answer(question, top_k)
+        result = self.retrieval_engine.retrieve_documents(question, top_k)
         
         print(f"\nQuery: {result['question']}")
-        print(f"\nAnswer: {result['answer']}")
         
-        if result['sources']:
-            print(f"\nReference sources (total {len(result['sources'])}):")
-            for i, source in enumerate(result['sources'], 1):
-                print(f"\n{i}. File: {source['file_name']}")
-                print(f"   Similarity: {source['score']:.3f}")
-                print(f"   Content: {source['chunk_text'][:200]}...")
+        if result['has_results']:
+            print(f"\nFound {len(result['documents'])} relevant documents:\n")
+            for i, doc in enumerate(result['documents'], 1):
+                print(f"{i}. File: {doc['file_name']}")
+                print(f"   Similarity: {doc['score']:.3f}")
+                print(f"   Content: {doc['chunk_text'][:200]}...\n")
+        else:
+            print("\nNo relevant documents found.")
     
     def search(self, question: str, top_k: int = 5):
         """只搜索不生成回答"""
@@ -202,6 +205,8 @@ def main():
         return
     
     tool = KnowledgeBaseTool()
+    # 显式初始化组件，因为构造函数不再自动初始化
+    tool._initialize_components()
     
     try:
         if args.command == 'build':

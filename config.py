@@ -44,11 +44,12 @@ class Config:
     
     # EMBEDDING模型配置
     TOP_K = int(os.getenv("TOP_K", "3"))                                            # 取前k个最相似的向量
-    VECTOR_DB_PATH = "../../" + os.getenv("VECTOR_DB_PATH", "data/vector_db")       # 向量数据库路径
-    DOCS_PATH = "../../" + os.getenv("DOCS_PATH", "data/docs")                      # 文档路径
+    # 使用基于项目根目录的路径，不使用相对路径前缀
+    VECTOR_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/vector_db") # 向量数据库路径
+    DOCS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/docs")           # 文档路径
     DOC_CHUNK_SIZE = int(os.getenv("DOC_CHUNK_SIZE", "500"))                        # 文档处理器文本分块大小
     DOC_CHUNK_OVERLAP = int(os.getenv("DOC_CHUNK_OVERLAP", "50"))                   # 文档处理器文本分块重叠大小
-    SUPPORTED_FILE_TYPES = os.getenv("SUPPORTED_FILE_TYPES", "['.pdf', '.docx', '.txt']")  # 支持的文件类型
+    SUPPORTED_FILE_TYPES = ['.pdf', '.docx', '.txt']                                # 支持的文件类型
     
     # RERANK模型配置
     RERANK_ENABLED = os.getenv("RERANK_ENABLED", "True").lower() == "true"          # 是否启用重排序

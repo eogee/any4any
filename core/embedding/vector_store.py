@@ -24,12 +24,10 @@ class VectorStore:
             name="documents",
             metadata={"hnsw:space": "cosine"}  # 使用余弦相似度
         )
-        
-        logger.info(f"ChromaDB vector storage initialized, collection: documents")
     
     def add_vectors(self, vectors: List[List[float]], metadata_list: List[Dict[str, Any]]):
         """添加向量和元数据"""
-        ids = [str(uuid.uuid4()) for _ in range(len(metadata_list))]    # 为每个文档生成唯一ID        
+        ids = [str(uuid.uuid4()) for _ in range(len(metadata_list))]    # 为每个文档生成唯一ID
         
         documents = [meta['chunk_text'] for meta in metadata_list]      # 提取文档文本
 
@@ -59,7 +57,7 @@ class VectorStore:
         formatted_results = []
         if results and 'metadatas' in results and results['metadatas'] and results['distances']:
             for i in range(len(results['metadatas'][0])):
-                # ChromaDB返回的是距离，我们需要转换为相似度（1-距离）
+                # ChromaDB返回的是距离，需要转换为相似度（1-距离）
                 similarity = 1 - results['distances'][0][i]
                 formatted_results.append((similarity, results['metadatas'][0][i]))
         
@@ -95,7 +93,7 @@ class VectorStore:
         logger.info("ChromaDB has persisted data")
     
     def get_stats(self) -> Dict[str, Any]:
-        """获取向量库统计信息"""        
+        """获取向量库统计信息"""
         results = self.collection.get(include=["metadatas"]) # 获取所有向量
         total_vectors = len(results.get("ids", [])) # 计算统计信息
         
