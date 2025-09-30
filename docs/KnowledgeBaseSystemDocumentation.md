@@ -11,19 +11,21 @@ The any4any Knowledge Base System is a vector search-based intelligent document 
 - **Efficient vector generation**: Integrates Hugging Face's Transformer models to support generating high-quality text embedding vectors
 - **Persistent vector storage**: Based on ChromaDB for efficient storage and retrieval of vectors, supporting cosine similarity calculation
 - **Semantic search**: Provides vector similarity-based semantic search functionality with Top-K retrieval support
+- **Rerank optimization**: Integrates rerank models to further optimize retrieval result relevance
 - **Intelligent question answering**: Combines retrieval results with LLM models to generate precise answers based on document content
-- **Command-line tools**: Provides a complete command-line toolset supporting knowledge base construction, querying, searching, statistics, and other operations
 - **OpenAI-compatible API**: Offers interfaces compatible with OpenAI Embedding API
+- **Knowledge Base Service**: Provides API services for knowledge base-related functionality
+- **Lazy initialization**: Components adopt lazy initialization mechanism to improve system startup efficiency
 
 ### 1.2 System Architecture
 
 The knowledge base system mainly consists of the following core components:
 
 1. **Document Processor**: Responsible for document loading, parsing, and chunking
-2. **Embedding Manager**: Responsible for text vector generation and management
-3. **Vector Store**: Responsible for vector storage, retrieval, and management
-4. **Retrieval Engine**: Responsible for semantic retrieval and intelligent question answering
-5. **Knowledge Base Tool**: Provides command-line interfaces and utility functions
+2. **Embedding Manager**: Responsible for text vector generation and management, supports lazy loading
+3. **Vector Store**: Responsible for vector storage, retrieval, and management, based on ChromaDB
+4. **Retrieval Engine**: Responsible for semantic retrieval, supports rerank functionality
+5. **Knowledge Base Server**: Provides API services for knowledge base-related functionality
 6. **API Interfaces**: Provides OpenAI-compatible embedding API interfaces
 
 ## 2. Workflow
@@ -37,6 +39,7 @@ sequenceDiagram
     participant DP as Document Processor
     participant EM as Embedding Manager
     participant VS as Vector Store
+    participant MM as ModelManager
 
     User->>Tool: Execute build command
     Tool->>VS: Check if data exists
@@ -44,10 +47,13 @@ sequenceDiagram
         VS-->>Tool: Return existing information
         Tool-->>User: Prompt knowledge base already exists
     else No data or forced rebuild
+        Tool->>VS: Clear existing collection (when forced rebuild)
         Tool->>DP: Load and process documents
         DP->>DP: Read document content
         DP->>DP: Process text chunking
         DP-->>Tool: Return chunked documents
+        Tool->>MM: Get embedding model
+        MM-->>Tool: Return model instance
         Tool->>EM: Generate text embedding vectors
         EM-->>Tool: Return vector representations
         Tool->>VS: Store vectors and metadata
@@ -56,33 +62,35 @@ sequenceDiagram
     end
 ```
 
-### 2.2 Intelligent Question Answering Flow
+### 2.2 Intelligent Retrieval Flow
 
 ```mermaid
 sequenceDiagram
     participant User as User
-    participant Tool as Knowledge Base Tool
+    participant Server as Knowledge Base Server
     participant RE as Retrieval Engine
     participant EM as Embedding Manager
     participant VS as Vector Store
-    participant LLM as LLM Service
+    participant Reranker as Rerank Model
+    participant MM as ModelManager
 
-    User->>Tool: Submit query question
-    Tool->>RE: Retrieve relevant documents
+    User->>Server: Submit query question
+    Server->>RE: Retrieve relevant documents
+    Server->>MM: Get embedding model and rerank model
+    MM-->>Server: Return model instances
     RE->>EM: Generate question vector
     EM-->>RE: Return question vector
-    RE->>VS: Search for similar vectors
+    RE->>VS: Search similar vectors (expanded candidate range)
     VS-->>RE: Return similar documents and scores
-    alt Relevant documents found
-        RE->>RE: Build context
-        RE->>LLM: Send question and context
-        LLM-->>RE: Generate answer
-        RE-->>Tool: Return answer and sources
-        Tool-->>User: Display answer and reference sources
-    else No relevant documents found
-        RE-->>Tool: Return no relevant information
-        Tool-->>User: Prompt no relevant information in knowledge base
+    alt Rerank enabled and model available
+        RE->>Reranker: Rerank candidate documents
+        Reranker-->>RE: Return reranked results
+        RE->>RE: Take Top-K results
+    else Rerank disabled or no model
+        RE->>RE: Use initial retrieval results directly
     end
+    RE-->>Server: Return retrieval results
+    Server-->>User: Display relevant document list and similarity scores
 ```
 
 ## 3. Core Components Detailed Explanation
@@ -110,18 +118,23 @@ The Document Processor is responsible for loading, parsing, and chunking various
 The Embedding Manager is responsible for converting text into vector representations, serving as the core component for semantic retrieval in the knowledge base.
 
 **Main Features:**
-- **Model loading**: Automatically loads configured embedding models
+- **Global model sharing**: Prioritizes using global embedding models from ModelManager
+- **Local model loading**: Loads local models when global models are unavailable
+- **Lazy loading mechanism**: Only loads models when first used, improving system startup efficiency
 - **Batch vectorization**: Supports batch text vector generation for improved efficiency
 - **Vector format conversion**: Supports numpy array and Python list format vector outputs
 - **Mean pooling**: Uses attention mask mean pooling to calculate sentence embeddings
 
 **Working Principle:**
-1. Load model using Hugging Face's AutoTokenizer and AutoModel
-2. Perform tokenization and padding on input text
-3. Obtain token-level embeddings through model forward propagation
-4. Apply attention mask mean pooling to obtain sentence-level embeddings
-5. Perform L2 normalization on embedding vectors
-6. Return standardized vector representations
+1. No model loading during initialization, adopting lazy loading strategy
+2. Model loading is triggered when get_embeddings is first called
+3. Attempts to use global embedding model from ModelManager, falls back to local loading on failure
+4. Uses Hugging Face's AutoTokenizer and AutoModel to process text
+5. Performs tokenization and padding on input text
+6. Obtains token-level embeddings through model forward propagation
+7. Applies attention mask mean pooling to obtain sentence-level embeddings
+8. Performs L2 normalization on embedding vectors
+9. Returns vectors in numpy array or Python list format as needed
 
 ### 3.3 Vector Store
 
@@ -131,49 +144,45 @@ The Vector Store is implemented based on ChromaDB and is responsible for persist
 - **Vector addition**: Adds text vectors and metadata to the vector database
 - **Similarity search**: Top-K retrieval based on cosine similarity
 - **File management**: Supports querying and deleting vectors by file name
-- **Statistics**: Provides statistical information about the vector database, such as total vectors, number of files, etc.
+- **Statistics**: Provides statistical information about the vector database, including total vectors, number of files, etc.
+- **Persistent storage**: Automatically handles vector persistence
 
 **Working Principle:**
-1. Initialize ChromaDB client and create collection
-2. Associate vectors, document content, and metadata during storage
-3. Convert cosine distance to similarity score (1-distance) during retrieval
-4. When deleting by file name, first query all relevant IDs, then batch delete
-5. ChromaDB automatically handles vector indexing and persistent storage
+1. Initializes ChromaDB persistent client with anonymous telemetry disabled
+2. Creates or gets a collection named "documents" using cosine similarity space
+3. Generates unique IDs during storage, associating vectors, document content, and complete metadata
+4. Converts cosine distance to similarity score (1-distance) during retrieval
+5. When deleting by file name, first queries all relevant IDs, then deletes in bulk
+6. ChromaDB automatically handles vector indexing and persistent storage
+7. When calculating statistics, retrieves all metadata and analyzes file count
 
 ### 3.4 Retrieval Engine
 
-The Retrieval Engine integrates the Embedding Manager and Vector Store, providing end-to-end retrieval and question-answering capabilities.
+The Retrieval Engine integrates the Embedding Manager and Vector Store, providing end-to-end retrieval functionality with rerank optimization support.
 
 **Main Features:**
 - **Semantic retrieval**: Converts queries into vectors and searches for similar documents
-- **Context building**: Automatically builds context containing retrieval results
-- **Intelligent question answering**: Combines retrieval results with LLM to generate answers
-- **OpenAI API compatibility**: Supports calling OpenAI-compatible model APIs
+- **Rerank optimization**: Supports rerank models to further optimize retrieval results
+- **Batch processing for rerank**: Supports batch processing of rerank calculations for improved efficiency
+- **Flexible configuration**: Supports configuration of retrieval parameters and rerank options
+- **Statistical query**: Provides vector database statistics query functionality
+- **Document management**: Supports deleting documents by file name
 
 **Working Principle:**
-1. Receive user query and generate vector representation
-2. Search for Top-K most similar documents in the vector database
-3. Build context prompt containing retrieval results
-4. Call LLM model to generate context-based answers
-5. Return answers, source documents, and similarity scores
+1. Receives embedding manager, vector store, and optional reranker during initialization
+2. First converts query text into vector representation during retrieval
+3. Expands retrieval range to obtain sufficient candidate documents (for reranking)
+4. If reranking is enabled and rerank model is available:
+   - Extract candidate document text content
+   - Build (query, document) pairs
+   - Call rerank model in batches to calculate relevance scores
+   - Reorder documents based on scores
+   - Take top Top-K results
+5. If reranking is not enabled or no model available, use initial retrieval results directly
+6. Format and return results, including document information, file name, score, etc.
+7. Provides auxiliary functions such as statistical query and document deletion
 
-### 3.5 Knowledge Base Tool
 
-The Knowledge Base Tool provides command-line interfaces, serving as the primary way for users to interact with the knowledge base system.
-
-**Main Features:**
-- **Knowledge base construction**: Scans document directories and builds vector database
-- **Intelligent query**: Answers questions based on knowledge base content
-- **Semantic search**: Searches for relevant documents without generating answers
-- **Statistical query**: Views statistical information about the knowledge base
-- **File management**: Deletes vectors for specific files
-
-**Working Principle:**
-1. Initializes all components (Embedding Manager, Vector Store, Retrieval Engine)
-2. Parses command-line parameters and executes corresponding operations
-3. Processes documents and generates vectors during construction
-4. Executes retrieval and question-answering flow during querying
-5. Provides detailed log output and error handling
 
 ## 4. Database Design
 
@@ -244,21 +253,40 @@ similarity = 1 - results['distances'][0][i]
 
 This conversion makes the results more intuitive to users (larger values indicate higher similarity).
 
-### 5.4 Error Handling and Logging
+### 5.4 Rerank Optimization
+
+The system integrates rerank functionality to further optimize preliminary retrieval results:
+
+```python
+# Rerank core logic
+if use_rerank and self.reranker and Config.RERANK_ENABLED:
+    documents = [metadata['chunk_text'] for _, metadata in similar_docs]
+    # Batch process to calculate relevance scores
+    batch_pairs = [[question, doc] for doc in documents]
+    batch_scores = self.reranker.compute_score(batch_pairs)
+    # Sort and take Top-K results
+    reranked_results.sort(key=lambda x: x['score'], reverse=True)
+    final_docs = reranked_results[:top_k]
+```
+
+### 5.5 Error Handling and Logging
 
 The system implements comprehensive error handling and logging mechanisms in each component to ensure system stability and provide debugging information:
 
 - All key operations have try-except blocks
 - Detailed logging (INFO, ERROR levels)
 - Unified log configuration and initialization
+- Exception information and stack trace logging
 
-### 5.5 Modular Design
+### 5.6 Modular Design
 
 The system adopts strict modular design with clear responsibilities and interfaces for each component:
 
 - Components are decoupled through dependency injection
 - Unified configuration management
 - Clear function interfaces and return types
+- Lazy initialization mechanism
+- Global model sharing strategy
 
 ## 6. Configuration Item Description
 
@@ -267,6 +295,9 @@ Key configuration items for the knowledge base system:
 | Configuration Item | Description | Default Value |
 |--------------------|-------------|---------------|
 | KNOWLEDGE_BASE_ENABLED | Whether to enable knowledge base functionality | Configurable |
+| RERANK_ENABLED | Whether to enable rerank functionality | Configurable |
+| RERANK_CANDIDATE_FACTOR | Rerank candidate document multiplier | 10 |
+| RERANK_BATCH_SIZE | Rerank batch processing size | Configurable |
 | EMBEDDING_MODEL_DIR | Embedding model path | /mnt/c/models/bge-small-zh-v1.5 |
 | VECTOR_DB_PATH | Vector database storage path | data/vector_db |
 | DOCS_PATH | Document directory path | data/docs |
@@ -305,122 +336,30 @@ Key configuration items for the knowledge base system:
   }
   ```
 
-### 7.2 Command-Line Interface
+### 7.2 Service API Interfaces
 
-#### Build Knowledge Base
+#### Knowledge Base Service
 
-```bash
-python -m core.embedding.kb_tool build [--force]
-```
-- `--force`: Force rebuild knowledge base, clearing existing data
+The KnowledgeBaseServer class provides the following main methods:
 
-#### Query Knowledge Base
-
-```bash
-python -m core.embedding.kb_tool query "your question" [--top-k 3]
-```
-- `question`: The question to query
-- `--top-k`: Number of most relevant documents to return (default 3)
-
-#### Search Related Documents
-
-```bash
-python -m core.embedding.kb_tool search "search keywords" [--top-k 5]
-```
-- `question`: Search keywords
-- `--top-k`: Number of most relevant documents to return (default 5)
-
-#### View Statistics
-
-```bash
-python -m core.embedding.kb_tool stats
-```
-
-#### Delete File Vectors
-
-```bash
-python -m core.embedding.kb_tool delete "filename.pdf"
-```
-- `file_name`: Name of the file to delete
+- **build_knowledge_base(force_rebuild=False)**: Build knowledge base
+- **retrieve_documents(question, top_k=3, use_rerank=True)**: Retrieve relevant documents
+- **simple_search(question, top_k=5)**: Simple search
+- **get_collection_stats()**: Get collection statistics
 
 ## 8. Usage Examples
 
-### 8.1 Building Knowledge Base
+### 8.1 Using API Interfaces
 
-1. Place documents in the `data/docs` directory
-2. Execute build command:
-   ```bash
-   python -m core.embedding.kb_tool build
-   ```
-3. View build progress and statistical information
-
-### 8.2 Querying Knowledge Base
-
-```bash
-python -m core.embedding.kb_tool query "What is a vector database?"
-```
-
-Output Example:
-```
-Query: What is a vector database?
-
-Answer: A vector database is a database system specifically designed for storing and retrieving vector embeddings. It can efficiently perform similarity searches to find the most similar vector collection to a query vector.
-
-Reference sources (total 3):
-
-1. File: vector_database_intro.pdf
-   Similarity: 0.921
-   Content: A vector database is a special type of database specifically optimized for storing and retrieving high-dimensional vector data. Unlike traditional relational databases, vector databases...
-
-2. File: ai_models_overview.docx
-   Similarity: 0.785
-   Content: Modern AI systems often use vector representations for data, such as text embeddings, image features, etc. Vector databases provide efficient similarity search mechanisms...
-
-3. File: data_storage_trends.txt
-   Similarity: 0.712
-   Content: With the development of artificial intelligence technology, the storage demand for vector data is rapidly growing. Vector databases, as an emerging type of database...
-```
-
-### 8.3 Using Search Function
-
-```bash
-python -m core.embedding.kb_tool search "machine learning models"
-```
-
-Output Example:
-```
-Search query: machine learning models
-Found 5 relevant results:
-
-1. File: ml_basics.pdf
-   Similarity: 0.897
-   Content: A machine learning model is an algorithm that can learn from data and make predictions. Common machine learning models include linear regression, decision trees, neural networks, etc...
-
-2. File: ai_models_overview.docx
-   Similarity: 0.876
-   Content: Modern machine learning models can be divided into three main categories: supervised learning, unsupervised learning, and reinforcement learning. Each type of model has its specific application scenarios...
-
-3. File: deep_learning_notes.txt
-   Similarity: 0.812
-   Content: Deep learning is a branch of machine learning, and its models are mainly based on artificial neural networks. Deep neural network models typically contain multiple hidden layers...
-
-4. File: model_training_guide.pdf
-   Similarity: 0.765
-   Content: Training a machine learning model is an iterative process, including data preparation, model selection, parameter tuning, evaluation, and deployment steps...
-
-5. File: nlp_models.pdf
-   Similarity: 0.721
-   Content: The field of Natural Language Processing (NLP) has many specialized machine learning models, such as bag-of-words models, TF-IDF, Word2Vec, etc...
-```
+Knowledge base functionality is now accessed through API interfaces. Please refer to the API documentation for specific usage methods.
 
 ## 9. Performance Optimization Recommendations
 
 ### 9.1 Chunk Size Tuning
 
-Based on document type and content characteristics, you can adjust the `DOC_CHUNK_SIZE` and `DOC_CHUNK_OVERLAP` parameters:
+Based on document type and content characteristics, you can adjust the `DOC_CHUNK_SIZE` parameter:
 - For long texts, increasing chunk size can reduce the total number of chunks
 - For short texts, decreasing chunk size can improve retrieval accuracy
-- Appropriate overlap helps maintain context continuity
 
 ### 9.2 Model Selection
 
@@ -430,10 +369,18 @@ Based on document type and content characteristics, you can adjust the `DOC_CHUN
 
 ### 9.3 Retrieval Parameter Adjustment
 
-- The `TOP_K` parameter controls the number of retrieval results, with a default value of 3
+- `TOP_K` parameter controls the number of retrieval results, default is 3
+- `RERANK_CANDIDATE_FACTOR` controls rerank candidate document multiplier, default is 10
+- `RERANK_BATCH_SIZE` controls rerank batch processing size
 - Increasing `TOP_K` can obtain more relevant documents but may introduce noise
-- Decreasing `TOP_K` can improve relevance but may miss some useful information
+- Adjusting rerank parameters appropriately can balance retrieval quality and performance
 
 ### 9.4 Batch Processing
 
 When processing a large number of documents, batch processing is recommended over individual processing to improve efficiency.
+
+### 9.5 Rerank Optimization
+
+- Enabling rerank can improve retrieval quality but increases computational overhead
+- Balance retrieval speed and quality according to actual needs
+- Adjust `RERANK_CANDIDATE_FACTOR` to control the number of candidate documents
