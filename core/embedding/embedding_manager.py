@@ -6,6 +6,7 @@ from typing import List
 from transformers import AutoTokenizer, AutoModel
 from config import Config
 from core.log import setup_logging
+from core.model_manager import ModelManager
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -16,10 +17,28 @@ class EmbeddingManager:
         self.tokenizer = None
         self.model = None
         self._load_model()
+        
+    def use_global_model(self):
+        """使用ModelManager中全局加载的嵌入模型"""
+        try:
+            model, tokenizer = ModelManager.get_embedding_model()
+            if model is not None and tokenizer is not None:
+                self.model = model
+                self.tokenizer = tokenizer
+                logger.info("Using embedding model from ModelManager")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to use global embedding model: {e}")
+            return False
     
     def _load_model(self):
         """加载Embedding模型"""
         try:
+            if self.use_global_model():
+                return
+                
+            logger.info(f"Loading embedding model locally: {self.model_name}") # 如果全局模型未加载，则自己加载
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModel.from_pretrained(self.model_name)
         except Exception as e:
@@ -46,7 +65,7 @@ class EmbeddingManager:
             sentence_embeddings = self._mean_pooling(model_output, encoded_input['attention_mask']) # 使用平均池化获取句子嵌入            
             sentence_embeddings = F.normalize(sentence_embeddings, p=2, dim=1)  # 归一化                
         
-        # 返回numpy数组，在kb_tool.py中有转换为列表的逻辑
+        # 返回numpy数组
         return sentence_embeddings.numpy()
     
     def get_embeddings_as_list(self, texts: List[str]) -> List[List[float]]:

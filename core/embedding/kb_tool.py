@@ -3,12 +3,14 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import logging
 import argparse
+import asyncio
 from config import Config
 from core.embedding.document_processor import DocumentProcessor
 from core.embedding.embedding_manager import EmbeddingManager
 from core.embedding.vector_store import VectorStore
 from core.embedding.retrieval_engine import RetrievalEngine
 from core.log import setup_logging
+from core.model_manager import ModelManager
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -24,12 +26,46 @@ class KnowledgeBaseTool:
     def _initialize_components(self):
         """初始化组件"""
         try:
+            # 初始化嵌入管理器和向量存储
             self.embedding_manager = EmbeddingManager(Config.EMBEDDING_MODEL_DIR)
             self.vector_store = VectorStore(Config.VECTOR_DB_PATH)
-            self.retrieval_engine = RetrievalEngine(self.embedding_manager, self.vector_store)
+            
+            # 获取ModelManager中的重排序器
+            reranker = ModelManager.get_reranker()
+            
+            # 只在重排序器不存在时才进行初始化
+            if reranker is None:
+                logger.info("Reranker not found, initializing ModelManager...")
+                # 使用asyncio.run来运行异步初始化
+                try:
+                    # 检查是否已有事件循环
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # 如果事件循环已在运行，创建新任务
+                        asyncio.create_task(self._async_initialize_reranker())
+                    else:
+                        # 否则直接运行
+                        asyncio.run(self._async_initialize_reranker())
+                except RuntimeError:
+                    # 如果没有事件循环，创建新的
+                    asyncio.run(self._async_initialize_reranker())
+                
+                reranker = ModelManager.get_reranker()
+                logger.info(f"Reranker initialized: {reranker is not None}")
+            else:
+                logger.info("Using existing reranker from ModelManager")
+            
+            # 创建检索引擎时传入重排序器
+            self.retrieval_engine = RetrievalEngine(self.embedding_manager, self.vector_store, reranker=reranker)
         except Exception as e:
             logger.error(f"Failed to initialize components: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             sys.exit(1)
+    
+    async def _async_initialize_reranker(self):
+        """异步初始化重排序器"""
+        await ModelManager.initialize(load_llm=False, load_asr=False, load_tts=False, load_reranker=True)
     
     def build_kb(self, force_rebuild=False):
         """构建知识库"""

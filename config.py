@@ -14,7 +14,7 @@ class Config:
     PREVIEW_TIMEOUT = int(os.getenv("PREVIEW_TIMEOUT", "60"))                       # 预览超时时间（秒），默认1分钟
     DELAY_MODE = os.getenv("DELAY_MODE", "False").lower() == "true"                 # 是否启用延迟模式，延迟模式下，系统会累积用户消息并延迟处理
     DELAY_TIME = int(os.getenv("DELAY_TIME", "3"))                                  # 延迟处理时间（秒），默认3秒，用户停止发送消息超过此时间才处理
-    USE_KNOWLEDGE_BASE = os.getenv("USE_KNOWLEDGE_BASE", "False").lower() == "true" # 是否启用知识库，启用后会根据用户问题从知识库中提取相关内容
+    KNOWLEDGE_BASE_ENABLED = os.getenv("KNOWLEDGE_BASE_ENABLED", "False").lower() == "true" # 是否启用知识库，启用后会根据用户问题从知识库中提取相关内容
 
     # MCP配置
     MCP_PORT = int(os.getenv("MCP_PORT", 9999))
@@ -49,6 +49,11 @@ class Config:
     DOC_CHUNK_SIZE = int(os.getenv("DOC_CHUNK_SIZE", "500"))                        # 文档处理器文本分块大小
     DOC_CHUNK_OVERLAP = int(os.getenv("DOC_CHUNK_OVERLAP", "50"))                   # 文档处理器文本分块重叠大小
     SUPPORTED_FILE_TYPES = os.getenv("SUPPORTED_FILE_TYPES", "['.pdf', '.docx', '.txt']")  # 支持的文件类型
+    
+    # RERANK模型配置
+    RERANK_ENABLED = os.getenv("RERANK_ENABLED", "True").lower() == "true"          # 是否启用重排序
+    RERANK_CANDIDATE_FACTOR = int(os.getenv("RERANK_CANDIDATE_FACTOR", "10"))       # 重排序候选文档倍数
+    RERANK_BATCH_SIZE = int(os.getenv("RERANK_BATCH_SIZE", "16"))                   # 重排序批处理大小
 
     # LLM模型生成参数配置
     MAX_LENGTH = int(os.getenv("MAX_LENGTH", "4096"))                               # 最大生成长度

@@ -266,7 +266,7 @@ Key configuration items for the knowledge base system:
 
 | Configuration Item | Description | Default Value |
 |--------------------|-------------|---------------|
-| USE_KNOWLEDGE_BASE | Whether to enable knowledge base functionality | Configurable |
+| KNOWLEDGE_BASE_ENABLED | Whether to enable knowledge base functionality | Configurable |
 | EMBEDDING_MODEL_DIR | Embedding model path | /mnt/c/models/bge-small-zh-v1.5 |
 | VECTOR_DB_PATH | Vector database storage path | data/vector_db |
 | DOCS_PATH | Document directory path | data/docs |

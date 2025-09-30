@@ -1,96 +1,136 @@
 import logging
-import requests
-import json
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from config import Config
-from embedding_manager import EmbeddingManager
-from vector_store import VectorStore
+from .embedding_manager import EmbeddingManager
+from .vector_store import VectorStore
 from core.log import setup_logging
+from core.model_manager import ModelManager
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
 class RetrievalEngine:
-    """检索引擎，通过OpenAI兼容的模型API进行知识库查询"""
-    def __init__(self, embedding_manager: EmbeddingManager, vector_store: VectorStore):
+    """检索引擎，负责查询向量数据库并返回相关内容，支持重排序功能"""
+    def __init__(self, embedding_manager: EmbeddingManager, vector_store: VectorStore, reranker=None):
         self.embedding_manager = embedding_manager
         self.vector_store = vector_store
+        # 如果传入了重排序器，则直接使用；否则通过ModelManager获取
+        self.reranker = reranker if reranker is not None else ModelManager.get_reranker()
     
-    def query(self, prompt: str, model: str = None, system_prompt: str = None) -> str:
-        """查询OpenAI兼容的模型API"""
-        url = f"http://{Config.HOST}:{Config.PORT}/v1/chat/completions"
-        if model is None:
-            model = Config.LLM_MODEL_NAME
-        
-        # 构建OpenAI兼容的消息格式
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        
-        payload = {
-            "model": model,
-            "messages": messages,
-            "stream": False
-        }
-        
-        try:
-            response = requests.post(url, json=payload, timeout=120)
-            response.raise_for_status()
-            result = response.json()
-            # OpenAI的响应结构中，内容在choices[0].message.content中
-            if result.get("choices") and len(result["choices"]) > 0:
-                return result["choices"][0].get("message", {}).get("content", "抱歉，我没有得到有效的回复。")
-            return "抱歉，我没有得到有效的回复。"
-        except requests.exceptions.RequestException as e:
-            return f"请求API时出错: {e}"
-        except json.JSONDecodeError as e:
-            return f"解析响应时出错: {e}"
-    
-    def retrieve_and_answer(self, question: str, top_k: int = None) -> Dict[str, Any]:
-        """检索相关信息并生成回答"""
+    def retrieve_documents(self, question: str, top_k: int = None, use_rerank: bool = None) -> Dict[str, Any]:
+        """检索相关文档并返回结果，支持重排序功能"""
         if top_k is None:
             top_k = Config.TOP_K
+        
+        if use_rerank is None:
+            use_rerank = Config.RERANK_ENABLED
+            
+        # 记录是否启用重排序
+        logger.info(f"Retrieval process: use_rerank={use_rerank}, RERANK_ENABLED={Config.RERANK_ENABLED}, reranker_available={self.reranker is not None}")
 
+        # 初步检索
+        initial_top_k = top_k * Config.RERANK_CANDIDATE_FACTOR if use_rerank and self.reranker else top_k # rerank 候选文档数 默认10倍于top_k
+        logger.info(f"Initial retrieval: top_k={initial_top_k}, final_top_k={top_k}")
         question_embedding = self.embedding_manager.get_single_embedding(question) # 将问题转换为向量
-        similar_docs = self.vector_store.search_similar(question_embedding, top_k=top_k)  # 在向量库中搜索相似内容
+        similar_docs = self.vector_store.search_similar(question_embedding, top_k=initial_top_k)  # 在向量库中搜索相似内容
         
         if not similar_docs:
             return {
-                "answer": "知识库中没有找到相关信息。",
-                "sources": [],
-                "question": question
+                "documents": [],
+                "question": question,
+                "has_results": False
             }
         
-        # 构建上下文
-        context = "以下是从知识库中检索到的相关信息：\n\n"
-        sources = []
+        # 精细排序
+        if use_rerank and self.reranker and Config.RERANK_ENABLED:
+            logger.info("Applying reranking to enhance retrieval quality")
+            documents = [metadata['chunk_text'] for _, metadata in similar_docs] # 准备重排序所需的数据
+            
+            # 批处理重排序以提高性能
+            all_scores = []
+            batch_size = Config.RERANK_BATCH_SIZE
+            
+            for i in range(0, len(documents), batch_size):
+                batch_docs = documents[i:i + batch_size]                
+                batch_pairs = [[question, doc] for doc in batch_docs] # 为批次中的每个文档创建(query, document)对
+                logger.info(f"Processing batch: {len(batch_docs)} documents")
+                batch_scores = self.reranker.compute_score(batch_pairs) # 计算批次的相关性分数
+                # 如果返回的是单个分数，将其扩展为列表
+                if isinstance(batch_scores, float):
+                    batch_scores = [batch_scores] * len(batch_docs)
+                all_scores.extend(batch_scores)
+           
+            # 组合结果并排序
+            reranked_results = []
+            for i, (_, metadata) in enumerate(similar_docs):
+                reranked_results.append({
+                    'score': all_scores[i],
+                    'metadata': metadata
+                })
+                        
+            reranked_results.sort(key=lambda x: x['score'], reverse=True) # 按相关性分数降序排列            
+            final_docs = reranked_results[:top_k] # 取前top_k个结果
+        else:
+            # 不使用重排序，直接使用初始检索结果
+            logger.info("Skipping reranking, using initial retrieval results")
+            final_docs = [{'score': score, 'metadata': metadata} for score, metadata in similar_docs[:top_k]]
         
-        for score, metadata in similar_docs:
-            context += f"文档: {metadata['file_name']}\n"
-            context += f"内容: {metadata['chunk_text']}\n\n"
-            sources.append({
+        # 构建返回结果
+        documents = []
+        
+        for item in final_docs:
+            metadata = item['metadata']
+            documents.append({
                 "file_name": metadata['file_name'],
                 "chunk_text": metadata['chunk_text'],
-                "score": float(score)
+                "score": float(item['score']),
+                "metadata": metadata
             })
         
-        # 构建提示词
-        system_prompt = f"你是一个专业的助手，请根据提供的上下文信息回答问题。\n如果上下文中有答案，请基于上下文回答。\n如果上下文中没有足够的信息，请如实告知，不要编造信息。{context}"
-        prompt = question
-        
-        # 调用LLM生成回答
-        answer = self.query(prompt, "default", system_prompt)
-        
         return {
-            "answer": answer,
-            "sources": sources,
-            "question": question
+            "documents": documents,
+            "question": question,
+            "has_results": len(documents) > 0
         }
     
-    def simple_search(self, question: str, top_k: int = None) -> List[Tuple[float, Dict[str, Any]]]:
-        if top_k is None:
-            top_k = Config.TOP_K
-        """只进行向量搜索，不生成回答"""
-        question_embedding = self.embedding_manager.get_single_embedding(question)
-        return self.vector_store.search_similar(question_embedding, top_k=top_k)
+    def simple_search(self, question: str, top_k: int = None, use_rerank: bool = None) -> List[Dict[str, Any]]:
+        """简单搜索，返回格式化的文档列表，保持向后兼容性"""
+        result = self.retrieve_documents(question, top_k, use_rerank)
+        
+        # 提取文档列表并转换为所需格式
+        return result.get("documents", [])
+    
+    def search(self, question: str, top_k: int = None, use_rerank: bool = None) -> Dict[str, Any]:
+        """统一的检索API，供外部调用，返回完整的检索结果信息"""
+        logger.info(f"Search API called with question: {question[:50]}..." if len(question) > 50 else f"Search API called with question: {question}")
+        return self.retrieve_documents(question, top_k, use_rerank)
+
+    def get_collection_stats(self) -> Dict[str, Any]:
+        """获取向量库统计信息，作为向量库的状态查询API"""
+        logger.info("Retrieving collection statistics")
+        try:
+            return self.vector_store.get_stats()
+        except Exception as e:
+            logger.error(f"Error retrieving collection stats: {e}")
+            return {
+                "error": str(e),
+                "success": False
+            }
+    
+    def delete_document_by_file(self, file_name: str) -> Dict[str, Any]:
+        """根据文件名删除相关文档"""
+        logger.info(f"Deleting documents for file: {file_name}")
+        try:
+            success = self.vector_store.delete_file_vectors(file_name)
+            return {
+                "success": success,
+                "file_name": file_name,
+                "message": "文档删除成功" if success else "未找到指定文件的文档"
+            }
+        except Exception as e:
+            logger.error(f"Error deleting documents for file {file_name}: {e}")
+            return {
+                "success": False,
+                "file_name": file_name,
+                "error": str(e)
+            }

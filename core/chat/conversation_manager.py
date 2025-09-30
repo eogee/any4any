@@ -360,9 +360,8 @@ class ConversationManager:
         )
     
     async def process_message_stream(self, sender, user_nick, platform, content, generation_id, is_timeout=False, message_id=None, delay_time: Optional[int] = None, is_delayed_processing=False):
-        """
-        流式处理用户消息 流式响应不支持延迟功能
-        """
+        """流式处理用户消息 流式响应不支持延迟功能"""
+        
         if message_id and self._check_message_processed(message_id):
             yield "消息已处理，跳过重复处理。"
             return
