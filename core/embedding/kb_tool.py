@@ -95,15 +95,15 @@ class KnowledgeBaseTool:
         
         result = self.retrieval_engine.retrieve_and_answer(question, top_k)
         
-        logger.info(f"\nQuery: {result['question']}")
-        logger.info(f"\nAnswer: {result['answer']}")
+        print(f"\nQuery: {result['question']}")
+        print(f"\nAnswer: {result['answer']}")
         
         if result['sources']:
-            logger.info(f"\nReference sources (total {len(result['sources'])}):")
+            print(f"\nReference sources (total {len(result['sources'])}):")
             for i, source in enumerate(result['sources'], 1):
-                logger.info(f"\n{i}. File: {source['file_name']}")
-                logger.info(f"   Similarity: {source['score']:.3f}")
-                logger.info(f"   Content: {source['chunk_text'][:200]}...")
+                print(f"\n{i}. File: {source['file_name']}")
+                print(f"   Similarity: {source['score']:.3f}")
+                print(f"   Content: {source['chunk_text'][:200]}...")
     
     def search(self, question: str, top_k: int = 5):
         """只搜索不生成回答"""
@@ -114,53 +114,48 @@ class KnowledgeBaseTool:
         
         results = self.retrieval_engine.simple_search(question, top_k)
         
-        logger.info(f"\nSearch query: {question}")
-        logger.info(f"Found {len(results)} relevant results:\n")
+        print(f"\nSearch query: {question}")
+        print(f"Found {len(results)} relevant results:\n")
         
         for i, (score, metadata) in enumerate(results, 1):
-            logger.info(f"{i}. File: {metadata['file_name']}")
-            logger.info(f"   Similarity: {score:.3f}")
-            logger.info(f"   Content: {metadata['chunk_text'][:150]}...")
-            logger.info("")
+            print(f"{i}. File: {metadata['file_name']}")
+            print(f"   Similarity: {score:.3f}")
+            print(f"   Content: {metadata['chunk_text'][:150]}...")
+            print("")
     
     def stats(self):
         """显示知识库统计信息"""
         stats = self.vector_store.get_stats()
-        logger.info("Knowledge base statistics:")
-        logger.info(f"  Total vectors: {stats['total_vectors']}")
-        logger.info(f"  Total files: {stats['total_files']}")
-        logger.info(f"  File list: {', '.join(stats['files'])}")
+        print("Knowledge base statistics:")
+        print(f"  Total vectors: {stats['total_vectors']}")
+        print(f"  Total files: {stats['total_files']}")
+        print(f"  File list: {', '.join(stats['files'])}")
     
     def delete_file(self, file_name: str):
         """删除指定文件的所有向量"""
         if self.vector_store.delete_file_vectors(file_name):
             self.vector_store.save_data()
-            logger.info(f"Deleted all vectors for file '{file_name}'")
+            print(f"Deleted all vectors for file '{file_name}'")
         else:
-            logger.info(f"File '{file_name}' not found in knowledge base")
+            print(f"File '{file_name}' not found in knowledge base")
 
 def main():
     parser = argparse.ArgumentParser(description="本地知识库命令行工具")
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
     
-    # build 命令
     build_parser = subparsers.add_parser('build', help='构建知识库')
     build_parser.add_argument('--force', action='store_true', help='强制重建知识库')
-    
-    # query 命令
+
     query_parser = subparsers.add_parser('query', help='查询知识库')
     query_parser.add_argument('question', help='要查询的问题')
     query_parser.add_argument('--top-k', type=int, default=3, help='返回的最相关文档数量')
     
-    # search 命令
     search_parser = subparsers.add_parser('search', help='只搜索不生成回答')
     search_parser.add_argument('question', help='要搜索的问题')
     search_parser.add_argument('--top-k', type=int, default=5, help='返回的最相关文档数量')
     
-    # stats 命令
     subparsers.add_parser('stats', help='显示知识库统计信息')
     
-    # delete 命令
     delete_parser = subparsers.add_parser('delete', help='删除指定文件的所有向量')
     delete_parser.add_argument('file_name', help='要删除的文件名')
     
