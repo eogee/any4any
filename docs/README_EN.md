@@ -76,7 +76,7 @@ git clone https://gitee.com/eogee/any4any.git
 git clone https://gitcode.com/eogee/any4any.git
 ```  
 
-You can also download the project via cloud storage: https://pan.quark.cn/s/cb3bae2560c6
+You can also download the project via cloud storage: https://pan.quark.cn/s/fbe126d5bd75
 
 ### 2. Download Models  
 
