@@ -31,6 +31,7 @@ class ModelManager:
     llm_service = None
     embedding_model = None
     embedding_tokenizer = None
+    index_tts = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -68,9 +69,82 @@ class ModelManager:
 
             if load_tts and not cls.available_voices:
                 logger.info("Loading voices...")
-                voices_manager = await VoicesManager.create()
-                cls.available_voices = voices_manager.voices
-                logger.info(f"Loaded {len(cls.available_voices)} voices")
+                try:
+                    voices_manager = await VoicesManager.create()
+                    cls.available_voices = voices_manager.voices
+                    logger.info(f"Loaded {len(cls.available_voices)} voices")
+                except Exception as e:
+                    logger.error(f"Failed to load voices: {str(e)}")
+                    logger.error(f"Traceback: {e.__traceback__}")
+                    # 即使加载失败，也不中断应用启动，使用空列表作为备选
+                    cls.available_voices = []
+            
+            # 加载IndexTTS模型（如果启用）
+            if Config.INDEX_TTS_ENABLED and not cls.index_tts:
+                logger.info("Loading IndexTTS model...")
+                try:
+                    import sys
+                    import os
+                    import traceback
+                    import importlib.util
+                    
+                    # 获取tts目录和infer.py的绝对路径
+                    tts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'core', 'tts')
+                    infer_file_path = os.path.join(tts_dir, 'indextts', 'infer.py')
+                    
+                    logger.info(f"Checking infer.py file: {infer_file_path}, exists: {os.path.exists(infer_file_path)}")
+                    
+                    # 使用importlib直接从文件路径导入模块
+                    if os.path.exists(infer_file_path):
+                        # 添加tts目录到sys.path，以便infer.py内部的导入能正常工作
+                        if tts_dir not in sys.path:
+                            sys.path.append(tts_dir)
+                        
+                        logger.info(f"Adding tts directory to path: {tts_dir}")
+                        
+                        # 动态导入infer.py模块
+                        spec = importlib.util.spec_from_file_location("infer_module", infer_file_path)
+                        infer_module = importlib.util.module_from_spec(spec)
+                        # 将模块添加到sys.modules，使infer.py内部的相对导入能找到indextts包
+                        sys.modules["indextts.infer"] = infer_module
+                        # 执行模块导入
+                        try:
+                            spec.loader.exec_module(infer_module)
+                            logger.info("Successfully loaded infer.py module")
+                        except Exception as exec_err:
+                            logger.error(f"Error executing infer.py module: {exec_err}")
+                            logger.error(f"Detailed traceback: {traceback.format_exc()}")
+                            # 尝试修复导入路径问题
+                            indextts_path = os.path.join(tts_dir, 'indextts')
+                            if indextts_path not in sys.path:
+                                sys.path.append(indextts_path)
+                            # 再次尝试执行模块
+                            spec.loader.exec_module(infer_module)
+                        
+                        # 从导入的模块中获取IndexTTS类
+                        if hasattr(infer_module, 'IndexTTS'):
+                            IndexTTS = infer_module.IndexTTS
+                            logger.info("Successfully got IndexTTS class from infer module")
+                            
+                            # 初始化IndexTTS模型
+                            cls.index_tts = IndexTTS(
+                                cfg_path=Config.TTS_MODEL_CONFIG,
+                                model_dir=Config.TTS_MODEL_DIR,
+                                is_fp16=True,
+                                use_cuda_kernel=True
+                            )
+                            logger.info("IndexTTS model loaded successfully")
+                        else:
+                            logger.error("IndexTTS class not found in infer module")
+                            cls.index_tts = None
+                    else:
+                        logger.error(f"Infer.py file not found at {infer_file_path}")
+                        cls.index_tts = None
+                except Exception as e:
+                    logger.error(f"Failed to load IndexTTS model: {str(e)}")
+                    logger.error(f"Detailed traceback: {traceback.format_exc()}")
+                    # 即使IndexTTS加载失败，也不要中断整个应用启动
+                    cls.index_tts = None
 
             if load_reranker and not cls.reranker:
                 logger.info("Loading reranker model...")
@@ -94,7 +168,7 @@ class ModelManager:
                 cls.llm_service = get_llm_service()
                 init_success = await cls.llm_service.initialize_model()
                 if init_success:
-                    logger.info(f"LLM model loaded...")
+                    logger.info(f"LLM model loaded")
                 else:
                     logger.error(f"Failed to load LLM model from: {Config.LLM_MODEL_DIR}")
             elif not load_llm:
@@ -128,6 +202,11 @@ class ModelManager:
     @classmethod
     def get_embedding_model(cls):
         return cls.embedding_model, cls.embedding_tokenizer
+        
+    @classmethod
+    def get_index_tts(cls):
+        """获取IndexTTS实例，如果未加载则返回None"""
+        return cls.index_tts
 
     @classmethod
     def cleanup(cls):
@@ -146,6 +225,12 @@ class ModelManager:
 
         cls.reranker = None
         cls.available_voices = []
+        
+        # 清理IndexTTS模型
+        if cls.index_tts is not None:
+            logger.info("Cleaning IndexTTS model...")
+            # IndexTTS可能没有to方法，直接设为None
+            cls.index_tts = None
         
         if cls.embedding_model is not None:
             logger.info("Cleaning embedding model...")
@@ -196,6 +281,7 @@ async def list_models(authorization: Optional[str] = Header(None)):
 async def health_check():
     """检查模型服务健康状态"""
     tts_status = "available" if ModelManager.get_voices() else "unavailable"
+    index_tts_status = "loaded" if Config.INDEX_TTS_ENABLED and ModelManager.index_tts is not None else "unavailable"
     return {
         "status": "healthy",
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -203,6 +289,7 @@ async def health_check():
             "asr": "loaded" if ModelManager.m is not None else "unloaded",
             "reranker": "loaded" if ModelManager.reranker is not None else "unloaded",
             "tts": tts_status,
+            "index_tts": index_tts_status,
             "llm": "loaded" if ModelManager.llm_service is not None else "unloaded",
             "embedding": "loaded" if ModelManager.embedding_model is not None else "unloaded"
         }
