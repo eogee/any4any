@@ -101,7 +101,6 @@ class LLMService:
             self.model = self.load_model(Config.LLM_MODEL_DIR, self.device)
             self._model_initialized = True
             
-            logger.info("Model loaded successfully")
             return True
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")

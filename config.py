@@ -35,6 +35,11 @@ class Config:
     NO_THINK = os.getenv("NO_THINK", "True").lower() == "true"
     ASR_PROMPT = os.getenv("ASR_PROMPT", "")
     LLM_PROMPT = os.getenv("LLM_PROMPT", "")
+    
+    # TTS配置
+    INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"
+    TTS_MODEL_DIR = os.getenv("TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
+    TTS_MODEL_CONFIG = os.getenv("TTS_MODEL_CONFIG", "/mnt/c/models/IndexTTS-1.5/config.yaml")
      
     # LLM模型加载配置
     TRUST_REMOTE_CODE = os.getenv("TRUST_REMOTE_CODE", "True").lower() == "true"    # 是否信任远程代码
@@ -83,5 +88,6 @@ class Config:
     os.makedirs(ASR_MODEL_DIR, exist_ok=True)
     os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
     os.makedirs(LLM_MODEL_DIR, exist_ok=True)
+    os.makedirs(TTS_MODEL_DIR, exist_ok=True)
     os.makedirs(VECTOR_DB_PATH, exist_ok=True)
     os.makedirs(DOCS_PATH, exist_ok=True)
