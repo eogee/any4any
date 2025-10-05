@@ -13,3 +13,9 @@ __pycache__/
 
 # data files
 data/
+
+# node_modules
+node_modules/
+package-lock.json
+package.json
+settings.json
