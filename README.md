@@ -1,4 +1,4 @@
-# any4any: 大模型会话、对话内容预览与修改、语音识别、文本转语音、文档重排、知识库文本处理和MCP服务的一键式API服务
+# any4any: 大模型会话、对话内容预览与修改、语音识别、文本转语音、文档重排、文本嵌入、知识库系统和MCP服务的一键式API服务
 
 <div align="center">
   中文简体 ·
@@ -7,19 +7,29 @@
 
 ## 功能特性
 
+**核心功能**：启动运行本项目后，您可以将几乎所有类型模型以openai-api兼容接口形式暴露，可被任何模型管理应用添加，可追踪用户对话历史，具体功能模块介绍如下：
+
 - 会话管理：支持多平台与LLM会话管的理，可将本地模型以openai-api兼容接口形式暴露，可被任何模型管理应用添加，可追踪用户对话历史
 - 预览模式：支持LLM响应内容预览和编辑功能
 - 钉钉机器人：支持钉钉机器人消息处理
 - 语音转录：将音频文件转换为文本（支持多种语言）
 - 文本转语音：将文本转换为语音文件（支持多种语音风格）：默认使用`zh-CN-XiaoyiNeural`音色
-- 文档重排：基于查询对文档进行相关性排序
-- MySQL数据库API：数据库连接并执行SQL查询和更新操作
+- 知识库：提供独立的embbeding和rerank能力，可基于ChromaDB向量数据库构建知识库系统
 - MCP服务：支持构建MCP工具、接口，可在任意MCP客户端调用
-- 自动清理：生成的临时音频文件会在响应后自动删除
-- 文本处理：将文本分块、关键词提取、文本追加写入、知识库处理
 - API文档：自动生成API使用说明，可通过浏览器访问：http://localhost:8888/docs#/
 
 ## 更新内容
+
+**2025.10.08(V0.1.1)：新增嵌入模型（Embedding）模块**
+
+新增：
+- Embedding模块：完整的嵌入模型支持，包括文档处理、向量存储、检索引擎等功能
+- 文档处理：支持文档解析、分块、向量化等处理流程
+- 向量存储：高效的向量存储和管理机制
+- 检索引擎：基于相似度的文档检索功能
+- 知识库服务器：提供知识库的创建、管理和查询服务
+- OpenAI API兼容接口：支持与OpenAI嵌入API一致的调用方式
+- [知识库系统说明文档.md](./docs/知识库系统说明文档.md)
 
 **2025.9.26(V0.1.0)：新增会话管理和预览模式功能**
 
@@ -42,14 +52,6 @@
 - MCP服务服务启动：运行启动命令：`python cli.py`或`a4a-run`，服务将运行在: http://localhost:9999/sse
 
 dify工作流文件:[mcp_test.yml](./workflows/dify_workflows/mcp_test.yml)
-
-**2025.5.18(V0.0.5)：新增支持文本添加关键词（text_add_keywords）**
-
-新增：
-- 文本分块：将`.text`或`.md`文件按照一定字符数进行分块，并返回分块后的文本，默认按每2000字符分块，允许200字符重叠
-- 文本关键词提取：配合大模型语义理解能力将分块后的内容进行关键字提取，默认提取10-20个关键词
-- 文本追加写入：将原始文本和提取的关键词追加到新的`.text`文件中，文件位于`data/text_add_keywords.txt`
-- 知识库处理：可以在dify中使用生成的`.text`文件作为知识库，进行文本检索
 
 ## 前置环境要求
 
@@ -76,22 +78,20 @@ git clone https://gitcode.com/eogee/any4any.git
 
 ```bash
 # 确认已安装git-lfs (https://git-lfs.com)，用于下载大文件
+# 您可在huggingface.co/modelscoup.com/hf-mirror.com站点中下载模型，此处以huggingface.co为例
 git lfs install
 
 # 下载语音识别模型：SenseVoiceSmall
-git clone https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall
-# 或
 git clone https://huggingface.co/FunAudioLLM/SenseVoiceSmall
 
 # 下载重排序模型：bge-reranker-base
-git clone https://hf-mirror.com/BAAI/bge-reranker-base
-# 或
 git clone https://huggingface.co/BAAI/bge-reranker-base
 
 # 下载LLM模型：Qwen3-1.7B
-git clone https://hf-mirror.com/Qwen/Qwen3-1.7B
-# 或
 git clone https://huggingface.co/Qwen/Qwen3-1.7B
+
+# 下载Embbeding模型：bge-small-zh-v1.5
+git clone https://huggingface.co/BAAI/bge-small-zh-v1.5
 ```
 
 ### 3. 创建conda环境
@@ -146,7 +146,7 @@ a4a-run
 - MCP服务: http://localhost:9999
 - 钉钉服务: http://localhost:6666
 
-### 7. dify内添加并调用模型
+### 7. 其他模型平台应用内容添加并调用模型（此处以Dify为例子）
 
 **7.1查看宿主机的ip地址**
 
@@ -175,8 +175,8 @@ API Key：EMPTY
 
 配置模型路径：
 ```
-#config.py
-ASR_MODEL_DIR = "/mnt/c/models/SenseVoiceSmall"  # 替换为你本地ASR模型路径
+#.env文件
+ASR_MODEL_DIR=/mnt/c/models/SenseVoiceSmall  # 替换为你本地ASR模型路径
 ```
 
 打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
@@ -191,8 +191,8 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.interna
 
 配置模型路径：
 ```
-#config.py
-RERANK_MODEL_DIR = "/mnt/c/models/bge-reranker-base"  # 替换为你本地rerank模型路径
+#.env文件 
+RERANK_MODEL_DIR=/mnt/c/models/bge-reranker-base  # 替换为你本地rerank模型路径
 ```
 
 同样打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
@@ -207,8 +207,8 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.interna
 
 配置模型路径：
 ```
-#config.py
-LLM_MODEL_DIR = "/mnt/c/models/Qwen3-1.7B"  # 替换为你本地LLM模型路径
+#.env文件
+LLM_MODEL_DIR=/mnt/c/models/Qwen3-1.7B  # 替换为你本地LLM模型路径
 ```
 
 同样打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
@@ -219,11 +219,27 @@ API Key：EMPTY
 API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.internal:8888/v1`
 ```
 
-**7.6设置为默认模型**
+**7.6导入Embbding模型**
 
-在右上角`系统模型设置`中的最下方，将`文本转语音模型`设置为`edge-tts`，将`语音识别模型`设置为`SenseVoiceSmall`，将`文档重排模型`设置为`bge-reranker-base`，将`语言模型`设置为`Qwen3-1.7B`，点击，保存设置。
+配置模型路径：
+```
+#.env文件
+EMBBEDING_MODEL_DIR = "/mnt/c/models/bge-small-zh-v1.5"  # 替换为你本地Embbding模型路径
+```
 
-**7.7使用模型**
+同样打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
+```
+模型类型：Embbding
+模型名称：bge-small-zh-v1.5
+API Key：EMPTY
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.internal:8888/v1`
+```
+
+**7.7设置为默认模型**
+
+在右上角`系统模型设置`中的最下方，将`文本转语音模型`设置为`edge-tts`，将`语音识别模型`设置为`SenseVoiceSmall`，将`文档重排模型`设置为`bge-reranker-base`，将`语言模型`设置为`Qwen3-1.7B`，将`嵌入模型`设置为`bge-small-zh-v1.5`，保存设置。
+
+**7.8使用模型**
 
 添加任意一个`chatflow`，进入工作流内容后在右上角`功能`，找到`文字转语音`和`语音转文字`功能，配置我们添加好的模型，将`自动播放`打开，然后对话即可。
 
@@ -231,13 +247,13 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.interna
 
 **8.1连接配置**
 
-在`config.py`中配置MySQL数据库连接信息:
-```python
-MYSQL_HOST = "172.21.48.1"  # 在cmd中使用ipconfig | findstr "IPv4" 查看并替换为你的实际的IP地址
-MYSQL_PORT = 3306
-MYSQL_USER = "root"
-MYSQL_PASSWORD = "root"
-MYSQL_DATABASE = "any4any"  # 替换为你的数据库名称
+在`.env`文件中配置MySQL数据库连接信息:
+```
+MYSQL_HOST=172.21.48.1  # 在cmd中使用ipconfig | findstr "IPv4" 查看并替换为你的实际的IP地址
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=root
+MYSQL_DATABASE=any4any  # 替换为你的数据库名称
 ```
 
 **8.2MySQL数据库配置**
@@ -275,6 +291,7 @@ any4any/
 │   ├── chat/                 # 聊天相关模块
 │   │   ├── conversation_database.py  # 会话数据库操作
 │   │   ├── conversation_manager.py   # 会话管理器
+│   │   ├── delay_manager.py          # 延迟管理器
 │   │   ├── llm.py            # 大语言模型接口
 │   │   ├── openai_api.py     # OpenAI API兼容接口
 │   │   └── preview.py        # 预览功能实现
@@ -282,6 +299,15 @@ any4any/
 │   │   └── database.py       # 数据库连接和查询实现
 │   ├── dingtalk/             # 钉钉机器人模块
 │   │   └── message_manager.py # 钉钉消息处理
+│   ├── embedding/           # 嵌入模型模块
+│   │   ├── document_processor.py # 文档处理器
+│   │   ├── embedding_manager.py  # 嵌入管理器
+│   │   ├── kb_server.py          # 知识库服务器
+│   │   ├── openai_api.py         # OpenAI API接口
+│   │   ├── retrieval_engine.py   # 检索引擎
+│   │   └── vector_store.py       # 向量存储
+│   ├── lifespan.py           # 应用生命周期管理
+│   ├── log.py                # 日志管理
 │   ├── mcp/                  # MCP协议模块
 │   │   └── mcp_tools.py      # MCP工具实现
 │   ├── rerank/               # 文档重排模块
@@ -289,10 +315,15 @@ any4any/
 │   ├── tts/                  # 文本转语音模块
 │   │   ├── file.py           # 音频文件处理
 │   │   └── speech.py         # 语音合成实现
-│   ├── lifespan.py           # 应用生命周期管理
 │   └── model_manager.py      # 模型管理器
 ├── data_models/              # 数据模型定义
+│   ├── Auth.py               # 认证相关模型
+│   ├── Preview.py            # 预览相关模型
+│   └── model.py              # 基础模型类
 ├── servers/                  # 服务器模块
+│   ├── AuthServer.py         # 认证服务器
+│   ├── IndexServer.py        # 索引服务器
+│   └── Server.py             # 基础服务器类
 ├── static/                   # 静态资源文件
 ├── utils/                    # 工具模块
 ├── workflows/                # 工作流和外部衔接插件
@@ -310,10 +341,11 @@ any4any/
 
 - edge-tts：https://github.com/rany2/edge-tts
 - SenseVoice：https://github.com/FunAudioLLM/SenseVoice
-- bge-reranker-base：https://huggingface.com/BAAI/bge-reranker-base
+- bge-reranker-base：https://huggingface.co/BAAI/bge-reranker-base
+- bge-small-zh-v1.5：https://huggingface.co/BAAI/bge-small-zh-v1.5
 - dify：https://github.com/langgenius/dify
 - fastapi：https://github.com/fastapi/fastapi
-- Qwen3-1.7B：https://huggingface.com/Qwen/Qwen3-1.7B
+- Qwen3-1.7B：https://huggingface.co/Qwen/Qwen3-1.7B
 - Layui：https://github.com/layui/layui
 - font-awesome：https://github.com/FortAwesome/Font-Awesome
 

@@ -59,7 +59,7 @@ class LLMService:
                 model_path,
                 device_map="cpu",
                 trust_remote_code=Config.TRUST_REMOTE_CODE,
-                torch_dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
+                dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
                 low_cpu_mem_usage=Config.LOW_CPU_MEM_USAGE
             ).eval()
         else:
@@ -72,10 +72,10 @@ class LLMService:
                 model_path,
                 device_map=device_map,
                 trust_remote_code=Config.TRUST_REMOTE_CODE,
-                torch_dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
+                dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
                 low_cpu_mem_usage=Config.LOW_CPU_MEM_USAGE,
                 offload_folder="offload",
-                offload_state_dict=Config.USE_HALF_PRECISION,
+                # offload_state_dict=Config.USE_HALF_PRECISION,
             ).eval()
 
     async def initialize_model(self):

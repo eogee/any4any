@@ -19,3 +19,4 @@ PyPDF2>=1.27.0          # PDF处理库
 python-docx>=0.8.11     # 读取Word文档库
 chardet>=4.0.0          # 字符编码检测库
 chromadb>=0.2.0         # 基于SQLite的向量数据库
+itsdangerous>           # 安全相关的工具库

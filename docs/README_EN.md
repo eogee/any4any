@@ -1,4 +1,4 @@
-# any4any: One-stop API service for LLM conversations, content preview and editing, voice recognition, text-to-speech, document rearrangement, knowledge base text processing, and MCP services 🚀
+# any4any: One-stop API service for LLM conversations, content preview and editing, voice recognition, text-to-speech, document reranking, text embedding, knowledge base system, and MCP services 🚀
 
 <div align="center">  
   <a href="../README.md">中文简体 ·  </a>
@@ -7,19 +7,29 @@
 
 ## ✨Features  
 
-- **LLM Conversation Management**: Supports multi-platform LLM conversation management, exposing local models as Openai-API compatible interfaces that can be added to any model management application, with user conversation history tracking
+**Core Features**: After starting and running this project, you can expose almost all types of models as OpenAI-API compatible interfaces, which can be added to any model management application and track user conversation history. Here's an introduction to each functional module:
+
+- **Conversation Management**: Supports multi-platform LLM conversation management, exposing local models as OpenAI-API compatible interfaces that can be added to any model management application, with user conversation history tracking
 - **Preview Mode**: Supports LLM response content preview and editing functionality
 - **DingTalk Bot**: Supports DingTalk bot message processing
 - **Speech-to-Text**: Convert audio files to text (supports multiple languages)
 - **Text-to-Speech**: Convert text to speech files (supports multiple voice styles). Default voice: `zh-CN-XiaoyiNeural`
-- **Document Reranking**: Sort documents based on relevance to a query
-- **MySQL Database API**: Connect to a database and execute SQL queries and updates
+- **Knowledge Base**: Provides independent embedding and reranking capabilities, can build knowledge base systems based on ChromaDB vector database
 - **MCP Service**: Supports building MCP tools, interfaces, and can be invoked by any MCP client
-- **Automatic Cleanup**: Temporary audio files are automatically deleted after the response
-- **Text Processing**: Text chunking, keyword extraction, text appending, and knowledge base processing
 - **API Documentation**: Automatically generated API documentation accessible via browser at: http://localhost:8888/docs#/
 
 ## 🎉Updates  
+
+**2025.10.08(V0.1.1): Added Embedding Module**
+
+New Features:
+- **Embedding Module**: Complete embedding model support, including document processing, vector storage, retrieval engine, etc.
+- **Document Processing**: Support for document parsing, chunking, vectorization and other processing flows
+- **Vector Storage**: Efficient vector storage and management mechanism
+- **Retrieval Engine**: Document retrieval functionality based on similarity
+- **Knowledge Base Server**: Provides knowledge base creation, management and query services
+- **OpenAI API Compatible Interface**: Supports calling methods consistent with OpenAI embedding API
+- [Knowledge Base System Documentation.md](./KnowledgeBaseSystemDocumentation.md)
 
 **2025.9.26(V0.1.0): Added conversation management and preview mode features**
 
@@ -45,17 +55,7 @@ Example documents for calling in Dify and Cherrystudio can be found at: [mcp_tes
 
 Dify workflow file: [mcp_test.yml](./workflows/mcp_test.yml).
 
-**2025.5.18(V0.0.5): Added support for text keyword addition (text_add_keywords)**
 
-New Features:  
-- **Text Chunking**: Split `.text` or `.md` files into chunks by character count (default: 2000 characters per chunk with 200-character overlap).  
-- **Keyword Extraction**: Use large language models to extract keywords from chunked content (default: 10–20 keywords).  
-- **Text Appending**: Append the original text and extracted keywords to a new `.text` file (`data/text_add_keywords.txt`).  
-- **Knowledge Base Processing**: Use the generated `.text` file in Dify as a knowledge base for text retrieval.  
-
-For detailed API documentation, see: [text_add_keywords.md](./docs/text_add_keywords.md).  
-
-Dify workflow file: [text_add_keywords.yml](./workflows/text_add_keywords.yml).  
 
 ## 🛠️Prerequisites  
 
@@ -81,23 +81,22 @@ You can also download the project via cloud storage: https://pan.quark.cn/s/fbe1
 ### 2. Download Models  
 
 ```bash  
-# Ensure git-lfs is installed (https://git-lfs.com) for large file downloads  
+# Ensure git-lfs is installed (https://git-lfs.com) for large file downloads
+# You can download models from huggingface.co, modelscoup.com, or hf-mirror.com sites. Here we use huggingface.co as an example
+# 您可在huggingface.co, modelscoup.com, hf-mirror.com站点中下载模型，此处以huggingface.co为例
 git lfs install  
 
 # Download the speech recognition model: SenseVoiceSmall  
-git clone https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall  
-# Or  
 git clone https://huggingface.co/FunAudioLLM/SenseVoiceSmall  
 
-# Download the reranking model: bge-reranker-base  
-git clone https://hf-mirror.com/BAAI/bge-reranker-base  
-# Or  
+# Download the reranking model: bge-reranker-base    
 git clone https://huggingface.co/BAAI/bge-reranker-base  
 
 # Download the LLM model: Qwen3-1.7B  
-git clone https://hf-mirror.com/Qwen/Qwen3-1.7B  
-# Or  
-git clone https://huggingface.co/Qwen/Qwen3-1.7B  
+git clone https://huggingface.co/Qwen/Qwen3-1.7B
+
+# Download the Embedding model: bge-small-zh-v1.5
+git clone https://huggingface.co/BAAI/bge-small-zh-v1.5  
 ```  
 
 ### 3. Create a Conda Environment  
@@ -153,7 +152,7 @@ The service will run at the following ports:
 - MCP service: http://localhost:9999
 - DingTalk service: http://localhost:6666
 
-### 7. Add and Call Models in Dify  
+### 7. Add and Call Models in Other Model Platform Applications (Dify as an Example)  
 
 **7.1 Check the Host Machine's IP Address**  
 Run the `ifconfig` command in WSL to check the host machine's IP address.  
@@ -180,7 +179,8 @@ Other fields can be left blank.
 Configure the model path:  
 ```python  
 # config.py  
-ASR_MODEL_DIR = "/mnt/c/models/SenseVoiceSmall"  # Replace with your local ASR model path  
+# .env file
+ASR_MODEL_DIR=/mnt/c/models/SenseVoiceSmall  # Replace with your local ASR model path  
 ```  
 
 Open the `OpenAI-API-compatible` plugin, click `Add Model`, and configure as follows:  
@@ -193,9 +193,9 @@ API Endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:
 
 **7.4 Import the Rerank Model**  
 Configure the model path:  
-```python  
-# config.py  
-RERANK_MODEL_DIR = "/mnt/c/models/bge-reranker-base"  # Replace with your local rerank model path  
+```
+# .env file
+RERANK_MODEL_DIR=/mnt/c/models/bge-reranker-base  # Replace with your local rerank model path
 ```  
 
 Open the `OpenAI-API-compatible` plugin, click `Add Model`, and configure as follows:  
@@ -209,8 +209,8 @@ API Endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:
 **7.5 Import the LLM Model**  
 Configure the model path:  
 ```python  
-# config.py  
-LLM_MODEL_DIR = "/mnt/c/models/Qwen3-1.7B"  # Replace with your local LLM model path  
+# .env file
+LLM_MODEL_DIR=/mnt/c/models/Qwen3-1.7B  # Replace with your local LLM model path  
 ```  
 
 Open the `OpenAI-API-compatible` plugin, click `Add Model`, and configure as follows:  
@@ -221,27 +221,44 @@ API Key: EMPTY
 API Endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:8888/v1`  
 ```  
 
-**7.6 Set as Default Models**  
+**7.6 Import Embedding Model**
+
+Configure the model path:
+```
+# .env file
+EMBBEDING_MODEL_DIR = "/mnt/c/models/bge-small-zh-v1.5"  # Replace with your local Embedding model path
+```
+
+Open the `OpenAI-API-compatible` plugin, click `Add Model`, and configure as follows:
+```
+Model Type: Embedding
+Model Name: bge-small-zh-v1.5
+API Key: EMPTY
+API endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:8888/v1`
+```
+
+**7.7 Set as Default Models**  
 In the top-right `System Model Settings`, set:  
 - **Text-to-Speech Model**: `edge-tts`  
 - **Speech-to-Text Model**: `SenseVoiceSmall`  
 - **Document Rerank Model**: `bge-reranker-base`  
 - **Language Model**: `Qwen3-1.7B`  
+- **Embedding Model**: `bge-small-zh-v1.5`
 Click `Save Settings`.  
 
-**7.7 Use the Models**  
+**7.8 Use the Models**  
 Add any `chatflow`, enter the workflow, and enable `Text-to-Speech` and `Speech-to-Text` features in the top-right `Functions`. Configure the models you added, turn on `Auto-Play`, and start chatting.  
 
 ### 8. Connect to MySQL Database in Dify  
 
 **8.1 Connection Configuration**  
-Configure MySQL connection details in `config.py`:  
-```python  
-MYSQL_HOST = "172.21.48.1"  # Replace with your actual IP address (check using `ipconfig | findstr "IPv4"` in cmd)  
-MYSQL_PORT = 3306  
-MYSQL_USER = "root"  
-MYSQL_PASSWORD = "root"  
-MYSQL_DATABASE = "any4any"  # Replace with your database name  
+Configure MySQL connection details in `.env` file:  
+```
+MYSQL_HOST="172.21.48.1"  # Replace with your actual IP address (check using `ipconfig | findstr "IPv4"` in cmd)
+MYSQL_PORT=3306
+MYSQL_USER="root"
+MYSQL_PASSWORD="root"
+MYSQL_DATABASE="any4any"  # Replace with your database name
 ```  
 
 **8.2 MySQL Database Configuration**  
@@ -277,6 +294,7 @@ any4any/
 │   ├── chat/                 # Chat-related modules
 │   │   ├── conversation_database.py  # Conversation database operations
 │   │   ├── conversation_manager.py   # Conversation manager
+│   │   ├── delay_manager.py          # Delay manager
 │   │   ├── llm.py            # Large language model interface
 │   │   ├── openai_api.py     # OpenAI API compatible interface
 │   │   └── preview.py        # Preview functionality implementation
@@ -284,6 +302,15 @@ any4any/
 │   │   └── database.py       # Database connection and query implementation
 │   ├── dingtalk/             # DingTalk bot module
 │   │   └── message_manager.py # DingTalk message processing
+│   ├── embedding/            # Embedding model module
+│   │   ├── document_processor.py     # Document processor
+│   │   ├── embedding_manager.py      # Embedding manager
+│   │   ├── kb_server.py              # Knowledge base server
+│   │   ├── openai_api.py             # OpenAI API interface
+│   │   ├── retrieval_engine.py       # Retrieval engine
+│   │   └── vector_store.py           # Vector store
+│   ├── lifespan.py           # Application lifecycle management
+│   ├── log.py                # Log management
 │   ├── mcp/                  # MCP protocol module
 │   │   └── mcp_tools.py      # MCP tools implementation
 │   ├── rerank/               # Document reranking module
@@ -291,17 +318,19 @@ any4any/
 │   ├── tts/                  # Text-to-speech module
 │   │   ├── file.py           # Audio file processing
 │   │   └── speech.py         # Speech synthesis implementation
-│   ├── lifespan.py           # Application lifecycle management
 │   └── model_manager.py      # Model manager
 ├── data_models/              # Data model definitions
+│   ├── Auth.py               # Authentication related models
+│   ├── Preview.py            # Preview related models
+│   └── model.py              # Base model class
 ├── servers/                  # Server modules
 ├── static/                   # Static resource files
 ├── utils/                    # Utility modules
-├── workflows/                # Workflows and external integration plugins
+├── workflows/                # Workflows and external 
 ├── app.py                    # Application entry file
 ├── cli.py                    # Command-line interface
 ├── config.py                 # Configuration file
-├── requirements.txt          # Dependency list
+├── requirements.txt          # Dependency package list
 ├── any4any.sql               # Database initialization script
 ├── a4a-run.sh                # Startup script
 └── .env.example              # Environment variable example file
@@ -309,13 +338,14 @@ any4any/
 
 ## 🌟Related Open-Source Projects  
 
-- edge-tts: https://github.com/rany2/edge-tts  
-- SenseVoice: https://github.com/FunAudioLLM/SenseVoice  
-- bge-reranker-base: https://huggingface.com/BAAI/bge-reranker-base  
-- Dify: https://github.com/langgenius/dify  
-- FastAPI: https://github.com/fastapi/fastapi  
-- Qwen3-1.7B: https://huggingface.com/Qwen/Qwen3-1.7B  
-- Layui: https://github.com/layui/layui  
+- edge-tts: https://github.com/rany2/edge-tts
+- SenseVoice: https://github.com/FunAudioLLM/SenseVoice
+- bge-reranker-base: https://huggingface.co/BAAI/bge-reranker-base
+- bge-small-zh-v1.5: https://huggingface.co/BAAI/bge-small-zh-v1.5
+- dify: https://github.com/langgenius/dify
+- fastapi: https://github.com/fastapi/fastapi
+- Qwen3-1.7B: https://huggingface.co/Qwen/Qwen3-1.7B
+- Layui: https://github.com/layui/layui
 - font-awesome: https://github.com/FortAwesome/Font-Awesome  
 
 ## 🚧Roadmap  
