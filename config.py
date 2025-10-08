@@ -27,6 +27,7 @@ class Config:
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
     DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
+    INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
     ASR_MODEL_DIR = os.getenv("ASR_MODEL_DIR", "/mnt/c/models/SenseVoiceSmall")
     RERANK_MODEL_DIR = os.getenv("RERANK_MODEL_DIR", "/mnt/c/models/bge-reranker-base")
     EMBEDDING_MODEL_DIR = os.getenv("EMBEDDING_MODEL_DIR", "/mnt/c/models/bge-small-zh-v1.5")
@@ -34,7 +35,6 @@ class Config:
     LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen3-1.7B")
     NO_THINK = os.getenv("NO_THINK", "True").lower() == "true"
     ASR_PROMPT = os.getenv("ASR_PROMPT", "")
-    LLM_PROMPT = os.getenv("LLM_PROMPT", "")
      
     # LLM模型加载配置
     TRUST_REMOTE_CODE = os.getenv("TRUST_REMOTE_CODE", "True").lower() == "true"    # 是否信任远程代码
@@ -42,9 +42,16 @@ class Config:
     LOW_CPU_MEM_USAGE = os.getenv("LOW_CPU_MEM_USAGE", "True").lower() == "true"    # 是否使用低CPU内存
     TOKENIZERS_PARALLELISM = os.getenv("TOKENIZERS_PARALLELISM", "False").lower() == "true" # 是否启用多线程分词
     
+    # LLM模型生成参数配置
+    MAX_LENGTH = int(os.getenv("MAX_LENGTH", "4096"))                               # 最大生成长度
+    NUM_RETURN_SEQUENCES = int(os.getenv("NUM_RETURN_SEQUENCES", "1"))              # 生成序列数量
+    TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))                            # 温度参数，控制生成的随机性
+    TOP_P = float(os.getenv("TOP_P", "0.9"))                                        # Top-p采样参数，控制生成的多样性
+    REPETITION_PENALTY = float(os.getenv("REPETITION_PENALTY", "1.1"))              # 重复惩罚参数，控制生成的多样性
+    LLM_PROMPT = os.getenv("LLM_PROMPT", "")                                        # LLM模型提示词
+    
     # EMBEDDING模型配置
     TOP_K = int(os.getenv("TOP_K", "3"))                                            # 取前k个最相似的向量
-    # 使用基于项目根目录的路径，不使用相对路径前缀
     VECTOR_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/vector_db") # 向量数据库路径
     DOCS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/docs")           # 文档路径
     DOC_CHUNK_SIZE = int(os.getenv("DOC_CHUNK_SIZE", "500"))                        # 文档处理器文本分块大小
@@ -55,13 +62,6 @@ class Config:
     RERANK_ENABLED = os.getenv("RERANK_ENABLED", "True").lower() == "true"          # 是否启用重排序
     RERANK_CANDIDATE_FACTOR = int(os.getenv("RERANK_CANDIDATE_FACTOR", "10"))       # 重排序候选文档倍数
     RERANK_BATCH_SIZE = int(os.getenv("RERANK_BATCH_SIZE", "16"))                   # 重排序批处理大小
-
-    # LLM模型生成参数配置
-    MAX_LENGTH = int(os.getenv("MAX_LENGTH", "4096"))                               # 最大生成长度
-    NUM_RETURN_SEQUENCES = int(os.getenv("NUM_RETURN_SEQUENCES", "1"))              # 生成序列数量
-    TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))                            # 温度参数，控制生成的随机性
-    TOP_P = float(os.getenv("TOP_P", "0.9"))                                        # Top-p采样参数，控制生成的多样性
-    REPETITION_PENALTY = float(os.getenv("REPETITION_PENALTY", "1.1"))              # 重复惩罚参数，控制生成的多样性    
     
     # MySQL数据库配置
     MYSQL_HOST = os.getenv("MYSQL_HOST", "172.21.48.1")
@@ -80,14 +80,13 @@ class Config:
     DINGTALK_PORT = os.getenv("DINGTALK_PORT", "6666")
 
     # IndexTTS-1.5引擎配置
-    INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"
-    INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
+    INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"   # 是否启用IndexTTS-1.5引擎
     INDEX_TTS_DEVICE = os.getenv("INDEX_TTS_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
-    INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))
-    INDEX_TTS_TIMEOUT = int(os.getenv("INDEX_TTS_TIMEOUT", "60"))  # 秒
-    INDEX_TTS_SUPPORTED_VOICES = ["default"]  # 根据实际支持情况修改
+    INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))            # IndexTTS-1.5最大并发数
+    INDEX_TTS_TIMEOUT = int(os.getenv("INDEX_TTS_TIMEOUT", "60"))                   # IndexTTS-1.5超时时间，单位为秒
+    INDEX_TTS_SUPPORTED_VOICES = ["default"]                                        # IndexTTS-1.5支持的语音列表
 
-    # 确保模型目录存在
+    # 确保目录存在
     os.makedirs(ASR_MODEL_DIR, exist_ok=True)
     os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
     os.makedirs(LLM_MODEL_DIR, exist_ok=True)
