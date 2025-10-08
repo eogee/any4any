@@ -1,4 +1,7 @@
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 def filter_special_chars(text: str) -> str:
     """过滤文本转语音特殊字符"""
