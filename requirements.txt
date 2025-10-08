@@ -1,11 +1,11 @@
 edge-tts                # 文本转语音服务
-torch<=2.3              # PyTorch深度学习框架
+torch==2.3              # PyTorch深度学习框架
 torchaudio              # PyTorch的音频处理库
 funasr>=1.1.3           # 语音识别框架
 fastapi>=0.111.1        # 快速构建API的框架
 uvicorn                 # ASGI服务器，用于运行FastAPI应用
 python-dotenv           # 从.env文件加载环境变量
-transformers>=4.52.3    # 自然语言处理模型库
+transformers==4.51.0    # 自然语言处理模型库
 FlagEmbedding==1.2.3    # 分块嵌入库
 pydantic>=2.0.0         # 数据模型验证库
 mysql-connector-python>=8.1.0  # MySQL数据库连接器
@@ -19,4 +19,17 @@ PyPDF2>=1.27.0          # PDF处理库
 python-docx>=0.8.11     # 读取Word文档库
 chardet>=4.0.0          # 字符编码检测库
 chromadb>=0.2.0         # 基于SQLite的向量数据库
-itsdangerous>           # 安全相关的工具库
+itsdangerous>=2.1.2     # 安全相关的工具库
+matplotlib              # 绘图库
+omegaconf               # 用于配置文件的库
+tqdm                    # 用于显示训练进度的库
+pyyaml                  # 用于解析YAML配置文件
+deepspeed               # 用于加速训练的库
+sentencepiece           # 用于处理文本的分词库
+einops                  # 张量操作库
+scipy                   # 科学计算库
+soundfile               # 音频文件处理库
+packaging               # 用于处理Python包的元数据
+huggingface_hub
+WeTextProcessing; platform_machine != "Darwin"
+wetext; platform_system == "Darwin"

@@ -8,10 +8,10 @@ from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
 from transformers.utils.model_parallel_utils import (assert_device_map,
                                                      get_device_map)
 
-from indextts.gpt.conformer_encoder import ConformerEncoder
-from indextts.gpt.perceiver import PerceiverResampler
-from indextts.utils.arch_util import AttentionBlock
-from indextts.utils.typical_sampling import TypicalLogitsWarper
+from .conformer_encoder import ConformerEncoder
+from .perceiver import PerceiverResampler
+from ..utils.arch_util import AttentionBlock
+from ..utils.typical_sampling import TypicalLogitsWarper
 
 
 def null_position_embeddings(range, dim):
@@ -86,6 +86,17 @@ class GPT2InferenceModel(GPT2PreTrainedModel, GenerationMixin):
         token_type_ids = kwargs.get("token_type_ids", None)  # usually None
         if not self.kv_cache:
             past_key_values = None
+        
+        # 转换旧格式的past_key_values到新的Cache格式
+        # 根据Transformers v4.53.0的警告，tuple形式的past_key_values将被移除
+        try:
+            from transformers.cache_utils import DynamicCache
+            if past_key_values is not None and isinstance(past_key_values, tuple):
+                past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+        except ImportError:
+            # 如果Transformers版本较旧，不支持DynamicCache，则继续使用旧格式
+            pass
+            
         # only last token for inputs_ids if past is defined in kwargs
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(-1)

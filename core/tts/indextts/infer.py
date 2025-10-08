@@ -15,12 +15,51 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from indextts.BigVGAN.models import BigVGAN as Generator
-from indextts.gpt.model import UnifiedVoice
-from indextts.utils.checkpoint import load_checkpoint
-from indextts.utils.feature_extractors import MelSpectrogramFeatures
+from .BigVGAN.models import BigVGAN as Generator
+from .gpt.model import UnifiedVoice
+from .utils.checkpoint import load_checkpoint
+from .utils.feature_extractors import MelSpectrogramFeatures
 
-from indextts.utils.front import TextNormalizer, TextTokenizer
+from .utils.front import TextNormalizer, TextTokenizer
+
+
+class IndexTTSInference:
+    """IndexTTS-1.5推理类（用于any4any集成）"""
+    def __init__(self, model_path=None, device=None):
+        """
+        初始化IndexTTS推理引擎
+        
+        Args:
+            model_path: 模型路径
+            device: 设备类型 ('cuda' 或 'cpu')
+        """
+        # 调用原有的IndexTTS类进行初始化
+        # 自动检测是否使用CUDA内核，当使用CUDA设备时启用
+        use_cuda = device.startswith('cuda') if device else torch.cuda.is_available()
+        
+        self.tts = IndexTTS(
+            cfg_path=os.path.join(model_path, "config.yaml"),
+            model_dir=model_path,
+            device=device,
+            is_fp16=use_cuda,
+            use_cuda_kernel=use_cuda  # 当使用CUDA设备时，启用CUDA内核以加速生成
+        )
+        
+    def infer(self, text, output_path, voice=None):
+        """
+        生成语音
+        
+        Args:
+            text: 文本内容
+            output_path: 输出音频路径
+            voice: 声音选项
+        """
+        # 使用IndexTTS生成语音
+        self.tts.infer(
+            audio_prompt=voice,  # 直接使用传入的voice参数，不再设置默认值
+            text=text,
+            output_path=output_path
+        )
 
 
 class IndexTTS:
@@ -61,7 +100,7 @@ class IndexTTS:
         # Comment-off to load the VQ-VAE model for debugging tokenizer
         #   https://github.com/index-tts/index-tts/issues/34
         #
-        # from indextts.vqvae.xtts_dvae import DiscreteVAE
+        # from .vqvae.xtts_dvae import DiscreteVAE
         # self.dvae = DiscreteVAE(**self.cfg.vqvae)
         # self.dvae_path = os.path.join(self.model_dir, self.cfg.dvae_checkpoint)
         # load_checkpoint(self.dvae, self.dvae_path)
@@ -79,7 +118,6 @@ class IndexTTS:
             self.gpt.eval().half()
         else:
             self.gpt.eval()
-        print(">> GPT weights restored from:", self.gpt_path)
         if self.is_fp16:
             try:
                 import deepspeed
@@ -97,9 +135,8 @@ class IndexTTS:
         if self.use_cuda_kernel:
             # preload the CUDA kernel for BigVGAN
             try:
-                from indextts.BigVGAN.alias_free_activation.cuda import load as anti_alias_activation_loader
+                from .BigVGAN.alias_free_activation.cuda import load as anti_alias_activation_loader
                 anti_alias_activation_cuda = anti_alias_activation_loader.load()
-                print(">> Preload custom CUDA kernel for BigVGAN", anti_alias_activation_cuda)
             except Exception as e:
                 print(">> Failed to load custom CUDA kernel for BigVGAN. Falling back to torch.", e, file=sys.stderr)
                 print(" Reinstall with `pip install -e . --no-deps --no-build-isolation` to prebuild `anti_alias_activation_cuda` kernel.", file=sys.stderr)
@@ -115,13 +152,10 @@ class IndexTTS:
         # remove weight norm on eval mode
         self.bigvgan.remove_weight_norm()
         self.bigvgan.eval()
-        print(">> bigvgan weights restored from:", self.bigvgan_path)
         self.bpe_path = os.path.join(self.model_dir, self.cfg.dataset["bpe_model"])
         self.normalizer = TextNormalizer()
         self.normalizer.load()
-        print(">> TextNormalizer loaded")
         self.tokenizer = TextTokenizer(self.bpe_path, self.normalizer)
-        print(">> bpe model loaded from:", self.bpe_path)
         # 缓存参考音频mel：
         self.cache_audio_prompt = None
         self.cache_cond_mel = None
@@ -473,14 +507,7 @@ class IndexTTS:
         self._set_gr_progress(0.9, "save audio...")
         wav = torch.cat(wavs, dim=1)
         wav_length = wav.shape[-1] / sampling_rate
-        print(f">> Reference audio length: {cond_mel_frame * 256 / sampling_rate:.2f} seconds")
-        print(f">> gpt_gen_time: {gpt_gen_time:.2f} seconds")
-        print(f">> gpt_forward_time: {gpt_forward_time:.2f} seconds")
-        print(f">> bigvgan_time: {bigvgan_time:.2f} seconds")
-        print(f">> Total fast inference time: {end_time - start_time:.2f} seconds")
         print(f">> Generated audio length: {wav_length:.2f} seconds")
-        print(f">> [fast] bigvgan chunk_length: {chunk_length}")
-        print(f">> [fast] batch_num: {all_batch_num} bucket_max_size: {bucket_max_size}", f"bucket_count: {bucket_count}" if bucket_max_size > 1 else "")
         print(f">> [fast] RTF: {(end_time - start_time) / wav_length:.4f}")
 
         # save audio
@@ -489,7 +516,6 @@ class IndexTTS:
             # 直接保存音频到指定路径中
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             torchaudio.save(output_path, wav.type(torch.int16), sampling_rate)
-            print(">> wav file saved to:", output_path)
             return output_path
         else:
             # 返回以符合Gradio的格式要求
@@ -499,7 +525,6 @@ class IndexTTS:
 
     # 原始推理模式
     def infer(self, audio_prompt, text, output_path, verbose=False, max_text_tokens_per_sentence=120, **generation_kwargs):
-        print(">> start inference...")
         self._set_gr_progress(0, "start inference...")
         if verbose:
             print(f"origin text:{text}")
@@ -634,11 +659,6 @@ class IndexTTS:
         self._set_gr_progress(0.9, "save audio...")
         wav = torch.cat(wavs, dim=1)
         wav_length = wav.shape[-1] / sampling_rate
-        print(f">> Reference audio length: {cond_mel_frame * 256 / sampling_rate:.2f} seconds")
-        print(f">> gpt_gen_time: {gpt_gen_time:.2f} seconds")
-        print(f">> gpt_forward_time: {gpt_forward_time:.2f} seconds")
-        print(f">> bigvgan_time: {bigvgan_time:.2f} seconds")
-        print(f">> Total inference time: {end_time - start_time:.2f} seconds")
         print(f">> Generated audio length: {wav_length:.2f} seconds")
         print(f">> RTF: {(end_time - start_time) / wav_length:.4f}")
 
@@ -652,7 +672,6 @@ class IndexTTS:
             if os.path.dirname(output_path) != "":
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
             torchaudio.save(output_path, wav.type(torch.int16), sampling_rate)
-            print(">> wav file saved to:", output_path)
             return output_path
         else:
             # 返回以符合Gradio的格式要求

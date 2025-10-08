@@ -59,7 +59,7 @@ class LLMService:
                 model_path,
                 device_map="cpu",
                 trust_remote_code=Config.TRUST_REMOTE_CODE,
-                dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
+                torch_dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
                 low_cpu_mem_usage=Config.LOW_CPU_MEM_USAGE
             ).eval()
         else:
@@ -72,7 +72,7 @@ class LLMService:
                 model_path,
                 device_map=device_map,
                 trust_remote_code=Config.TRUST_REMOTE_CODE,
-                dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
+                torch_dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
                 low_cpu_mem_usage=Config.LOW_CPU_MEM_USAGE,
                 offload_folder="offload",
                 # offload_state_dict=Config.USE_HALF_PRECISION,
@@ -90,9 +90,7 @@ class LLMService:
             logger.info(f"Skipping model loading in non-main process {os.getpid()}")
             return
             
-        try:
-            logger.info(f"Loading model from: {Config.LLM_MODEL_DIR}")
-            
+        try:            
             self.tokenizer = AutoTokenizer.from_pretrained(
                 Config.LLM_MODEL_DIR,
                 trust_remote_code=Config.TRUST_REMOTE_CODE
@@ -100,9 +98,8 @@ class LLMService:
             
             self.model = self.load_model(Config.LLM_MODEL_DIR, self.device)
             self._model_initialized = True
-            
-            logger.info("Model loaded successfully")
             return True
+
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
             return False

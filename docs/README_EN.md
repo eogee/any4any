@@ -31,7 +31,7 @@ New Features:
 - **Retrieval Engine**: Document retrieval functionality based on similarity
 - **Knowledge Base Server**: Provides knowledge base creation, management and query services
 - **OpenAI API Compatible Interface**: Supports calling methods consistent with OpenAI embedding API
-- [Knowledge Base System Documentation.md](./KnowledgeBaseSystemDocumentation.md)
+- [Knowledge Base System Documentation.md](./en/KnowledgeBaseSystemDocumentation.md)
 
 **2025.9.26(V0.1.0): Added conversation management and preview mode features**
 
@@ -41,7 +41,7 @@ New Features:
 - **DingTalk Bot Integration**: Supports DingTalk bot message processing, enabling interaction with the system within DingTalk
 - **Enhanced User Authentication**: Added API key-based authentication mechanism to improve system security
 - **Database Conversation Storage**: Stores conversation data in MySQL database, supporting persistence and querying
-- [Conversation Management System Documentation.md](./ConversationManagementSystemDocumentation.md)
+- [Conversation Management System Documentation.md](./en/ConversationManagementSystemDocumentation.md)
 
 Updates:
 - **Restructured Project Architecture**: Added data_models module for managing data models, servers module for managing services, and static directory for managing static files
@@ -53,11 +53,7 @@ New Features:
 - **MCP Tool Registration**: Import the corresponding module in `app.py`, such as `from core.mcp_tools import add, sub, mul, div`, and register them in the `mcp.tool()` function.
 - **MCP Service Startup**: Run the start command: `python cli.py` or `a4a-run`, and the service will be available at: http://localhost:9999
 
-Example documents for calling in Dify and Cherrystudio can be found at: [mcp_test.md](./docs/mcp_test.md) (to be completed later).
-
-Dify workflow file: [mcp_test.yml](./workflows/mcp_test.yml).
-
-
+Dify workflow file: [mcp_test.yml](../workflows/dify_workflows/mcp_test.yml).
 
 ## 🛠️Prerequisites  
 

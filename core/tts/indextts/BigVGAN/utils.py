@@ -3,19 +3,29 @@
 
 import glob
 import os
-
-import matplotlib
-import matplotlib.pylab as plt
 import torch
 from scipy.io.wavfile import write
 from torch.nn.utils import weight_norm
 
-matplotlib.use("Agg")
+# 尝试导入matplotlib，但不强制要求
+MATPLOTLIB_AVAILABLE = False
+try:
+    import matplotlib
+    import matplotlib.pylab as plt
+    matplotlib.use("Agg")
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    pass  # matplotlib不是必需的，只在需要绘图时使用
 
 MAX_WAV_VALUE = 32768.0
 
 
 def plot_spectrogram(spectrogram):
+    # 检查matplotlib是否可用
+    if not MATPLOTLIB_AVAILABLE:
+        print("Warning: matplotlib not available, cannot plot spectrogram")
+        return None
+    
     fig, ax = plt.subplots(figsize=(10, 2))
     im = ax.imshow(spectrogram, aspect="auto", origin="lower", interpolation="none")
     plt.colorbar(im, ax=ax)
@@ -27,6 +37,11 @@ def plot_spectrogram(spectrogram):
 
 
 def plot_spectrogram_clipped(spectrogram, clip_max=2.0):
+    # 检查matplotlib是否可用
+    if not MATPLOTLIB_AVAILABLE:
+        print("Warning: matplotlib not available, cannot plot spectrogram")
+        return None
+    
     fig, ax = plt.subplots(figsize=(10, 2))
     im = ax.imshow(
         spectrogram,

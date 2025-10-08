@@ -10,6 +10,7 @@ from edge_tts import VoicesManager
 from FlagEmbedding import FlagReranker
 from core.auth.model_auth import verify_token
 from core.chat.llm import get_llm_service
+from core.tts.index_tts_engine import IndexTTSEngine
 from utils.funasr.model import SenseVoiceSmall
 
 try:
@@ -22,7 +23,7 @@ os.environ['TOKENIZERS_PARALLELISM'] = 'true' if Config.TOKENIZERS_PARALLELISM e
 logger = logging.getLogger(__name__)
 
 class ModelManager:
-    """模型管理器-用于初始化所有模型和资源"""    
+    """模型管理器-用于初始化所有模型和资源"""
     _instance = None
     m = None
     kwargs = None
@@ -31,6 +32,7 @@ class ModelManager:
     llm_service = None
     embedding_model = None
     embedding_tokenizer = None
+    index_tts_engine = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -38,7 +40,7 @@ class ModelManager:
         return cls._instance
 
     @classmethod
-    async def initialize(cls, load_llm=True, load_asr=True, load_reranker=True, load_tts=True, load_embedding=True):
+    async def initialize(cls, load_llm=True, load_asr=True, load_reranker=True, load_tts=True, load_embedding=True, load_index_tts=True):
         """初始化模型和声音列表
         
         Args:
@@ -47,6 +49,7 @@ class ModelManager:
             load_reranker: 是否加载重排序模型
             load_tts: 是否加载TTS声音列表
             load_embedding: 是否加载嵌入模型
+            load_index_tts: 是否加载IndexTTS-1.5引擎
         """
         try:
             if not hasattr(cls, '_initialized'):
@@ -55,8 +58,7 @@ class ModelManager:
             if cls._initialized:
                 logger.info("Models already initialized")
                 return
-                
-            # 只在需要时加载ASR模型
+
             if load_asr and not cls.m:
                 logger.info(f"Loading ASR model...")
                 cls.m, cls.kwargs = SenseVoiceSmall.from_pretrained(
@@ -72,12 +74,31 @@ class ModelManager:
                 cls.available_voices = voices_manager.voices
                 logger.info(f"Loaded {len(cls.available_voices)} voices")
 
+            if load_index_tts and Config.INDEX_TTS_ENABLED and not cls.index_tts_engine:
+                try:
+                    logger.info("Loading IndexTTS-1.5...")
+
+                    cls.index_tts_engine = IndexTTSEngine.get_instance({
+                        'model_path': Config.INDEX_TTS_MODEL_DIR,
+                        'device': Config.INDEX_TTS_DEVICE
+                    })
+                    
+                    # 验证初始化状态
+                    if cls.index_tts_engine.is_initialized():
+                        logger.info("IndexTTS-1.5 loaded")
+                    else:
+                        logger.warning("IndexTTS-1.5 loaded but not initialized properly")
+                except Exception as e:
+                    logger.error(f"Failed to load IndexTTS-1.5: {str(e)}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    cls.index_tts_engine = None
+
             if load_reranker and not cls.reranker:
                 logger.info("Loading reranker model...")
                 cls.reranker = FlagReranker(Config.RERANK_MODEL_DIR, use_fp16=False)
                 logger.info("Reranker model loaded")
 
-            # 只在需要时加载嵌入模型
             if load_embedding and not cls.embedding_model:
                 logger.info(f"Loading embedding model...")
                 from transformers import AutoTokenizer, AutoModel
@@ -87,7 +108,6 @@ class ModelManager:
                     logger.info("Embedding model loaded")
                 except Exception as e:
                     logger.error(f"Failed to load embedding model: {str(e)}")
-                    # 不抛出异常，让其他模型继续加载
 
             if load_llm and not cls.llm_service:
                 logger.info("Loading LLM model...")
@@ -128,14 +148,25 @@ class ModelManager:
     @classmethod
     def get_embedding_model(cls):
         return cls.embedding_model, cls.embedding_tokenizer
+    
+    @classmethod
+    def get_index_tts_engine(cls):
+        return cls.index_tts_engine
 
     @classmethod
     def cleanup(cls):
         """清理所有模型资源"""
         logger.info("Cleaning up model resources...")
+        
+        if cls.llm_service is not None:
+            try:
+                if hasattr(cls.llm_service, 'cleanup'):
+                    cls.llm_service.cleanup()
+                cls.llm_service = None
+            except Exception as e:
+                logger.error(f"Error cleaning LLM service: {str(e)}")
 
         if cls.m is not None:
-            logger.info("Cleaning ASR model...")
             if hasattr(cls.m, 'to'):
                 try:
                     cls.m.to('cpu')
@@ -148,7 +179,6 @@ class ModelManager:
         cls.available_voices = []
         
         if cls.embedding_model is not None:
-            logger.info("Cleaning embedding model...")
             if hasattr(cls.embedding_model, 'to'):
                 try:
                     cls.embedding_model.to('cpu')
@@ -157,13 +187,12 @@ class ModelManager:
             cls.embedding_model = None
         cls.embedding_tokenizer = None
 
-        if cls.llm_service is not None:
+        if cls.index_tts_engine is not None:
             try:
-                if hasattr(cls.llm_service, 'cleanup'):
-                    cls.llm_service.cleanup()
-                cls.llm_service = None
+                IndexTTSEngine.cleanup()
             except Exception as e:
-                logger.error(f"Error cleaning LLM service: {str(e)}")
+                logger.error(f"Error cleaning IndexTTS-1.5: {str(e)}")
+            cls.index_tts_engine = None
         
         gc.collect()
         logger.info("Model cleanup completed")
@@ -196,6 +225,9 @@ async def list_models(authorization: Optional[str] = Header(None)):
 async def health_check():
     """检查模型服务健康状态"""
     tts_status = "available" if ModelManager.get_voices() else "unavailable"
+    index_tts_status = "loaded" if (ModelManager.get_index_tts_engine() and \
+                                   ModelManager.get_index_tts_engine().is_initialized()) else "unloaded"
+    
     return {
         "status": "healthy",
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -204,6 +236,7 @@ async def health_check():
             "reranker": "loaded" if ModelManager.reranker is not None else "unloaded",
             "tts": tts_status,
             "llm": "loaded" if ModelManager.llm_service is not None else "unloaded",
-            "embedding": "loaded" if ModelManager.embedding_model is not None else "unloaded"
+            "embedding": "loaded" if ModelManager.embedding_model is not None else "unloaded",
+            "index_tts": index_tts_status
         }
     }

@@ -51,7 +51,7 @@ def load(force_rebuild=False):
     if not torch.cuda.is_available():
         raise RuntimeError("Please install PyTorch with CUDA support to use the anti_alias_activation_cuda extension.")
     try:
-        from indextts.BigVGAN.alias_free_activation.cuda import anti_alias_activation_cuda
+        from ..cuda import anti_alias_activation_cuda
         if not force_rebuild:
             return anti_alias_activation_cuda
     except ImportError:

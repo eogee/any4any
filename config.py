@@ -79,9 +79,19 @@ class Config:
     ROBOT_CODE = os.getenv("ROBOT_CODE", "")
     DINGTALK_PORT = os.getenv("DINGTALK_PORT", "6666")
 
+    # IndexTTS-1.5引擎配置
+    INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"
+    INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
+    INDEX_TTS_DEVICE = os.getenv("INDEX_TTS_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
+    INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))
+    INDEX_TTS_TIMEOUT = int(os.getenv("INDEX_TTS_TIMEOUT", "60"))  # 秒
+    INDEX_TTS_SUPPORTED_VOICES = ["default"]  # 根据实际支持情况修改
+
     # 确保模型目录存在
     os.makedirs(ASR_MODEL_DIR, exist_ok=True)
     os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
     os.makedirs(LLM_MODEL_DIR, exist_ok=True)
+    os.makedirs(EMBEDDING_MODEL_DIR, exist_ok=True)
     os.makedirs(VECTOR_DB_PATH, exist_ok=True)
     os.makedirs(DOCS_PATH, exist_ok=True)
+    os.makedirs(INDEX_TTS_MODEL_DIR, exist_ok=True)

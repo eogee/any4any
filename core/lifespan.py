@@ -7,14 +7,17 @@ from core.chat.delay_manager import delay_manager
 from config import Config
 from core.embedding.kb_server import initialize_kb_server_after_model
 
+# 全局IndexTTS引擎实例
+index_tts_engine_instance = None
+
 logger = logging.getLogger(__name__)
 
 async def lifespan(app: FastAPI):
     """模型生命周期管理"""
+    global index_tts_engine_instance
+    
     current_port = os.environ.get('CURRENT_PORT', str(Config.PORT))
     load_llm = current_port == str(Config.PORT) and current_port == '8888'
-    
-    logger.info(f"Initializing - PID: {os.getpid()}, Port: {current_port}, Load LLM: {load_llm}")
     
     # 初始化模型管理器
     await ModelManager.initialize(load_llm=load_llm)
@@ -38,6 +41,16 @@ async def lifespan(app: FastAPI):
     yield
     
     logger.info("Application shutting down...")
+    
+    # 清理IndexTTS-1.5引擎资源
+    if Config.INDEX_TTS_ENABLED:
+        try:
+            from core.tts.index_tts_engine import IndexTTSEngine
+            IndexTTSEngine.cleanup()
+            index_tts_engine_instance = None
+            logger.info("IndexTTS-1.5 engine cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up IndexTTS-1.5 engine: {str(e)}")
     
     # 清理LLM服务资源
     llm_service = ModelManager.get_llm_service()

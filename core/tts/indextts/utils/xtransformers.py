@@ -917,6 +917,16 @@ class AttentionLayers(nn.Module):
             past_key_values=None,
             expected_seq_len=None,
     ):
+        
+        # 转换旧格式的past_key_values到新的Cache格式
+        # 根据Transformers v4.53.0的警告，tuple形式的past_key_values将被移除
+        try:
+            from transformers.cache_utils import DynamicCache
+            if past_key_values is not None and isinstance(past_key_values, tuple):
+                past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+        except ImportError:
+            # 如果Transformers版本较旧，不支持DynamicCache，则继续使用旧格式
+            pass
 
         assert not (self.cross_attend ^ (exists(context) or exists(
             full_context))), 'context must be passed in if cross_attend is set to True'
