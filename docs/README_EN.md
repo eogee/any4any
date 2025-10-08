@@ -224,7 +224,7 @@ API Endpoint URL: `http://172.21.56.14:8888/v1` or `http://host.docker.internal:
 Configure the model path:
 ```
 # .env file
-EMBBEDING_MODEL_DIR = "/mnt/c/models/bge-small-zh-v1.5"  # Replace with your local Embedding model path
+EMBEDDING_MODEL_DIR = "/mnt/c/models/bge-small-zh-v1.5"  # Replace with your local Embedding model path
 ```
 
 Open the `OpenAI-API-compatible` plugin, click `Add Model`, and configure as follows:

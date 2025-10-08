@@ -92,7 +92,7 @@ git clone https://huggingface.co/BAAI/bge-reranker-base
 # 下载LLM模型：Qwen3-1.7B
 git clone https://huggingface.co/Qwen/Qwen3-1.7B
 
-# 下载Embbeding模型：bge-small-zh-v1.5
+# 下载Embedding模型：bge-small-zh-v1.5
 git clone https://huggingface.co/BAAI/bge-small-zh-v1.5
 ```
 
@@ -226,7 +226,7 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.interna
 配置模型路径：
 ```
 #.env文件
-EMBBEDING_MODEL_DIR = "/mnt/c/models/bge-small-zh-v1.5"  # 替换为你本地Embbding模型路径
+EMBEDDING_MODEL_DIR = "/mnt/c/models/bge-small-zh-v1.5"  # 替换为你本地Embbding模型路径
 ```
 
 同样打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：

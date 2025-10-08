@@ -23,3 +23,8 @@ settings.json
 # test
 test/
 rules/
+
+# build files
+dist/
+build/
+*.egg-info/

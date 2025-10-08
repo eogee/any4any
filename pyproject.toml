@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "any4any"
+description = "大模型会话、对话内容预览与修改、语音识别、文本转语音、文档重排、文本嵌入、知识库系统和MCP服务的一键式API服务"
+version = "0.1.1"
+authors = [
+    { name = "eogee", email = "eogee@qq.com" },
+]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["AI", "ML", "ASR", "LLM", "TTS", "RERANK", "EMBEDDING"]
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "edge-tts",
+    "torch==2.3",
+    "torchaudio",
+    "funasr>=1.1.3",
+    "fastapi>=0.111.1",
+    "uvicorn",
+    "python-dotenv",
+    "transformers==4.51.0",
+    "FlagEmbedding==1.2.3",
+    "pydantic>=2.0.0",
+    "mysql-connector-python>=8.1.0",
+    "FastMCP",
+    "dingtalk_stream",
+    "alibabacloud_dingtalk",
+    "numpy>=1.21.0",
+    "sentence-transformers>=2.2.0",
+    "requests>=2.25.0",
+    "PyPDF2>=1.27.0",
+    "python-docx>=0.8.11",
+    "chardet>=4.0.0",
+    "chromadb>=0.2.0",
+    "itsdangerous>=2.1.2",
+    "matplotlib",
+    "omegaconf",
+    "tqdm",
+    "pyyaml",
+    "deepspeed",
+    "sentencepiece",
+    "einops",
+    "scipy",
+    "soundfile",
+    "packaging",
+    "huggingface_hub",
+    "WeTextProcessing; platform_machine != 'Darwin'",
+    "wetext; platform_system == 'Darwin'",
+]
+
+[project.scripts]
+any4any = "cli:main"
+
+[project.urls]
+Homepage = "https://eogee.com"
+Source = "https://github.com/eogee/any4any"
+Documentation = "https://github.com/eogee/any4any/tree/master/docs"
+Issues = "https://github.com/eogee/any4any/issues"
+Repository = "https://github.com/eogee/any4any"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests", "tests.*", "*.tests", "*.tests.*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["${PYTHONPATH}", "."]
+testpaths = ["tests"]
