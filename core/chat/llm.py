@@ -75,7 +75,6 @@ class LLMService:
                 torch_dtype=torch.float16 if Config.USE_HALF_PRECISION else torch.float32,
                 low_cpu_mem_usage=Config.LOW_CPU_MEM_USAGE,
                 offload_folder="offload",
-                # offload_state_dict=Config.USE_HALF_PRECISION,
             ).eval()
 
     async def initialize_model(self):
@@ -170,26 +169,50 @@ class LLMService:
     def _build_prompt(self, user_message: str) -> str:
         """构建提示文本"""
         system_prompt = getattr(Config, 'LLM_PROMPT', '')
-        
+
         if Config.KNOWLEDGE_BASE_ENABLED and self.kb_server: # 知识库检索
             try:
                 retrieval_result = self.kb_server.retrieve_documents(user_message)
-                
+
                 if retrieval_result.get('success') and retrieval_result.get('has_results'):
-                    
+
                     knowledge_content = "\n\n[知识库检索结果]\n"
-                    
+
                     for i, doc in enumerate(retrieval_result.get('documents', []), 1):
                         content = doc.get('chunk_text', '')
                         file_name = doc.get('file_name', '未知文件')
                         knowledge_content += f"【资料{i}】来自文件：{file_name}\n"
                         knowledge_content += f"内容：{content}\n\n"
-                    
+
                     system_prompt += knowledge_content # 将知识库内容添加到system_prompt
 
             except Exception as e:
                 logger.error(f"Knowledge base retrieval error: {str(e)}")
-        
+
+        # 构建消息列表
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_message})
+
+        enable_thinking = not getattr(Config, 'NO_THINK', True)
+
+        try:
+            text = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=enable_thinking
+            )
+            logger.info(f"Using Qwen3 chat template with thinking mode: {enable_thinking}")
+            return text
+        except Exception as e:
+            logger.warning(f"Failed to apply chat template: {e}, falling back to manual format")
+
+            return self._manual_chat_format(system_prompt, user_message)
+
+    def _manual_chat_format(self, system_prompt: str, user_message: str) -> str:
+        """手动构建聊天格式"""
         if system_prompt:
             return f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
         else:

@@ -33,3 +33,12 @@ packaging               # 用于处理Python包的元数据
 huggingface_hub
 WeTextProcessing; platform_machine != "Darwin"
 wetext; platform_system == "Darwin"
+
+# sql_agent 依赖
+langchain>=0.1.0 
+langchain-openai>=0.0.5
+langgraph>=0.0.40
+langchain-community>=0.0.10
+sqlalchemy>=2.0.0
+sqlparse>=0.4.4
+termcolor>=1.1.0

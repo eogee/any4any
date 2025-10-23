@@ -68,7 +68,7 @@ class ModelManager:
                 cls.m.eval()
                 logger.info("ASR model loaded")
 
-            if load_tts and not cls.available_voices:
+            if load_tts and not cls.available_voices and Config.EDGE_TTS_ENABLED:
                 logger.info("Loading voices...")
                 voices_manager = await VoicesManager.create()
                 cls.available_voices = voices_manager.voices

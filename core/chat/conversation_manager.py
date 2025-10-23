@@ -98,6 +98,49 @@ class ConversationManager:
     
     def _generate_message_id(self):
         return str(uuid.uuid4())
+
+    def _truncate_conversation_history(self, messages):
+        """截断对话历史以控制token数量"""
+        if not getattr(Config, 'ENABLE_CONVERSATION_TRUNCATION', True):
+            return messages
+
+        max_messages = getattr(Config, 'MAX_CONVERSATION_MESSAGES', 20)
+        max_tokens = getattr(Config, 'MAX_CONVERSATION_TOKENS', 8000)
+
+        if not messages or len(messages) <= max_messages:
+            return messages
+
+        logger.info(f"Truncating conversation history from {len(messages)} to {max_messages} messages")
+
+        truncated_messages = messages[-max_messages:] # 保留最近的消息，确保是成对的对话
+
+        conversation_text = "\n".join([ # 进一步基于token数量截断
+            f"{msg['sender_type']}: {msg['content']}"
+            for msg in truncated_messages
+        ])
+
+        estimated_tokens = len(conversation_text) * 1.2 #中文字符*1.5 + 英文单词*1
+
+        if estimated_tokens > max_tokens:
+            logger.info(f"Further truncating based on token estimate: {estimated_tokens} > {max_tokens}")
+            
+            final_messages = [] # 从后往前逐条添加消息，直到不超过token限制
+            current_tokens = 0
+
+            for msg in reversed(truncated_messages):
+                msg_text = f"{msg['sender_type']}: {msg['content']}"
+                msg_tokens = len(msg_text) * 1.2
+
+                if current_tokens + msg_tokens > max_tokens and final_messages:
+                    break
+
+                final_messages.insert(0, msg)
+                current_tokens += msg_tokens
+
+            truncated_messages = final_messages
+            logger.info(f"Final truncated to {len(truncated_messages)} messages, estimated tokens: {current_tokens:.0f}")
+
+        return truncated_messages
     
     def _get_current_time(self):
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -282,13 +325,21 @@ class ConversationManager:
             if 'messages' not in conversation:
                 conversation['messages'] = []
             conversation['messages'].append(user_message)
-        
+
+        # 获取并截断对话历史
+        all_messages = conversation.get('messages', [])
+        truncated_messages = self._truncate_conversation_history(all_messages)
+
         # 生成对话历史
         conversation_history = "\n".join([
-            f"{msg['sender_type']}: {msg['content']}" 
-            for msg in conversation.get('messages', [])
+            f"{msg['sender_type']}: {msg['content']}"
+            for msg in truncated_messages
         ])
-        
+
+        # 记录截断信息
+        if len(all_messages) > len(truncated_messages):
+            logger.info(f"Conversation truncated for {sender}: {len(all_messages)} -> {len(truncated_messages)} messages")
+
         try:
             # 生成响应
             llm_response = await self.llm_service.generate_response(conversation_history)
@@ -402,13 +453,21 @@ class ConversationManager:
         if 'messages' not in conversation:
             conversation['messages'] = []
         conversation['messages'].append(user_message)
-        
+
+        # 获取并截断对话历史（流式处理也需要截断）
+        all_messages = conversation.get('messages', [])
+        truncated_messages = self._truncate_conversation_history(all_messages)
+
         # 生成对话历史
         conversation_history = "\n".join([
-            f"{msg['sender_type']}: {msg['content']}" 
-            for msg in conversation.get('messages', [])
+            f"{msg['sender_type']}: {msg['content']}"
+            for msg in truncated_messages
         ])
-        
+
+        # 记录截断信息
+        if len(all_messages) > len(truncated_messages):
+            logger.info(f"Stream conversation truncated for {sender}: {len(all_messages)} -> {len(truncated_messages)} messages")
+
         accumulated_response = ""
         
         try:

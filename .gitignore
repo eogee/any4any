@@ -28,3 +28,8 @@ rules/
 dist/
 build/
 *.egg-info/
+
+# claude
+.claude/
+CLAUDE.MD
+CLAUDE_zh.MD

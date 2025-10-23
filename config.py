@@ -23,9 +23,13 @@ class Config:
     # 认证配置
     API_KEY = os.getenv("API_KEY", "EMPTY")
     SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE", "1800"))                     # 会话有效期，单位为秒，默认为30分钟
+    MAX_CONVERSATION_MESSAGES = int(os.getenv("MAX_CONVERSATION_MESSAGES", "20"))          # 最大对话轮次（消息数量）
+    MAX_CONVERSATION_TOKENS = int(os.getenv("MAX_CONVERSATION_TOKENS", "8000"))            # 最大对话token数估算
+    ENABLE_CONVERSATION_TRUNCATION = os.getenv("ENABLE_CONVERSATION_TRUNCATION", "True").lower() == "true"  # 是否启用对话截断
     
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+    EDGE_TTS_ENABLED = os.getenv("EDGE_TTS_ENABLED", "False").lower() == "true"  # 是否启用edge-tts
     DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
     INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
     ASR_MODEL_DIR = os.getenv("ASR_MODEL_DIR", "/mnt/c/models/SenseVoiceSmall")
@@ -62,6 +66,13 @@ class Config:
     RERANK_ENABLED = os.getenv("RERANK_ENABLED", "True").lower() == "true"          # 是否启用重排序
     RERANK_CANDIDATE_FACTOR = int(os.getenv("RERANK_CANDIDATE_FACTOR", "10"))       # 重排序候选文档倍数
     RERANK_BATCH_SIZE = int(os.getenv("RERANK_BATCH_SIZE", "16"))                   # 重排序批处理大小
+
+    # IndexTTS-1.5引擎配置
+    INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"   # 是否启用IndexTTS-1.5引擎
+    INDEX_TTS_DEVICE = os.getenv("INDEX_TTS_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
+    INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))            # IndexTTS-1.5最大并发数
+    INDEX_TTS_TIMEOUT = int(os.getenv("INDEX_TTS_TIMEOUT", "60"))                   # IndexTTS-1.5超时时间，单位为秒
+    INDEX_TTS_SUPPORTED_VOICES = ["default"]                                        # IndexTTS-1.5支持的语音列表
     
     # MySQL数据库配置
     MYSQL_HOST = os.getenv("MYSQL_HOST", "172.21.48.1")
@@ -72,19 +83,32 @@ class Config:
 
     # 数据库功能配置
     QUERY_CLEANING = os.getenv("QUERY_CLEANING", "True").lower() == "true"          # 是否启用数据库查询清理功能
+
+    # SQL Agent配置
+    SQL_AGENT_ENABLED = os.getenv("SQL_AGENT_ENABLED", "True").lower() == "true"
+    SQL_AGENT_MAX_TURNS = int(os.getenv("SQL_AGENT_MAX_TURNS", "5"))
+    SQL_AGENT_TABLE_INFO_TRUNCATE = int(os.getenv("SQL_AGENT_TABLE_INFO_TRUNCATE", "2048"))
+    SQL_AGENT_EXECUTION_TRUNCATE = int(os.getenv("SQL_AGENT_EXECUTION_TRUNCATE", "2048"))
+    SQL_AGENT_DEBUG = os.getenv("SQL_AGENT_DEBUG", "False").lower() == "true"
+
+    # SQL Agent LLM配置
+    SQL_AGENT_MODEL_PROVIDER = os.getenv("SQL_AGENT_MODEL_PROVIDER", "openai")
+    SQL_AGENT_TEMPERATURE = float(os.getenv("SQL_AGENT_TEMPERATURE", "0.0"))
+    SQL_AGENT_MAX_TOKENS = int(os.getenv("SQL_AGENT_MAX_TOKENS", "2048"))
+
+    # SQL数据库配置 (复用现有MySQL配置)
+    SQL_DB_TYPE = os.getenv("SQL_DB_TYPE", "mysql")
+    SQL_DB_HOST = MYSQL_HOST  # 复用现有MySQL配置
+    SQL_DB_PORT = MYSQL_PORT  # 复用现有MySQL配置
+    SQL_DB_USERNAME = MYSQL_USER  # 复用现有MySQL配置
+    SQL_DB_PASSWORD = MYSQL_PASSWORD  # 复用现有MySQL配置
+    SQL_DB_DATABASE = MYSQL_DATABASE  # 复用现有MySQL配置
     
     # 钉钉配置
     CLIENT_ID = os.getenv("CLIENT_ID", "")
     CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
     ROBOT_CODE = os.getenv("ROBOT_CODE", "")
     DINGTALK_PORT = os.getenv("DINGTALK_PORT", "6666")
-
-    # IndexTTS-1.5引擎配置
-    INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"   # 是否启用IndexTTS-1.5引擎
-    INDEX_TTS_DEVICE = os.getenv("INDEX_TTS_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
-    INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))            # IndexTTS-1.5最大并发数
-    INDEX_TTS_TIMEOUT = int(os.getenv("INDEX_TTS_TIMEOUT", "60"))                   # IndexTTS-1.5超时时间，单位为秒
-    INDEX_TTS_SUPPORTED_VOICES = ["default"]                                        # IndexTTS-1.5支持的语音列表
 
     # 确保目录存在
     os.makedirs(ASR_MODEL_DIR, exist_ok=True)
