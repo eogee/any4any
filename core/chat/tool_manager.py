@@ -19,8 +19,8 @@ class ToolResult:
             "metadata": self.metadata
         }
 
-class ToolServer:
-    """工具服务器 - 用于SQL问题识别"""
+class ToolManager:
+    """工具管理器 - 用于SQL问题识别"""
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -157,12 +157,12 @@ class ToolServer:
 
         return has_sql_keywords or has_data_question
 
-# 全局工具服务器实例
-_tool_server_instance = None
+# 全局工具管理器实例
+_tool_manager_instance = None
 
-def get_tool_server() -> ToolServer:
-    """获取工具服务器单例实例"""
-    global _tool_server_instance
-    if _tool_server_instance is None:
-        _tool_server_instance = ToolServer()
-    return _tool_server_instance
+def get_tool_manager() -> ToolManager:
+    """获取工具管理器单例实例"""
+    global _tool_manager_instance
+    if _tool_manager_instance is None:
+        _tool_manager_instance = ToolManager()
+    return _tool_manager_instance

@@ -38,7 +38,7 @@ class LLMService:
         self.active_generations = {}
         self.active_queues = []
         self._kb_server = None  # 延迟初始化，不在构造函数中立即获取
-        self._tool_server = None  # 工具服务器实例
+        self._tool_manager = None  # 工具管理器实例
         self._tools_enabled = getattr(Config, 'TOOLS_ENABLED', True)  # 是否启用工具
     
     @property
@@ -53,15 +53,15 @@ class LLMService:
         return self._kb_server
 
     @property
-    def tool_server(self):
-        """延迟获取工具服务器实例"""
-        if self._tool_server is None and self._tools_enabled:
+    def tool_manager(self):
+        """延迟获取工具管理器实例"""
+        if self._tool_manager is None and self._tools_enabled:
             try:
-                from core.chat.tool_server import get_tool_server
-                self._tool_server = get_tool_server()
+                from core.chat.tool_manager import get_tool_manager
+                self._tool_manager = get_tool_manager()
             except Exception as e:
-                logger.error(f"Tool server init error: {e}")
-        return self._tool_server
+                logger.error(f"Tool manager init error: {e}")
+        return self._tool_manager
 
     def load_model(self, model_path, device=None):
         """加载模型并自动选择设备"""
@@ -323,12 +323,12 @@ class LLMService:
 
     async def process_with_tools(self, user_message: str) -> str:
         """使用工具处理用户消息"""
-        if not self._tools_enabled or not self.tool_server:
+        if not self._tools_enabled or not self.tool_manager:
             return await self.generate_response(user_message)
 
         try:
             # 检查是否是SQL查询问题 - 使用新的NL2SQL工作流
-            if self.tool_server.is_sql_question(user_message):
+            if self.tool_manager.is_sql_question(user_message):
                 from core.tools.nl2sql.workflow import get_nl2sql_workflow
 
                 workflow = get_nl2sql_workflow()
@@ -488,7 +488,7 @@ class LLMService:
 
         for tool_name in tool_names:
             try:
-                result = await self.tool_server.execute_tool(tool_name, {})
+                result = await self.tool_manager.execute_tool(tool_name, {})
 
                 tool_results.append({
                     "tool": tool_name,
@@ -574,11 +574,11 @@ class LLMService:
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """获取可用工具列表"""
-        if not self._tools_enabled or not self.tool_server:
+        if not self._tools_enabled or not self.tool_manager:
             return []
 
         try:
-            tools = self.tool_server.get_tool_list()
+            tools = self.tool_manager.get_tool_list()
             return tools
         except Exception as e:
             logger.error(f"Get available tools error: {e}")
