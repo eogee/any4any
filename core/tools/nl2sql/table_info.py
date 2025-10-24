@@ -183,15 +183,9 @@ class DatabaseTableManager:
             'successful_count': len(schemas)
         }
 
-# 全局实例
-_table_manager = None
-
 def get_table_manager() -> DatabaseTableManager:
-    """获取全局表管理器实例"""
-    global _table_manager
-    if _table_manager is None:
-        _table_manager = DatabaseTableManager()
-    return _table_manager
+    """获取表管理器实例"""
+    return DatabaseTableManager()
 
 def get_all_tables() -> Dict[str, Any]:
     """

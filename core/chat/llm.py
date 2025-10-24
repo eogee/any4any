@@ -478,13 +478,7 @@ class LLMService:
 
         for tool_name in tool_names:
             try:
-                if tool_name == "sql_query":
-                    result = await self.tool_server.execute_tool(
-                        tool_name,
-                        {"question": user_message}
-                    )
-                else:
-                    result = await self.tool_server.execute_tool(tool_name, {})
+                result = await self.tool_server.execute_tool(tool_name, {})
 
                 tool_results.append({
                     "tool": tool_name,

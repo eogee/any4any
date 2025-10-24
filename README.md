@@ -11,16 +11,36 @@
 
 **核心功能**：启动运行本项目后，您可以将几乎所有类型模型以openai-api兼容接口形式暴露，可被任何模型管理应用添加，可追踪用户对话历史，具体功能模块介绍如下：
 
-- 会话管理：支持多平台与LLM会话管的理，可将本地模型以openai-api兼容接口形式暴露，可被任何模型管理应用添加，可追踪用户对话历史
+- 会话管理：支持多平台与LLM会话管理，可将本地模型以openai-api兼容接口形式暴露，可被任何模型管理应用添加，可追踪用户对话历史
 - 预览模式：支持LLM响应内容预览和编辑功能
 - 钉钉机器人：支持钉钉机器人消息处理
 - 语音转录：将音频文件转换为文本（支持多种语言）
-- 文本转语音：将文本转换为语音文件（支持多种语音风格）：默认使用`zh-CN-XiaoyiNeural`音色
-- 知识库：提供独立的embbeding和rerank能力，可基于ChromaDB向量数据库构建知识库系统
+- 文本转语音：将文本转换为语音文件，支持edge-tts和IndexTTS-1.5引擎，提供多种语音风格
+- **智能SQL查询**：自然语言到SQL转换，用户可用中文直接查询数据库，系统自动生成并执行SQL语句
+- 知识库：提供独立的embedding和rerank能力，可基于ChromaDB向量数据库构建知识库系统
 - MCP服务：支持构建MCP工具、接口，可在任意MCP客户端调用
 - API文档：自动生成API使用说明，可通过浏览器访问：http://localhost:8888/docs#/
 
 ## 更新内容
+
+**2025.10.24(V0.1.2)：新增智能SQL查询和IndexTTS-1.5支持**
+
+新增：
+- **NL2SQL智能查询系统**：基于LLM的自然语言到SQL转换功能
+  - 支持用户用中文直接提问，系统自动识别SQL查询需求
+  - 智能获取相关数据库表结构信息
+  - LLM基于表结构生成准确的SQL查询语句
+  - 安全的SQL执行环境，仅允许SELECT查询确保数据库安全
+  - 智能格式化查询结果并生成自然语言回答
+  - 完整的6步工作流程：问题识别→表结构获取→SQL生成→查询执行→结果格式化→回答生成
+  - [NL2SQL智能查询系统说明文档](./docs/zh/NL2SQL智能查询系统说明文档.md)
+
+- **IndexTTS-1.5语音引擎支持**：新增高质量的本地TTS引擎
+  - 支持IndexTTS-1.5模型，提供更自然的语音合成效果
+  - 多种音色和语音风格选择
+  - 与edge-tts引擎并存，用户可选择不同的TTS引擎
+  - 优化的音频生成和处理流程
+  - [TTS实现与集成说明文档.md](./docs/zh/TTS实现与集成说明文档.md)
 
 **2025.10.08(V0.1.1)：新增嵌入模型（Embedding）模块**
 
@@ -46,15 +66,6 @@
 更新：
 - 重塑了项目结构，新增data_models模块用于管理数据模型，新增servers模块用于管理服务，新增static目录用于管理静态文件
 
-**2025.5.24(V0.0.6)：新增支持构建MCP服务**
-
-新增：
-- MCP工具构建：可在`core/mcp_tools.py`中任意添加MCP工具，默认提供了两个整数的加、减、乘和除的计算
-- MCP工具注册：在`app.py`中引入对应的模块，如`from core.mcp_tools import add, sub, mul, div`，并在`mcp.tool()`函数中注册
-- MCP服务服务启动：运行启动命令：`python cli.py`或`a4a-run`，服务将运行在: http://localhost:9999/sse
-
-dify工作流文件:[mcp_test.yml](./workflows/dify_workflows/mcp_test.yml)
-
 ## 前置环境要求
 
 - WSL2 (Windows Subsystem for Linux)：Windows系统下的必要条件
@@ -78,6 +89,8 @@ git clone https://gitcode.com/eogee/any4any.git
 
 ### 2.下载模型
 
+推荐前往网盘一站式获取所有模型：https://pan.quark.cn/s/c65799f2cb93
+
 ```bash
 # 确认已安装git-lfs (https://git-lfs.com)，用于下载大文件
 # 您可在huggingface.co/modelscoup.com/hf-mirror.com站点中下载模型，此处以huggingface.co为例
@@ -94,6 +107,9 @@ git clone https://huggingface.co/Qwen/Qwen3-1.7B
 
 # 下载Embedding模型：bge-small-zh-v1.5
 git clone https://huggingface.co/BAAI/bge-small-zh-v1.5
+
+# 下载IndexTTS-1.5模型
+https://hf-mirror.com/IndexTeam/IndexTTS-1.5
 ```
 
 ### 3. 创建conda环境
@@ -125,10 +141,30 @@ cp .env.example .env
 ```
 
 编辑`.env`文件，配置以下内容：
-- 数据库连接信息
-- 模型路径
+- 数据库连接信息（包括SQL数据库配置用于NL2SQL功能）
+- 模型路径（包括IndexTTS-1.5模型路径）
 - API密钥
+- 工具系统配置（启用NL2SQL智能查询功能）
 - 其他自定义配置
+
+**重要配置项**：
+```bash
+# 数据库配置（NL2SQL功能需要）
+SQL_DB_TYPE=mysql
+SQL_DB_HOST=localhost
+SQL_DB_PORT=3306
+SQL_DB_USERNAME=root
+SQL_DB_PASSWORD=root
+SQL_DB_DATABASE=your_database_name
+
+# IndexTTS-1.5模型配置（可选）
+TTS_MODEL_DIR=/path/to/Index-1.5-Voice
+
+# 工具系统配置
+TOOLS_ENABLED=true
+TOOLS_DEBUG=false
+TOOLS_TIMEOUT=30
+```
 
 ### 6. 启动服务
 
@@ -148,7 +184,7 @@ a4a-run
 - MCP服务: http://localhost:9999
 - 钉钉服务: http://localhost:6666
 
-### 7. 其他模型平台应用内容添加并调用模型（此处以Dify为例子）
+### 7. 其他模型平台应用内容添加并调用模型（此处以Dify为例）
 
 **7.1查看宿主机的ip地址**
 
@@ -163,6 +199,8 @@ eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
 
 启动Docker并保证dify服务正常运行。
 将插件`langgenius-openai_api_compatible_0.0.16.difypkg`导入并安装至dify中。
+
+**edge-tts引擎配置**：
 打开`OpenAI-API-compatible`插件，点击`添加模型`，配置内容如下：
 ```
 模型类型：TTS
@@ -171,6 +209,21 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.interna
 API Key：EMPTY
 可用声音（用英文逗号分隔）：zh-CN-XiaoyiNeural
 其他可空余不填
+```
+
+**IndexTTS-1.5引擎配置**（如果下载了IndexTTS-1.5模型）：
+配置模型路径：
+```
+#.env文件
+TTS_MODEL_DIR=/mnt/c/models/Index-1.5-Voice  # 替换为你本地IndexTTS模型路径
+```
+
+添加IndexTTS模型：
+```
+模型类型：TTS
+模型名称：IndexTTS-1.5
+API Key：EMPTY
+API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.internal:8888/v1`
 ```
 
 **7.3导入ASR模型**
@@ -239,9 +292,38 @@ API endpoint URL：`http://172.21.56.14:8888/v1` 或 `http://host.docker.interna
 
 **7.7设置为默认模型**
 
-在右上角`系统模型设置`中的最下方，将`文本转语音模型`设置为`edge-tts`，将`语音识别模型`设置为`SenseVoiceSmall`，将`文档重排模型`设置为`bge-reranker-base`，将`语言模型`设置为`Qwen3-1.7B`，将`嵌入模型`设置为`bge-small-zh-v1.5`，保存设置。
+在右上角`系统模型设置`中的最下方，将：
+- `文本转语音模型`设置为`edge-tts`或`IndexTTS-1.5`
+- `语音识别模型`设置为`SenseVoiceSmall`
+- `文档重排模型`设置为`bge-reranker-base`
+- `语言模型`设置为`Qwen3-1.7B`
+- `嵌入模型`设置为`bge-small-zh-v1.5`
 
-**7.8使用模型**
+保存设置。
+
+**7.8使用NL2SQL智能查询功能**
+
+系统会自动识别用户的SQL查询需求，当您在对话中提出数据查询问题时，系统将：
+
+1. **自动识别SQL问题**：如"有多少订单？"、"查询产品平均价格"等
+2. **智能获取表结构**：根据问题自动获取相关的数据库表结构信息
+3. **生成SQL查询**：LLM基于表结构生成准确的SQL语句
+4. **安全执行查询**：在安全环境中执行SQL，仅允许SELECT查询
+5. **返回自然语言回答**：将查询结果转换为自然语言回答
+
+**使用示例**：
+```
+用户: 有多少订单？
+系统: 根据查询结果，目前共有15个订单。
+
+用户: 查询所有产品的平均价格
+系统: 所有产品的平均价格为258.50元。
+
+用户: 统计每个分类的产品数量
+系统: 各分类产品数量统计如下：电子产品有8个，家居用品有12个，服装类有5个。
+```
+
+**7.9使用模型**
 
 添加任意一个`chatflow`，进入工作流内容后在右上角`功能`，找到`文字转语音`和`语音转文字`功能，配置我们添加好的模型，将`自动播放`打开，然后对话即可。
 
@@ -289,18 +371,17 @@ any4any/
 │   ├── asr/                  # 语音识别模块
 │   │   └── transcription.py  # 音频转录实现
 │   ├── auth/                 # 认证模块
-│   │   └── model_auth.py     # 模型认证实现
 │   ├── chat/                 # 聊天相关模块
 │   │   ├── conversation_database.py  # 会话数据库操作
 │   │   ├── conversation_manager.py   # 会话管理器
 │   │   ├── delay_manager.py          # 延迟管理器
 │   │   ├── llm.py            # 大语言模型接口
 │   │   ├── openai_api.py     # OpenAI API兼容接口
-│   │   └── preview.py        # 预览功能实现
+│   │   ├── preview.py        # 预览功能实现
+│   │   ├── sql_tools.py      # SQL工具集成
+│   │   └── tool_server.py    # 工具服务器（SQL问题识别）
 │   ├── database/             # 数据库模块
-│   │   └── database.py       # 数据库连接和查询实现
 │   ├── dingtalk/             # 钉钉机器人模块
-│   │   └── message_manager.py # 钉钉消息处理
 │   ├── embedding/           # 嵌入模型模块
 │   │   ├── document_processor.py # 文档处理器
 │   │   ├── embedding_manager.py  # 嵌入管理器
@@ -309,26 +390,27 @@ any4any/
 │   │   ├── retrieval_engine.py   # 检索引擎
 │   │   └── vector_store.py       # 向量存储
 │   ├── lifespan.py           # 应用生命周期管理
-│   ├── log.py                # 日志管理
 │   ├── mcp/                  # MCP协议模块
-│   │   └── mcp_tools.py      # MCP工具实现
 │   ├── rerank/               # 文档重排模块
-│   │   └── rerank.py         # 文档重排实现
+│   ├── tools/                # 工具模块
+│   │   └── nl2sql/           # NL2SQL智能查询工具
+│   │       ├── table_info.py # 表信息获取工具
+│   │       ├── sql_executor.py # SQL生成和执行工具
+│   │       └── workflow.py   # NL2SQL工作流程管理
 │   ├── tts/                  # 文本转语音模块
-│   │   ├── file.py           # 音频文件处理
+│   │   ├── indextts/         # IndexTTS-1.5引擎
+│   │   │   └── infer.py      # IndexTTS推理实现
 │   │   └── speech.py         # 语音合成实现
 │   └── model_manager.py      # 模型管理器
 ├── data_models/              # 数据模型定义
-├── servers/                  # 服务器模块
+├── servers/                  # 网络服务模块
 ├── static/                   # 静态资源文件
 ├── utils/                    # 工具模块
 ├── workflows/                # 工作流和外部衔接插件
 ├── app.py                    # 应用入口文件
 ├── cli.py                    # 命令行接口
 ├── config.py                 # 配置文件
-├── requirements.txt          # 依赖包列表
 ├── any4any.sql               # 数据库初始化脚本
-├── a4a-run.sh                # 启动脚本
 └── .env.example              # 环境变量示例文件
 
 ```
@@ -336,6 +418,7 @@ any4any/
 ## 相关开源项目
 
 - edge-tts：https://github.com/rany2/edge-tts
+- IndexTTS-1.5：https://huggingface.co/IndexTeam/IndexTTS-1.5
 - SenseVoice：https://github.com/FunAudioLLM/SenseVoice
 - bge-reranker-base：https://huggingface.co/BAAI/bge-reranker-base
 - bge-small-zh-v1.5：https://huggingface.co/BAAI/bge-small-zh-v1.5
@@ -351,6 +434,7 @@ any4any/
 - 接入更多即时通讯服务商
 - 增强前端界面，提供更友好的用户体验
 - 增加更多TTS和ASR模型的支持
+- 扩展NL2SQL功能，支持更多数据库类型
 - 增加其他接口和服务
 
 ## 联系我们

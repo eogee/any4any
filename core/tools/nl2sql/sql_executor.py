@@ -201,15 +201,9 @@ class SQLExecutor:
                 'formatted_output': f'SQL执行失败: {str(e)}'
             }
 
-# 全局实例
-_sql_executor = None
-
 def get_sql_executor() -> SQLExecutor:
-    """获取全局SQL执行器实例"""
-    global _sql_executor
-    if _sql_executor is None:
-        _sql_executor = SQLExecutor()
-    return _sql_executor
+    """获取SQL执行器实例"""
+    return SQLExecutor()
 
 async def generate_and_execute_sql(question: str, table_schemas: str, context: str = "") -> Dict[str, Any]:
     """
