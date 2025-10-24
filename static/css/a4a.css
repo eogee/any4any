@@ -7,14 +7,14 @@
 }
 
 :root {
-    --primary: #0066cc;
+    --primary: #16baaa;
     --secondary: #7e22ce;
     --light-bg: #f8fafc;
     --lighter-bg: #ffffff;
     --card-bg: rgba(255, 255, 255, 0.9);
     --text-primary: #1e293b;
     --text-secondary: #64748b;
-    --user-msg: rgba(0, 102, 204, 0.08);
+    --user-msg: rgba(22, 186, 170, 0.08);
     --border: #e2e8f0;
     --shadow: rgba(0, 0, 0, 0.05);
 }
@@ -34,8 +34,8 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background: 
-        radial-gradient(circle at 20% 80%, rgba(0, 102, 204, 0.03) 0%, transparent 50%),
+    background:
+        radial-gradient(circle at 20% 80%, rgba(22, 186, 170, 0.03) 0%, transparent 50%),
         radial-gradient(circle at 80% 20%, rgba(126, 34, 206, 0.03) 0%, transparent 50%);
     z-index: -1;
 }
@@ -62,7 +62,7 @@ body::before {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    text-shadow: 0 0 10px rgba(0, 102, 204, 0.2);
+    text-shadow: 0 0 10px rgba(22, 186, 170, 0.2);
     margin-bottom: 10px;
     letter-spacing: 1px;
 }
@@ -253,7 +253,7 @@ body::before {
 }
 
 .layui-btn-normal {
-    background: linear-gradient(90deg, var(--primary), #0052a3);
+    background: linear-gradient(90deg, var(--primary), #149a8c);
 }
 
 .layui-btn-normal:hover {
@@ -261,30 +261,30 @@ body::before {
 }
 
 .layui-input:focus {
-    border-color: #0066cc !important;
-    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15) !important;
+    border-color: #16baaa !important;
+    box-shadow: 0 0 0 3px rgba(22, 186, 170, 0.15) !important;
     transition: all 0.3s ease !important;
 }
 
 .layui-textarea:focus {
-    border-color: #0066cc !important;
-    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15) !important;
+    border-color: #16baaa !important;
+    box-shadow: 0 0 0 3px rgba(22, 186, 170, 0.15) !important;
     transition: all 0.3s ease !important;
 }
 
 .layui-select:focus {
-    border-color: #0066cc !important;
-    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15) !important;
+    border-color: #16baaa !important;
+    box-shadow: 0 0 0 3px rgba(22, 186, 170, 0.15) !important;
     transition: all 0.3s ease !important;
 }
 
 .layui-form-checkbox:focus-within {
-    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1) !important;
+    box-shadow: 0 0 0 3px rgba(22, 186, 170, 0.1) !important;
     border-radius: 2px;
 }
 
 .layui-form-radio:focus-within {
-    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1) !important;
+    box-shadow: 0 0 0 3px rgba(22, 186, 170, 0.1) !important;
     border-radius: 50%;
 }
 
@@ -574,7 +574,7 @@ body::before {
 }
 
 .request-table th {
-    background: #0052a3;
+    background: #149a8c;
     color: white;
     padding: 12px;
     text-align: left;
@@ -601,7 +601,7 @@ body::before {
 }
 
 .request-table tr:hover {
-    background: rgba(0, 102, 204, 0.05);
+    background: rgba(22, 186, 170, 0.05);
 }
 
 .request-table .loading-state {
@@ -725,7 +725,7 @@ body::before {
 
 .login-form .layui-input:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+    box-shadow: 0 0 0 2px rgba(22, 186, 170, 0.1);
 }
 
 .form-icon {
@@ -738,7 +738,7 @@ body::before {
 }
 
 .login-btn {
-    background: linear-gradient(90deg, var(--primary), #0052a3);
+    background: linear-gradient(90deg, var(--primary), #149a8c);
     border: none;
     height: 42px;
     line-height: 42px;

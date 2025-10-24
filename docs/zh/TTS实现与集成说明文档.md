@@ -108,7 +108,7 @@ async def create_speech(
         # 获取请求数据
         data = await request.json()
         text = data.get("input", "")
-        voice = data.get("voice", str(Config.DEFAULT_VOICE))
+        voice = data.get("voice", str(Config.EDGE_DEFAULT_VOICE))
         
         # 文本过滤
         text = filter_special_chars(text)
@@ -325,7 +325,7 @@ TTS API接收JSON格式的请求体，包含以下字段：
 | 字段名 | 类型 | 必填 | 说明 |
 |-------|------|------|------|
 | input | string | 是 | 需要转换为语音的文本内容 |
-| voice | string | 否 | 指定使用的声音标识符，默认为配置中的DEFAULT_VOICE |
+| voice | string | 否 | 指定使用的声音标识符，默认为配置中的EDGE_DEFAULT_VOICE |
 
 **请求示例：**
 ```json
@@ -354,7 +354,7 @@ TTS模块的配置参数在`config.py`中定义：
 # config.py中的TTS相关配置
 
 # 默认声音配置
-DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
+EDGE_DEFAULT_VOICE = os.getenv("EDGE_DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
 
 # IndexTTS-1.5引擎配置
 INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"

@@ -42,57 +42,14 @@
         </div>
     </div>
     
+    <!-- 引入公共函数库 -->
+    <script src="/static/js/index/common/api-service.js"></script>
+    <script src="/static/js/index/common/ui-utils.js"></script>
+
+    <!-- 引入登录控制器 -->
+    <script src="/static/js/index/login.js"></script>
+
+    <!-- 引入第三方库 -->
     <script src="/static/layui/layui.js"></script>
-    <script>
-        layui.use(['form', 'layer'], function() {
-            const form = layui.form;
-            const layer = layui.layer;
-            
-            form.verify({
-                username: function(value) {
-                    if (value.length < 3 || value.length > 50) {
-                        return '用户名长度3-50个字符';
-                    }
-                },
-                password: function(value) {
-                    if (value.length < 6 || value.length > 50) {
-                        return '密码长度6-50个字符';
-                    }
-                }
-            });
-            
-            form.on('submit(login)', function(data) {
-                const loading = layer.load(2, {
-                    shade: [0.3, '#fff'],
-                    content: '登录中...'
-                });
-                
-                fetch('/auth/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data.field)
-                })
-                .then(response => {
-                    layer.close(loading);
-                    if (!response.ok) throw new Error('网络错误');
-                    return response.json();
-                })
-                .then(result => {
-                    if (result.success) {
-                        layer.msg('登录成功', {icon: 1, time: 1500});
-                        setTimeout(() => window.location.href = '/index', 1500);
-                    } else {
-                        layer.msg(result.message || '登录失败', {icon: 2});
-                    }
-                })
-                .catch(error => {
-                    layer.close(loading);
-                    layer.msg('登录失败，请重试', {icon: 2});
-                });
-                
-                return false;
-            });
-        });
-    </script>
 </body>
 </html>

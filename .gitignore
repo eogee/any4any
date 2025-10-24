@@ -31,5 +31,8 @@ build/
 
 # claude
 .claude/
-CLAUDE.MD
-CLAUDE_zh.MD
+CLAUDE.md
+CLAUDE_zh.md
+
+# code_rules
+CODE_GUIDELINES.md

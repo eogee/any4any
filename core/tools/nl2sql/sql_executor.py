@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 from sqlalchemy import create_engine, text
 from config import Config
 

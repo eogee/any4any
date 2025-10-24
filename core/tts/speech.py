@@ -27,7 +27,7 @@ async def create_speech(
     try:
         data = await request.json()
         text = data.get("input", "")
-        voice = data.get("voice", str(Config.DEFAULT_VOICE))
+        voice = data.get("voice", str(Config.EDGE_DEFAULT_VOICE))
         
         text = filter_special_chars(text)
 

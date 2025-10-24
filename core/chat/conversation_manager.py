@@ -334,8 +334,9 @@ class ConversationManager:
         ])
         
         try:
-            # 生成响应 - 使用新的NL2SQL工具处理
-            if hasattr(self.llm_service, 'process_with_tools'):
+            # 生成响应 - 检查是否启用工具
+            if (hasattr(self.llm_service, 'process_with_tools') and
+                getattr(self.llm_service, '_tools_enabled', False)):
                 response_text = await self.llm_service.process_with_tools(content)
             else:
                 response_text = await self.llm_service.generate_response(conversation_history)
@@ -464,10 +465,12 @@ class ConversationManager:
         accumulated_response = ""
         
         try:
-            # 检查是否支持工具调用
-            if hasattr(self.llm_service, 'process_with_tools'):
+            # 检查是否启用工具调用
+            if (hasattr(self.llm_service, 'process_with_tools') and
+                getattr(self.llm_service, '_tools_enabled', False)):
                 # 对于流式处理，先获取完整响应，然后分段返回
                 full_response = await self.llm_service.process_with_tools(content)
+                accumulated_response = full_response
 
                 # 模拟流式输出 - 分段返回响应
                 words = full_response.split()

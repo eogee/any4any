@@ -30,7 +30,16 @@ class Config:
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
     EDGE_TTS_ENABLED = os.getenv("EDGE_TTS_ENABLED", "False").lower() == "true"  # 是否启用edge-tts
-    DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
+    EDGE_DEFAULT_VOICE = os.getenv("EDGE_DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
+
+    # 模型按需加载配置 (默认不加载，只在首次调用时加载)
+    INDEX_TTS_MODEL_ENABLED = os.getenv("INDEX_TTS_MODEL_ENABLED", "False").lower() == "true"  # 是否启用IndexTTS-1.5模型
+    ASR_MODEL_ENABLED = os.getenv("ASR_MODEL_ENABLED", "False").lower() == "true"           # 是否启用ASR模型
+    RERANK_MODEL_ENABLED = os.getenv("RERANK_MODEL_ENABLED", "False").lower() == "true"     # 是否启用Rerank模型
+    EMBEDDING_MODEL_ENABLED = os.getenv("EMBEDDING_MODEL_ENABLED", "False").lower() == "true" # 是否启用Embedding模型
+    LLM_MODEL_ENABLED = os.getenv("LLM_MODEL_ENABLED", "False").lower() == "true"           # 是否启用LLM模型
+
+    # 模型路径配置 (按需加载的模型路径)
     INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
     ASR_MODEL_DIR = os.getenv("ASR_MODEL_DIR", "/mnt/c/models/SenseVoiceSmall")
     RERANK_MODEL_DIR = os.getenv("RERANK_MODEL_DIR", "/mnt/c/models/bge-reranker-base")

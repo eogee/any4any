@@ -24,6 +24,9 @@ async def rerank_documents(
             return {"results": []}
 
         reranker = ModelManager.get_reranker()
+        if reranker is None:
+            raise HTTPException(status_code=503, detail="Rerank model not available")
+
         pairs = [[docs.query, doc] for doc in docs.documents]
         scores = reranker.compute_score(pairs)
         

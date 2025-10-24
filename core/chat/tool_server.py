@@ -1,13 +1,7 @@
-import json
 import logging
-import asyncio
-from typing import Dict, Any, List, Optional, Callable, Union
-from dataclasses import dataclass
-from enum import Enum
-import inspect
+from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
-
 
 class ToolResult:
     """工具执行结果"""
@@ -30,6 +24,100 @@ class ToolServer:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self._tools = self._initialize_tools()
+
+    def _initialize_tools(self) -> List[Dict[str, Any]]:
+        """初始化工具列表"""
+        return [
+            {
+                "name": "sql_query",
+                "description": "执行SQL查询，用于数据库操作和数据分析",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "要执行的SQL查询语句"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        ]
+
+    def get_tool_list(self) -> List[Dict[str, Any]]:
+        """获取可用工具列表"""
+        return self._tools
+
+    async def execute_tool(self, tool_name: str, parameters: Dict[str, Any]) -> ToolResult:
+        """
+        执行指定的工具
+
+        参数:
+            tool_name: 工具名称
+            parameters: 工具参数
+
+        返回:
+            工具执行结果
+        """
+        try:
+            if tool_name == "sql_query":
+                return await self._execute_sql_query(parameters.get("query", ""))
+            else:
+                return ToolResult(
+                    success=False,
+                    error=f"未知工具: {tool_name}",
+                    metadata={"tool_name": tool_name}
+                )
+        except Exception as e:
+            self.logger.error(f"Tool execution error '{tool_name}': {e}")
+            return ToolResult(
+                success=False,
+                error=f"工具执行失败: {str(e)}",
+                metadata={"tool_name": tool_name}
+            )
+
+    async def _execute_sql_query(self, query: str) -> ToolResult:
+        """
+        执行SQL查询
+
+        参数:
+            query: SQL查询语句
+
+        返回:
+            查询结果
+        """
+        try:
+            # 安全检查：只允许SELECT查询
+            if not query.strip().upper().startswith('SELECT'):
+                return ToolResult(
+                    success=False,
+                    error="出于安全考虑，只允许执行SELECT查询",
+                    metadata={"query": query}
+                )
+
+            # 导入SQL执行器
+            from core.tools.nl2sql.sql_executor import sql_executor
+
+            # 执行查询
+            result = await sql_executor.execute_query(query)
+
+            return ToolResult(
+                success=True,
+                data=result,
+                metadata={
+                    "query": query,
+                    "type": "sql_query"
+                }
+            )
+
+        except Exception as e:
+            self.logger.error(f"SQL query execution error: {e}")
+            return ToolResult(
+                success=False,
+                error=f"SQL查询执行失败: {str(e)}",
+                metadata={"query": query}
+            )
 
     def is_sql_question(self, question: str) -> bool:
         """
@@ -78,5 +166,3 @@ def get_tool_server() -> ToolServer:
     if _tool_server_instance is None:
         _tool_server_instance = ToolServer()
     return _tool_server_instance
-
-

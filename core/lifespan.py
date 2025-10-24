@@ -19,8 +19,15 @@ async def lifespan(app: FastAPI):
     current_port = os.environ.get('CURRENT_PORT', str(Config.PORT))
     load_llm = current_port == str(Config.PORT) and current_port == '8888'
     
-    # 初始化模型管理器
-    await ModelManager.initialize(load_llm=load_llm)
+    # 初始化模型管理器（根据配置项决定加载哪些模型）
+    await ModelManager.initialize(
+        load_llm=load_llm and Config.LLM_MODEL_ENABLED,
+        load_asr=Config.ASR_MODEL_ENABLED,
+        load_reranker=Config.RERANK_MODEL_ENABLED,
+        load_tts=Config.EDGE_TTS_ENABLED,
+        load_embedding=Config.EMBEDDING_MODEL_ENABLED,
+        load_index_tts=Config.INDEX_TTS_MODEL_ENABLED
+    )
     
     # 初始化知识库服务
     if Config.KNOWLEDGE_BASE_ENABLED:

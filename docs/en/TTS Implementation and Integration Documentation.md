@@ -108,7 +108,7 @@ async def create_speech(
         # Get request data
         data = await request.json()
         text = data.get("input", "")
-        voice = data.get("voice", str(Config.DEFAULT_VOICE))
+        voice = data.get("voice", str(Config.EDGE_DEFAULT_VOICE))
         
         # Text filtering
         text = filter_special_chars(text)
@@ -325,7 +325,7 @@ The TTS API accepts a JSON format request body, containing the following fields:
 | Field Name | Type | Required | Description |
 |-----------|------|----------|-------------|
 | input | string | Yes | Text content to be converted to speech |
-| voice | string | No | Voice identifier to use, defaults to DEFAULT_VOICE in configuration |
+| voice | string | No | Voice identifier to use, defaults to EDGE_DEFAULT_VOICE in configuration |
 
 **Request Example:**
 ```json
@@ -354,7 +354,7 @@ The configuration parameters for the TTS module are defined in `config.py`:
 # TTS-related configuration in config.py
 
 # Default voice configuration
-DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
+EDGE_DEFAULT_VOICE = os.getenv("EDGE_DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
 
 # IndexTTS-1.5 engine configuration
 INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"

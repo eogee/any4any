@@ -30,19 +30,19 @@ class EmbeddingManager:
         except Exception as e:
             logger.error(f"Failed to use global embedding model: {e}")
             return False
-    
+
     def _load_model(self):
         """未获取到则本地加载Embedding模型"""
         try:
             if self.use_global_model():
-                return                
+                return
             logger.info(f"Loading embedding model locally: {self.model_name}")
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModel.from_pretrained(self.model_name)
         except Exception as e:
             logger.error(f"Load model failed: {e}")
             raise
-    
+
     def get_embeddings(self, texts: List[str]) -> np.ndarray:
         """获取文本的向量表示"""
         if not self._model_loaded:

@@ -42,7 +42,7 @@ class ModelManager:
     @classmethod
     async def initialize(cls, load_llm=True, load_asr=True, load_reranker=True, load_tts=True, load_embedding=True, load_index_tts=True):
         """初始化模型和声音列表
-        
+
         Args:
             load_llm: 是否加载LLM模型
             load_asr: 是否加载ASR模型
@@ -140,15 +140,15 @@ class ModelManager:
     @classmethod
     def get_voices(cls):
         return cls.available_voices
-        
+
     @classmethod
     def get_llm_service(cls):
         return cls.llm_service
-        
+
     @classmethod
     def get_embedding_model(cls):
         return cls.embedding_model, cls.embedding_tokenizer
-    
+
     @classmethod
     def get_index_tts_engine(cls):
         return cls.index_tts_engine

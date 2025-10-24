@@ -3,7 +3,7 @@ import torch
 import queue
 import asyncio
 import threading
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 from config import Config
 
@@ -95,20 +95,20 @@ class LLMService:
         """初始化模型和分词器"""
         if self._model_initialized:
             return
-        
+
         import os
         is_main_process = self._check_main_process()
-        
+
         if not is_main_process:
             logger.info(f"Skipping model loading in non-main process {os.getpid()}")
             return
-            
-        try:            
+
+        try:
             self.tokenizer = AutoTokenizer.from_pretrained(
                 Config.LLM_MODEL_DIR,
                 trust_remote_code=Config.TRUST_REMOTE_CODE
             )
-            
+
             self.model = self.load_model(Config.LLM_MODEL_DIR, self.device)
             self._model_initialized = True
             return True
@@ -407,9 +407,19 @@ class LLMService:
 
             if tool.get('parameters'):
                 schema_lines.append("  参数:")
-                for param in tool['parameters']:
-                    required = "必需" if param.get('required', False) else "可选"
-                    schema_lines.append(f"    - {param['name']} ({param['type']}, {required}): {param['description']}")
+                parameters = tool['parameters']
+
+                # 处理 properties 字段
+                if isinstance(parameters, dict) and 'properties' in parameters:
+                    for param_name, param_info in parameters['properties'].items():
+                        param_type = param_info.get('type', 'unknown')
+                        param_desc = param_info.get('description', '无描述')
+                        required_list = parameters.get('required', [])
+                        required = "必需" if param_name in required_list else "可选"
+                        schema_lines.append(f"    - {param_name} ({param_type}, {required}): {param_desc}")
+                else:
+                    # 如果格式不符合预期，显示原始信息
+                    schema_lines.append(f"    参数格式: {parameters}")
 
             schema_lines.append("")  # 空行分隔
 
@@ -581,11 +591,11 @@ def get_llm_service():
     """获取全局 LLM 服务实例"""
     import os
     global _global_llm_service, _llm_service_pid
-    
+
     current_pid = os.getpid()
-    
+
     if _global_llm_service is None or _llm_service_pid != current_pid:
         _global_llm_service = LLMService()
         _llm_service_pid = current_pid
-    
+
     return _global_llm_service
