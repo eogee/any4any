@@ -33,10 +33,10 @@ class NL2SQLWorkflow:
             包含处理结果或错误信息的字典
         """
         try:
-            logger.info(f"开始处理SQL问题: {question}")
+            logger.info(f"Start processing SQL question: {question}")
 
             # 步骤1: 获取所有表的基本信息
-            logger.info("步骤1: 获取所有表的基本信息")
+            logger.info("Step 1: Get all tables' basic information")
             all_tables_result = await self._get_all_tables_async()
 
             if not all_tables_result['success']:
@@ -49,7 +49,7 @@ class NL2SQLWorkflow:
             all_tables = all_tables_result['data']['tables']
 
             # 步骤2: LLM分析问题并确定需要的表
-            logger.info("步骤2: LLM分析问题并确定需要的表")
+            logger.info("Step 2: Analyze tables needed for the question")
             required_tables = await self._analyze_tables_needed(question, all_tables, context)
 
             if not required_tables:
@@ -60,7 +60,7 @@ class NL2SQLWorkflow:
                 }
 
             # 步骤3: 获取详细表结构
-            logger.info(f"步骤3: 获取表结构信息: {required_tables}")
+            logger.info(f"Step 3: Get table schemas: {required_tables}")
             table_schemas_result = await self._get_table_schemas_async(required_tables)
 
             if not table_schemas_result['success']:
@@ -71,7 +71,7 @@ class NL2SQLWorkflow:
                 }
 
             # 步骤4: LLM生成SQL语句
-            logger.info("步骤4: LLM生成SQL语句")
+            logger.info("Step 4: Generate SQL statement")
             sql_result = await self._generate_sql(question, table_schemas_result['formatted_output'], context)
 
             if not sql_result['success']:
@@ -82,7 +82,7 @@ class NL2SQLWorkflow:
                 }
 
             # 步骤5: 执行SQL查询
-            logger.info("步骤5: 执行SQL查询")
+            logger.info("Step 5: Execute SQL query")
             execution_result = await self._execute_sql_async(sql_result['generated_sql'])
 
             if not execution_result['success']:
@@ -94,7 +94,7 @@ class NL2SQLWorkflow:
                 }
 
             # 步骤6: LLM生成最终回答
-            logger.info("步骤6: 生成最终回答")
+            logger.info("Step 6: Generate final answer")
             final_answer = await self._generate_final_answer(
                 question,
                 sql_result['generated_sql'],
@@ -113,7 +113,7 @@ class NL2SQLWorkflow:
             }
 
         except Exception as e:
-            logger.error(f"NL2SQL工作流程处理失败: {e}")
+            logger.error(f"NL2SQL workflow processing failed: {e}")
             return {
                 'success': False,
                 'error': f"工作流程执行失败: {str(e)}",
@@ -126,7 +126,7 @@ class NL2SQLWorkflow:
             result = get_all_tables()
             return result
         except Exception as e:
-            logger.error(f"获取所有表信息失败: {e}")
+            logger.error(f"Failed to get all tables' information: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -183,7 +183,7 @@ orders
             return table_names
 
         except Exception as e:
-            logger.error(f"LLM分析表需求失败: {e}")
+            logger.error(f"Failed to analyze tables needed for the question: {e}")
             return None
 
     async def _get_table_schemas_async(self, table_names: List[str]) -> Dict[str, Any]:
@@ -223,7 +223,7 @@ orders
             }
 
         except Exception as e:
-            logger.error(f"获取表结构失败: {e}")
+            logger.error(f"Failed to get table schemas: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -295,7 +295,7 @@ SQL语句:"""
             }
 
         except Exception as e:
-            logger.error(f"SQL生成失败: {e}")
+            logger.error(f"Failed to generate SQL: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -307,7 +307,7 @@ SQL语句:"""
             result = self.sql_executor.execute_sql_query(sql_query)
             return result
         except Exception as e:
-            logger.error(f"SQL执行失败: {e}")
+            logger.error(f"Failed to execute SQL query: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -352,7 +352,7 @@ SQL语句:"""
             return response.strip()
 
         except Exception as e:
-            logger.error(f"生成最终回答失败: {e}")
+            logger.error(f"Failed to generate final answer: {e}")
             return f"根据查询结果回答您的问题，但处理时出现错误: {str(e)}"
 
 # 全局实例

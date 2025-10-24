@@ -30,10 +30,10 @@ class SQLExecutor:
                 raise ValueError(f"不支持的数据库类型: {self.db_type}")
 
             self.engine = create_engine(connection_string)
-            logger.info("SQL执行器数据库连接初始化成功")
+            logger.info("SQL Executor initialized successfully.")
 
         except Exception as e:
-            logger.error(f"SQL执行器数据库连接初始化失败: {e}")
+            logger.error(f"SQL Executor database connection initialization failed: {e}")
             self.engine = None
 
     def _validate_sql_safety(self, sql_query: str) -> Tuple[bool, str]:
