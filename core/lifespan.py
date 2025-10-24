@@ -37,6 +37,18 @@ async def lifespan(app: FastAPI):
         from core.dingtalk import message_manager
         message_manager.register_preview_confirm_callback()
         logger.info("Preview confirm callback registered")
+
+    # 初始化NL2SQL工具的示例数据
+    try:
+        if getattr(Config, 'TOOLS_ENABLED', False):
+            from core.tools.nl2sql.table_info import get_table_manager
+            table_manager = get_table_manager()
+            # 创建示例表（如果需要）
+            logger.info("NL2SQL table manager initialized")
+    except ImportError as e:
+        logger.warning(f"NL2SQL table manager initialization skipped, module not available: {e}")
+    except Exception as e:
+        logger.error(f"Failed to initialize NL2SQL table manager: {e}")
     
     yield
     

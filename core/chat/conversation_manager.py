@@ -110,8 +110,7 @@ class ConversationManager:
         if not messages or len(messages) <= max_messages:
             return messages
 
-        logger.info(f"Truncating conversation history from {len(messages)} to {max_messages} messages")
-
+        
         truncated_messages = messages[-max_messages:] # 保留最近的消息，确保是成对的对话
 
         conversation_text = "\n".join([ # 进一步基于token数量截断
@@ -122,8 +121,7 @@ class ConversationManager:
         estimated_tokens = len(conversation_text) * 1.2 #中文字符*1.5 + 英文单词*1
 
         if estimated_tokens > max_tokens:
-            logger.info(f"Further truncating based on token estimate: {estimated_tokens} > {max_tokens}")
-            
+
             final_messages = [] # 从后往前逐条添加消息，直到不超过token限制
             current_tokens = 0
 
@@ -138,7 +136,6 @@ class ConversationManager:
                 current_tokens += msg_tokens
 
             truncated_messages = final_messages
-            logger.info(f"Final truncated to {len(truncated_messages)} messages, estimated tokens: {current_tokens:.0f}")
 
         return truncated_messages
     
@@ -335,25 +332,24 @@ class ConversationManager:
             f"{msg['sender_type']}: {msg['content']}"
             for msg in truncated_messages
         ])
-
-        # 记录截断信息
-        if len(all_messages) > len(truncated_messages):
-            logger.info(f"Conversation truncated for {sender}: {len(all_messages)} -> {len(truncated_messages)} messages")
-
+        
         try:
-            # 生成响应
-            llm_response = await self.llm_service.generate_response(conversation_history)
-            
+            # 生成响应 - 使用新的NL2SQL工具处理
+            if hasattr(self.llm_service, 'process_with_tools'):
+                response_text = await self.llm_service.process_with_tools(content)
+            else:
+                response_text = await self.llm_service.generate_response(conversation_history)
+
             # 创建助手消息
-            assistant_message = self._create_assistant_message(llm_response)
+            assistant_message = self._create_assistant_message(response_text)
             assistant_message['sequence_number'] = user_message['sequence_number'] + 1
             assistant_message['is_timeout'] = 1 if is_timeout else 0
-            
+
             if not skip_save:
                 self.db.save_message(conversation['conversation_id'], assistant_message)
                 conversation['messages'].append(assistant_message)
-            
-            return llm_response, conversation['conversation_id']
+
+            return response_text, conversation['conversation_id']
             
         except Exception as e:
             logger.error(f"Error generating response: {e}")
@@ -464,23 +460,33 @@ class ConversationManager:
             for msg in truncated_messages
         ])
 
-        # 记录截断信息
-        if len(all_messages) > len(truncated_messages):
-            logger.info(f"Stream conversation truncated for {sender}: {len(all_messages)} -> {len(truncated_messages)} messages")
-
+        
         accumulated_response = ""
         
         try:
-            async for text_chunk in self.llm_service.generate_stream(conversation_history, generation_id):
-                # 清理特殊标记
-                cleaned_chunk = text_chunk
-                if "<|im_start|>assistant" in cleaned_chunk:
-                    cleaned_chunk = cleaned_chunk.split("<|im_start|>assistant")[-1].strip()
-                if "<|im_end|>" in cleaned_chunk:
-                    cleaned_chunk = cleaned_chunk.split("<|im_end|>")[0].strip()
-                
-                accumulated_response += cleaned_chunk
-                yield cleaned_chunk
+            # 检查是否支持工具调用
+            if hasattr(self.llm_service, 'process_with_tools'):
+                # 对于流式处理，先获取完整响应，然后分段返回
+                full_response = await self.llm_service.process_with_tools(content)
+
+                # 模拟流式输出 - 分段返回响应
+                words = full_response.split()
+                for i, word in enumerate(words):
+                    if i % 3 == 0:  # 每3个词一组
+                        yield " ".join(words[i:i+3]) + " "
+                    elif i == len(words) - 1:  # 最后一个词
+                        yield word
+            else:
+                async for text_chunk in self.llm_service.generate_stream(conversation_history, generation_id):
+                    # 清理特殊标记
+                    cleaned_chunk = text_chunk
+                    if "<|im_start|>assistant" in cleaned_chunk:
+                        cleaned_chunk = cleaned_chunk.split("<|im_start|>assistant")[-1].strip()
+                    if "<|im_end|>" in cleaned_chunk:
+                        cleaned_chunk = cleaned_chunk.split("<|im_end|>")[0].strip()
+
+                    accumulated_response += cleaned_chunk
+                    yield cleaned_chunk
                 
         except Exception as e:
             error_message = f"\n\n[错误: {str(e)}]"

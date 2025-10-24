@@ -84,17 +84,10 @@ class Config:
     # 数据库功能配置
     QUERY_CLEANING = os.getenv("QUERY_CLEANING", "True").lower() == "true"          # 是否启用数据库查询清理功能
 
-    # SQL Agent配置
-    SQL_AGENT_ENABLED = os.getenv("SQL_AGENT_ENABLED", "True").lower() == "true"
-    SQL_AGENT_MAX_TURNS = int(os.getenv("SQL_AGENT_MAX_TURNS", "5"))
-    SQL_AGENT_TABLE_INFO_TRUNCATE = int(os.getenv("SQL_AGENT_TABLE_INFO_TRUNCATE", "2048"))
-    SQL_AGENT_EXECUTION_TRUNCATE = int(os.getenv("SQL_AGENT_EXECUTION_TRUNCATE", "2048"))
-    SQL_AGENT_DEBUG = os.getenv("SQL_AGENT_DEBUG", "False").lower() == "true"
-
-    # SQL Agent LLM配置
-    SQL_AGENT_MODEL_PROVIDER = os.getenv("SQL_AGENT_MODEL_PROVIDER", "openai")
-    SQL_AGENT_TEMPERATURE = float(os.getenv("SQL_AGENT_TEMPERATURE", "0.0"))
-    SQL_AGENT_MAX_TOKENS = int(os.getenv("SQL_AGENT_MAX_TOKENS", "2048"))
+    # 工具系统配置
+    TOOLS_ENABLED = os.getenv("TOOLS_ENABLED", "True").lower() == "true"
+    TOOLS_DEBUG = os.getenv("TOOLS_DEBUG", "False").lower() == "true"
+    TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))  # 工具执行超时时间（秒）
 
     # SQL数据库配置 (复用现有MySQL配置)
     SQL_DB_TYPE = os.getenv("SQL_DB_TYPE", "mysql")
@@ -103,6 +96,11 @@ class Config:
     SQL_DB_USERNAME = MYSQL_USER  # 复用现有MySQL配置
     SQL_DB_PASSWORD = MYSQL_PASSWORD  # 复用现有MySQL配置
     SQL_DB_DATABASE = MYSQL_DATABASE  # 复用现有MySQL配置
+
+    # 工具服务器配置
+    TOOLS_ENABLED = os.getenv("TOOLS_ENABLED", "True").lower() == "true"
+    TOOLS_DEBUG = os.getenv("TOOLS_DEBUG", "False").lower() == "true"
+    TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))  # 工具执行超时时间（秒）
     
     # 钉钉配置
     CLIENT_ID = os.getenv("CLIENT_ID", "")

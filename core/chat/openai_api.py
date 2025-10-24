@@ -72,7 +72,6 @@ class OpenAIAPI:
             sender = chat_request.sender_id or request.headers.get("X-User-ID", "anonymous_user")
             user_nick = chat_request.sender_nickname or request.headers.get("X-User-Nick", "Anonymous")
             platform = chat_request.platform or request.headers.get("X-Platform", "web")
-            
             # 获取用户最新消息
             user_message_content = ""
             for msg in reversed(chat_request.messages):

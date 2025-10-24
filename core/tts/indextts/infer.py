@@ -159,7 +159,7 @@ class IndexTTS:
         # 缓存参考音频mel：
         self.cache_audio_prompt = None
         self.cache_cond_mel = None
-        # 进度引用显示（可选）
+        # 进度引用显示
         self.gr_progress = None
         self.model_version = self.cfg.version if hasattr(self.cfg, "version") else None
 
