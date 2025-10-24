@@ -21,6 +21,7 @@ from core.embedding.openai_api import get_embedding_router
 from core.mcp.mcp_tools import add,sub,mul,div
 from servers.IndexServer import IndexServer
 from servers.AuthServer import AuthServer
+from servers.ChatServer import ChatServer
 
 # 初始化 MCP 服务
 mcp = FastMCP("tools")
@@ -96,3 +97,7 @@ index_server.register_routes(app)
 # 初始化AuthServer并注册路由
 auth_server = AuthServer()
 auth_server.register_routes(app)
+
+# 初始化ChatServer并注册路由
+chat_server = ChatServer()
+chat_server.register_routes(app)

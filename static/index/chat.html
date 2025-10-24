@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Any4Chat - 智能对话</title>
+
+    <!-- 外部样式表 -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/a4a.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Any4Chat</h1>
+            <p>智能AI助手，与AI进行自然对话，获取专业建议和帮助</p>
+        </div>
+
+        <div class="app-container">
+            <!-- 聊天侧边栏 -->
+            <div class="app-sidebar">
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-comments"></i> 对话控制</h3>
+                    <div class="chat-controls">
+                        <button class="layui-btn layui-btn-primary" id="newChatBtn">
+                            <i class="fas fa-plus"></i> 新对话
+                        </button>
+                        <div class="chat-status">
+                            <div class="status-indicator"></div>
+                            <span id="connectionStatus">已连接</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-chart-bar"></i> 对话统计</h3>
+                    <div class="chat-stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="messageCount">0</div>
+                            <div class="stat-label">消息数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="sessionTime">0</div>
+                            <div class="stat-label">会话时长</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-cog"></i> 设置</h3>
+                    <div class="chat-settings">
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <i class="fas fa-bolt"></i> 流式响应
+                            </label>
+                            <div class="setting-control">
+                                <input type="checkbox" id="streamModeToggle" checked>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <i class="fas fa-save"></i> 自动保存
+                            </label>
+                            <div class="setting-control">
+                                <input type="checkbox" id="autoSaveToggle" checked>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 聊天主区域 -->
+            <div class="app-main">
+                <div class="chat-messages" id="chatMessages">
+                    <!-- 空状态提示 -->
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-comments"></i>
+                        <h3>开始新的对话</h3>
+                        <p>向AI助手提问，开始智能对话体验</p>
+                    </div>
+
+                    <!-- 正在输入提示 -->
+                    <div class="typing-indicator" id="typingIndicator">
+                        <div class="typing-dots">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                        <span>AI正在思考...</span>
+                    </div>
+                </div>
+
+                <!-- 聊天输入区域 -->
+                <div class="chat-input-container">
+                    <div class="input-wrapper">
+                        <textarea
+                            class="chat-input"
+                            id="chatInput"
+                            placeholder="输入您的问题，按 Enter 发送..."
+                            rows="1"
+                            maxlength="2000"
+                        ></textarea>
+                        <button class="send-button" id="sendButton" type="button">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入公共函数库 -->
+    <script src="/static/js/index/common/content-processor.js"></script>
+    <script src="/static/js/index/common/api-service.js"></script>
+    <script src="/static/js/index/common/ui-utils.js"></script>
+    <script src="/static/js/index/common/data-manager.js"></script>
+
+    <!-- 引入聊天控制器 -->
+    <script src="/static/js/index/chat/chat.js"></script>
+
+    <!-- 引入第三方库 -->
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/marked.min.js"></script>
+
+    <!-- 初始化脚本 -->
+    <script>
+        // 初始化聊天页面
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.ChatController) {
+                const chatController = new ChatController();
+                chatController.initialize();
+            }
+        });
+    </script>
+</body>
+</html>
