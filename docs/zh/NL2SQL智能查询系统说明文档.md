@@ -201,8 +201,6 @@ SQL_DB_DATABASE=your_database_name         # 数据库名称
 
 # 工具系统配置
 TOOLS_ENABLED=true                          # 是否启用工具系统
-TOOLS_DEBUG=false                          # 工具调试模式
-TOOLS_TIMEOUT=30                           # 工具执行超时时间
 ```
 
 ### 4.2 数据库权限配置

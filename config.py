@@ -94,9 +94,6 @@ class Config:
     QUERY_CLEANING = os.getenv("QUERY_CLEANING", "True").lower() == "true"          # 是否启用数据库查询清理功能
 
     # 工具系统配置
-    TOOLS_ENABLED = os.getenv("TOOLS_ENABLED", "True").lower() == "true"
-    TOOLS_DEBUG = os.getenv("TOOLS_DEBUG", "False").lower() == "true"
-    TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))  # 工具执行超时时间（秒）
 
     # SQL数据库配置 (复用现有MySQL配置)
     SQL_DB_TYPE = os.getenv("SQL_DB_TYPE", "mysql")
@@ -142,3 +139,16 @@ class Config:
     os.makedirs(INDEX_TTS_MODEL_DIR, exist_ok=True)
     os.makedirs(ANY4DH_AVATARS_DIR, exist_ok=True)
     os.makedirs(os.path.dirname(ANY4DH_WAV2LIP_MODEL_DIR), exist_ok=True)
+
+    # 外部LLM API配置
+    LLM_SERVER_TYPE = os.getenv("LLM_SERVER_TYPE", "local")
+    API_KEY = os.getenv("API_KEY", "")
+    API_URL = os.getenv("API_URL", "")
+    MODEL_NAME = os.getenv("MODEL_NAME", "")
+    API_BASE_URL = os.getenv("API_BASE_URL", "")
+    API_TIMEOUT = int(os.getenv("API_TIMEOUT", "30"))
+    MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
+    STREAM_ENABLED = os.getenv("STREAM_ENABLED", "true").lower() == "true"
+
+    # 本地LLM模型名称配置
+    LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen3-0.6b")

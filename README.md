@@ -167,8 +167,6 @@ TTS_MODEL_DIR=/path/to/Index-1.5-Voice
 
 # 工具系统配置
 TOOLS_ENABLED=true
-TOOLS_DEBUG=false
-TOOLS_TIMEOUT=30
 ```
 
 ### 6. 启动服务

@@ -201,8 +201,6 @@ SQL_DB_DATABASE=your_database_name         # Database name
 
 # Tool system configuration
 TOOLS_ENABLED=true                          # Enable tool system
-TOOLS_DEBUG=false                          # Tool debug mode
-TOOLS_TIMEOUT=30                           # Tool execution timeout
 ```
 
 ### 4.2 Database Permissions Configuration

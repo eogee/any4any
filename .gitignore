@@ -43,3 +43,6 @@ static/dh/chat.html
 static/js/index/dh/asr/
 static/js/index/dh/chat.js
 core/any4dh/results/
+
+# backups
+backups/

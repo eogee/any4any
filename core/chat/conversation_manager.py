@@ -336,10 +336,17 @@ class ConversationManager:
         try:
             # 生成响应 - 检查是否启用工具
             if (hasattr(self.llm_service, 'process_with_tools') and
-                getattr(self.llm_service, '_tools_enabled', False)):
+                self.llm_service.is_tool_supported()):
                 response_text = await self.llm_service.process_with_tools(content)
             else:
-                response_text = await self.llm_service.generate_response(conversation_history)
+                # 检查LLM服务类型，为外部API提供正确的消息格式
+                if self.llm_service.service_type == "external":
+                    # 外部LLM需要OpenAI格式的messages数组
+                    openai_messages = self._convert_to_openai_format(truncated_messages)
+                    response_text = await self.llm_service.generate_response(openai_messages)
+                else:
+                    # 本地LLM使用对话历史字符串
+                    response_text = await self.llm_service.generate_response(conversation_history)
 
             # 创建助手消息
             assistant_message = self._create_assistant_message(response_text)
@@ -467,7 +474,7 @@ class ConversationManager:
         try:
             # 检查是否启用工具调用
             if (hasattr(self.llm_service, 'process_with_tools') and
-                getattr(self.llm_service, '_tools_enabled', False)):
+                self.llm_service.is_tool_supported()):
                 # 对于流式处理，先获取完整响应，然后分段返回
                 full_response = await self.llm_service.process_with_tools(content)
                 accumulated_response = full_response
@@ -480,16 +487,25 @@ class ConversationManager:
                     elif i == len(words) - 1:  # 最后一个词
                         yield word
             else:
-                async for text_chunk in self.llm_service.generate_stream(conversation_history, generation_id):
-                    # 清理特殊标记
-                    cleaned_chunk = text_chunk
-                    if "<|im_start|>assistant" in cleaned_chunk:
-                        cleaned_chunk = cleaned_chunk.split("<|im_start|>assistant")[-1].strip()
-                    if "<|im_end|>" in cleaned_chunk:
-                        cleaned_chunk = cleaned_chunk.split("<|im_end|>")[0].strip()
+                # 检查LLM服务类型，为外部API提供正确的消息格式
+                if self.llm_service.service_type == "external":
+                    # 外部LLM需要OpenAI格式的messages数组
+                    openai_messages = self._convert_to_openai_format(truncated_messages)
+                    async for text_chunk in self.llm_service.generate_stream(openai_messages, generation_id):
+                        accumulated_response += text_chunk
+                        yield text_chunk
+                else:
+                    # 本地LLM使用对话历史字符串
+                    async for text_chunk in self.llm_service.generate_stream(conversation_history, generation_id):
+                        # 清理特殊标记
+                        cleaned_chunk = text_chunk
+                        if "<|im_start|>assistant" in cleaned_chunk:
+                            cleaned_chunk = cleaned_chunk.split("<|im_start|>assistant")[-1].strip()
+                        if "<|im_end|>" in cleaned_chunk:
+                            cleaned_chunk = cleaned_chunk.split("<|im_end|>")[0].strip()
 
-                    accumulated_response += cleaned_chunk
-                    yield cleaned_chunk
+                        accumulated_response += cleaned_chunk
+                        yield cleaned_chunk
                 
         except Exception as e:
             error_message = f"\n\n[错误: {str(e)}]"
@@ -561,6 +577,19 @@ class ConversationManager:
             if user_id in self.pending_request_counts:
                 del self.pending_request_counts[user_id]
 
+    def _convert_to_openai_format(self, messages):
+        """将内部消息格式转换为OpenAI格式"""
+        openai_messages = []
+
+        for msg in messages:
+            role = "user" if msg['sender_type'] == "user" else "assistant"
+            openai_messages.append({
+                "role": role,
+                "content": msg['content']
+            })
+
+        return openai_messages
+
 # 全局实例管理
 _global_conversation_manager = None
 _conversation_manager_pid = None
@@ -568,13 +597,13 @@ _conversation_manager_pid = None
 def get_conversation_manager():
     """获取会话管理器单例"""
     global _global_conversation_manager, _conversation_manager_pid
-    
+
     current_pid = os.getpid()
-    
+
     if _global_conversation_manager is None or _conversation_manager_pid != current_pid:
         _global_conversation_manager = ConversationManager()
         _conversation_manager_pid = current_pid
-    
+
     return _global_conversation_manager
 
 conversation_manager = get_conversation_manager()

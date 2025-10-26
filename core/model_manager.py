@@ -114,11 +114,11 @@ class ModelManager:
             if load_llm and not cls.llm_service:
                 logger.info("Loading LLM model...")
                 cls.llm_service = get_llm_service()
-                init_success = await cls.llm_service.initialize_model()
+                init_success = await cls.llm_service.initialize()
                 if init_success:
-                    logger.info(f"LLM model loaded...")
+                    logger.info(f"LLM service initialized...")
                 else:
-                    logger.error(f"Failed to load LLM model from: {Config.LLM_MODEL_DIR}")
+                    logger.error(f"Failed to initialize LLM service")
             elif not load_llm:
                 logger.info("Skipping LLM model loading")
                 
@@ -237,7 +237,7 @@ async def health_check():
             "asr": "loaded" if ModelManager.m is not None else "unloaded",
             "reranker": "loaded" if ModelManager.reranker is not None else "unloaded",
             "tts": tts_status,
-            "llm": "loaded" if ModelManager.llm_service is not None else "unloaded",
+            "llm": ModelManager.llm_service.get_service_type() if ModelManager.llm_service else "unloaded",
             "embedding": "loaded" if ModelManager.embedding_model is not None else "unloaded",
             "index_tts": index_tts_status
         }

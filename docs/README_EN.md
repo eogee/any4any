@@ -176,8 +176,6 @@ TTS_MODEL_DIR=/path/to/Index-1.5-Voice
 
 # Tool system configuration
 TOOLS_ENABLED=true
-TOOLS_DEBUG=false
-TOOLS_TIMEOUT=30
 ```
 
 ### 6. Start the Service

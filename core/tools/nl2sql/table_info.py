@@ -29,7 +29,6 @@ class DatabaseTableManager:
                 raise ValueError(f"不支持的数据库类型: {self.db_type}")
 
             self.engine = create_engine(connection_string)
-            logger.info("Database connection initialized successfully")
 
         except Exception as e:
             logger.error(f"Database connection initialization failed: {e}")
