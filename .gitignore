@@ -36,3 +36,10 @@ CLAUDE_zh.md
 
 # code_rules
 CODE_GUIDELINES.md
+
+# any4dh
+asr.html
+static/dh/chat.html
+static/js/index/dh/asr/
+static/js/index/dh/chat.js
+core/any4dh/results/

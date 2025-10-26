@@ -13,8 +13,10 @@ from core.chat.llm import get_llm_service
 from core.tts.index_tts_engine import IndexTTSEngine
 from utils.funasr.model import SenseVoiceSmall
 
+# 多进程启动方法由主应用统一设置
 try:
-    multiprocessing.set_start_method('spawn', force=True)
+    if multiprocessing.get_start_method(allow_none=True) is None:
+        multiprocessing.set_start_method('spawn')
 except RuntimeError:
     pass
 

@@ -7,13 +7,22 @@ from core.chat.delay_manager import delay_manager
 from config import Config
 from core.embedding.kb_server import initialize_kb_server_after_model
 
+# 全局服务器实例
+_global_servers = {}
+
 # 全局IndexTTS引擎实例
 index_tts_engine_instance = None
 
 logger = logging.getLogger(__name__)
 
+def get_server_instance(server_class, server_name):
+    """获取服务器实例的单例"""
+    if server_name not in _global_servers:
+        _global_servers[server_name] = server_class()
+    return _global_servers[server_name]
+
 async def lifespan(app: FastAPI):
-    """模型生命周期管理"""
+    """应用生命周期管理"""
     global index_tts_engine_instance
     
     current_port = os.environ.get('CURRENT_PORT', str(Config.PORT))
@@ -49,14 +58,43 @@ async def lifespan(app: FastAPI):
     try:
         if getattr(Config, 'TOOLS_ENABLED', False):
             from core.tools.nl2sql.table_info import get_table_manager
-            table_manager = get_table_manager()
-            # 创建示例表（如果需要）
+            table_manager = get_table_manager()            
             logger.info("NL2SQL table manager initialized")
     except ImportError as e:
         logger.warning(f"NL2SQL table manager initialization skipped, module not available: {e}")
     except Exception as e:
         logger.error(f"Failed to initialize NL2SQL table manager: {e}")
-    
+
+    if current_port != str(Config.MCP_PORT):
+
+        from servers.IndexServer import IndexServer
+        from servers.AuthServer import AuthServer
+        from servers.ChatServer import ChatServer
+
+        index_server = get_server_instance(IndexServer, "IndexServer")
+        index_server.register_routes(app)
+
+        auth_server = get_server_instance(AuthServer, "AuthServer")
+        auth_server.register_routes(app)
+
+        chat_server = get_server_instance(ChatServer, "ChatServer")
+        chat_server.register_routes(app)
+
+        if Config.ANY4DH_ENABLED: # 初始化 any4dh 数字人系统（如果启用）
+            try:
+                from core.any4dh.any4dh_server import initialize_any4dh, register_any4dh_routes
+                from servers.DHServer import DHServer
+
+                opt, model, avatar = initialize_any4dh(Config())
+
+                register_any4dh_routes(app)
+
+                dh_server = get_server_instance(DHServer, "DHServer")
+                dh_server.register_routes(app)
+
+            except Exception as e:
+                logger.error(f"any4dh server start failed: {e}")
+
     yield
     
     logger.info("Application shutting down...")

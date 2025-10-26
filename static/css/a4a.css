@@ -206,7 +206,57 @@ body::before {
     margin-top: 20px;
 }
 
+.video-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
+.video-container video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.placeholder-message {
+    color: #6c757d;
+    font-size: 18px;
+    text-align: center;
+}
+
+.controls-panel {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-connected {
+    background-color: #28a745;
+}
+
+.status-disconnected {
+    background-color: #dc3545;
+}
+
+.video-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
 
 .layui-btn {
     border-radius: 8px;
@@ -218,6 +268,15 @@ body::before {
     color: var(--primary);
     transform: translateY(-1px);
 }
+
+.layui-btn i , .layui-btn-danger i{
+    color: white !important;
+}
+
+.layui-btn:hover i , .layui-btn-primary i {
+    color: var(--primary) !important;
+}
+
 
 .layui-btn-normal {
     background: linear-gradient(90deg, var(--primary), #149a8c);
@@ -253,6 +312,10 @@ body::before {
 .layui-form-radio:focus-within {
     box-shadow: 0 0 0 3px rgba(22, 186, 170, 0.1) !important;
     border-radius: 50%;
+}
+
+.layui-badge {
+    border-radius: 5px;
 }
 
 .sidebar-section {
@@ -875,6 +938,8 @@ body::before {
 .chat-status {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
     gap: 8px;
     padding: 8px 12px;
     background: var(--light-bg);

@@ -166,20 +166,24 @@ class IndexServer(Server):
     
     def register_routes(self, app: FastAPI):
         """注册路由"""
-        
+
+        # Mount static files
+        from fastapi.staticfiles import StaticFiles
+        app.mount("/static", StaticFiles(directory="static"), name="static")
+
         async def require_login(request: Request):
             """登录检查装饰器"""
             if not await check_user_login(request):
                 return get_login_redirect()
             return None
-        
+
         @app.get("/", response_class=HTMLResponse)
         @app.get("/index", response_class=HTMLResponse)
         async def read_root(request: Request):
             """首页"""
             if redirect := await require_login(request):
                 return redirect
-            
+
             with open(os.path.join("static", "index", "index.html"), "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         

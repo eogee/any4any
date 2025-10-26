@@ -117,6 +117,21 @@ class Config:
     ROBOT_CODE = os.getenv("ROBOT_CODE", "")
     DINGTALK_PORT = os.getenv("DINGTALK_PORT", "6666")
 
+    # any4dh 数字人配置
+    ANY4DH_ENABLED = os.getenv("ANY4DH_ENABLED", "False").lower() == "true"
+    ANY4DH_TRANSPORT = os.getenv("ANY4DH_TRANSPORT", "webrtc")
+    ANY4DH_MODEL = os.getenv("ANY4DH_MODEL", "wav2lip")
+    ANY4DH_AVATAR_ID = os.getenv("ANY4DH_AVATAR_ID", "001")
+    ANY4DH_BATCH_SIZE = int(os.getenv("ANY4DH_BATCH_SIZE", "16"))
+    ANY4DH_FPS = int(os.getenv("ANY4DH_FPS", "50"))
+    ANY4DH_TTS = os.getenv("ANY4DH_TTS", "edgetts")
+    ANY4DH_REF_FILE = os.getenv("ANY4DH_REF_FILE", "zh-CN-YunxiaNeural")
+    ANY4DH_REF_TEXT = os.getenv("ANY4DH_REF_TEXT", "")
+    ANY4DH_TTS_SERVER = os.getenv("ANY4DH_TTS_SERVER", "http://127.0.0.1:9880")
+    ANY4DH_MAX_SESSION = int(os.getenv("ANY4DH_MAX_SESSION", "1"))
+    ANY4DH_WAV2LIP_MODEL_DIR = os.getenv("ANY4DH_WAV2LIP_MODEL_DIR", "/mnt/c/models/wav2lip256/wav2lip.pth")
+    ANY4DH_AVATARS_DIR = os.getenv("ANY4DH_AVATARS_DIR", "data/avatars")
+  
     # 确保目录存在
     os.makedirs(ASR_MODEL_DIR, exist_ok=True)
     os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
@@ -125,3 +140,5 @@ class Config:
     os.makedirs(VECTOR_DB_PATH, exist_ok=True)
     os.makedirs(DOCS_PATH, exist_ok=True)
     os.makedirs(INDEX_TTS_MODEL_DIR, exist_ok=True)
+    os.makedirs(ANY4DH_AVATARS_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(ANY4DH_WAV2LIP_MODEL_DIR), exist_ok=True)

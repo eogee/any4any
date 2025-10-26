@@ -460,5 +460,3 @@ class ChatServer(Server):
                     'status': 'unhealthy',
                     'error': str(e)
                 }, status_code=503)
-
-        logger.info("ChatServer routes registered successfully")

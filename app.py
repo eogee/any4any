@@ -1,4 +1,10 @@
 import os
+import multiprocessing
+try:
+    if multiprocessing.get_start_method(allow_none=True) is None:
+        multiprocessing.set_start_method("spawn")
+except RuntimeError:
+    pass
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -19,9 +25,6 @@ from core.rerank.rerank import rerank_documents
 from core.chat.openai_api import openai_api
 from core.embedding.openai_api import get_embedding_router
 from core.mcp.mcp_tools import add,sub,mul,div
-from servers.IndexServer import IndexServer
-from servers.AuthServer import AuthServer
-from servers.ChatServer import ChatServer
 
 # 初始化 MCP 服务
 mcp = FastMCP("tools")
@@ -68,9 +71,6 @@ app.add_middleware(
     max_age=Config.SESSION_MAX_AGE                      # 使用配置文件中的会话有效期设置
 )
 
-# 挂载静态文件目录
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 # API路由
 app.get("/v1/models")(list_models)
 app.post("/v1/rerank")(rerank_documents)
@@ -89,15 +89,3 @@ app.post("/get_chunk_content")(get_chunk_content)
 # 注册Embedding API路由
 embedding_router = get_embedding_router()
 app.include_router(embedding_router)
-
-# 初始化IndexServer并注册路由
-index_server = IndexServer()
-index_server.register_routes(app)
-
-# 初始化AuthServer并注册路由
-auth_server = AuthServer()
-auth_server.register_routes(app)
-
-# 初始化ChatServer并注册路由
-chat_server = ChatServer()
-chat_server.register_routes(app)
