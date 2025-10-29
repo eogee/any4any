@@ -20,6 +20,16 @@ class DashboardController {
         this.videoElement = null;
         this.placeholderMessage = null;
 
+        // 绿幕处理相关
+        this.greenScreenProcessor = null;
+        this.enableGreenScreenSwitch = null;
+        this.keyColorPicker = null;
+        this.thresholdSlider = null;
+        this.smoothingSlider = null;
+        this.bgImageInput = null;
+        this.uploadBgBtn = null;
+        this.resetGreenScreenBtn = null;
+
         // WebRTC相关
         this.pc = null;
         this.sessionId = null;
@@ -35,11 +45,16 @@ class DashboardController {
     init() {
         // 等待LayUI加载完成
         if (typeof layui !== 'undefined') {
-            layui.use(['layer', 'form', 'element'], () => {
+            layui.use(['layer', 'form', 'element', 'slider'], () => {
                 this.setupLayUI();
                 this.bindElements();
                 this.bindEvents();
                 this.initializeUI();
+
+                // 延迟初始化绿幕功能，确保主UI优先显示
+                setTimeout(() => {
+                    this.initGreenScreen();
+                }, 100);
             });
         } else {
             console.error('LayUI框架未加载');
@@ -53,6 +68,9 @@ class DashboardController {
         this.layer = layui.layer;
         this.form = layui.form;
         this.element = layui.element;
+
+        // 重新渲染表单组件
+        this.form.render();
     }
 
     /**
@@ -69,6 +87,16 @@ class DashboardController {
         this.videoElement = document.getElementById('videoElement');
         this.placeholderMessage = document.getElementById('placeholderMessage');
 
+        // 绿幕控制元素
+        this.enableGreenScreenSwitch = document.getElementById('enableGreenScreen');
+        this.keyColorPicker = document.getElementById('keyColor');
+        this.thresholdSlider = document.getElementById('thresholdSlider');
+        this.smoothingSlider = document.getElementById('smoothingSlider');
+        this.bgImageInput = document.getElementById('bgImageInput');
+        this.uploadBgBtn = document.getElementById('uploadBg');
+        this.resetGreenScreenBtn = document.getElementById('resetGreenScreen');
+
+        
         if (!this.sendBtn || !this.messageText || !this.connectionStatus || !this.statusText || !this.systemInfo ||
             !this.connectBtn || !this.disconnectBtn || !this.videoElement || !this.placeholderMessage) {
             console.error('必要的DOM元素未找到');
@@ -210,6 +238,13 @@ class DashboardController {
             this.videoElement.srcObject = event.streams[0];
             this.videoElement.style.display = 'block';
             this.placeholderMessage.style.display = 'none';
+
+            // 如果绿幕处理器已启用，开始处理
+            if (this.greenScreenProcessor && this.greenScreenProcessor.isEnabled) {
+                setTimeout(() => {
+                    this.greenScreenProcessor.startProcessing();
+                }, 100); // 等待视频开始播放
+            }
         };
 
         // ICE candidate事件
@@ -451,6 +486,204 @@ class DashboardController {
         this.systemInfo.innerHTML = '等待发送消息...';
         this.updateConnectionUI(false);
         this.setSendingState(false);
+    }
+
+    /**
+     * 初始化绿幕处理器
+     */
+    initGreenScreen() {
+        try {
+            // 重新渲染表单组件（确保绿幕相关的表单元素正确渲染）
+            if (this.form) {
+                this.form.render();
+            }
+
+            // 检查绿幕脚本是否加载
+            if (typeof GreenScreenProcessor === 'undefined') {
+                this.hideGreenScreenControls();
+                return;
+            }
+
+            // 检查绿幕相关DOM元素
+            if (!this.enableGreenScreenSwitch || !this.keyColorPicker) {
+                this.hideGreenScreenControls();
+                return;
+            }
+
+            
+            // 创建绿幕处理器实例
+            this.greenScreenProcessor = new GreenScreenProcessor({
+                keyColor: [0, 255, 0],
+                threshold: 160,
+                smoothing: 5,
+                scaleFactor: 0.75, // 75%分辨率处理，平衡性能和质量
+                maxFPS: 25,
+                enableWebGL: true
+            });
+
+            // 绑定绿幕事件
+            this.bindGreenScreenEvents();
+
+            
+            } catch (error) {
+            this.hideGreenScreenControls();
+        }
+    }
+
+    /**
+     * 隐藏绿幕控制面板（如果初始化失败）
+     */
+    hideGreenScreenControls() {
+        const greenScreenSection = document.querySelector('.sidebar-section h3');
+        if (greenScreenSection && greenScreenSection.textContent.includes('绿幕设置')) {
+            const section = greenScreenSection.closest('.sidebar-section');
+            if (section) {
+                section.style.display = 'none';
+            }
+        }
+    }
+
+    /**
+     * 显示简单的绿幕状态信息（即使绿幕功能不可用）
+     */
+    showSimpleGreenScreenInfo() {
+        const greenScreenInfo = document.getElementById('green-screen-info');
+        if (greenScreenInfo) {
+            greenScreenInfo.innerHTML = '绿幕功能: 不可用<br>请刷新页面重试';
+        }
+    }
+
+    /**
+     * 绑定绿幕控制事件
+     */
+    bindGreenScreenEvents() {
+        if (!this.greenScreenProcessor) return;
+
+        // 启用/禁用绿幕 - 使用LayUI表单事件监听
+        if (this.form) {
+            this.form.on('switch(enableGreenScreen)', (data) => {
+                if (data.elem.checked) {
+                    this.greenScreenProcessor.enable();
+                    this.updateGreenScreenInfo();
+                } else {
+                    this.greenScreenProcessor.disable();
+                    this.updateGreenScreenInfo();
+                }
+            });
+        }
+
+        // 目标颜色选择
+        if (this.keyColorPicker) {
+            this.keyColorPicker.addEventListener('change', (e) => {
+                this.greenScreenProcessor.setKeyColor(e.target.value);
+            });
+        }
+
+        // 阈值滑块
+        if (this.thresholdSlider) {
+            layui.slider.render({
+                elem: this.thresholdSlider,
+                min: 0,
+                max: 255,
+                value: 160,
+                change: (value) => {
+                    this.greenScreenProcessor.setThreshold(value);
+                    document.getElementById('thresholdValue').textContent = value;
+                }
+            });
+        }
+
+        // 平滑度滑块
+        if (this.smoothingSlider) {
+            layui.slider.render({
+                elem: this.smoothingSlider,
+                min: 0,
+                max: 10,
+                value: 5,
+                change: (value) => {
+                    this.greenScreenProcessor.setSmoothing(value);
+                    document.getElementById('smoothingValue').textContent = value;
+                }
+            });
+        }
+
+        // 背景图片上传
+        if (this.uploadBgBtn && this.bgImageInput) {
+            this.uploadBgBtn.addEventListener('click', () => {
+                this.bgImageInput.click();
+            });
+
+            this.bgImageInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        this.greenScreenProcessor.setBackground(event.target.result);
+                        this.showNotification('背景图片已更新', 'success');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // 重置按钮
+        if (this.resetGreenScreenBtn) {
+            this.resetGreenScreenBtn.addEventListener('click', () => {
+                this.greenScreenProcessor.reset();
+
+                // 重置UI控件
+                this.enableGreenScreenSwitch.checked = false;
+                this.keyColorPicker.value = '#00ff00';
+                document.getElementById('thresholdValue').textContent = '160';
+                document.getElementById('smoothingValue').textContent = '5';
+
+                // 重置滑块
+                layui.slider.render({
+                    elem: this.thresholdSlider,
+                    min: 0,
+                    max: 255,
+                    value: 160
+                });
+
+                layui.slider.render({
+                    elem: this.smoothingSlider,
+                    min: 0,
+                    max: 10,
+                    value: 5
+                });
+
+                this.showNotification('绿幕设置已重置', 'info');
+            });
+        }
+    }
+
+    /**
+     * 获取绿幕状态
+     */
+    getGreenScreenStatus() {
+        if (!this.greenScreenProcessor) return null;
+        return this.greenScreenProcessor.getStatus();
+    }
+
+    /**
+     * 更新绿幕系统信息
+     */
+    updateGreenScreenInfo() {
+        const status = this.getGreenScreenStatus();
+        if (!status) return;
+
+        const info = `
+            绿幕状态: ${status.enabled ? '启用' : '禁用'}<br>
+            处理中: ${status.processing ? '是' : '否'}<br>
+            FPS: ${status.fps}<br>
+            渲染: ${status.webgl ? 'WebGL' : 'Canvas 2D'}
+        `;
+
+        // 可以在系统信息面板中显示
+        const greenScreenInfoElement = document.getElementById('green-screen-info');
+        if (greenScreenInfoElement) {
+            greenScreenInfoElement.innerHTML = info;
+        }
     }
 }
 

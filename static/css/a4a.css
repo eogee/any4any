@@ -326,9 +326,9 @@ body::before {
 
 .sidebar-section:first-child {
     flex: 1;
-    min-height: 0;
+    min-height: auto;
     margin-bottom: 20px;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
 }
@@ -613,6 +613,10 @@ body::before {
 
 .editor-actions .layui-btn {
     margin: 0;
+}
+
+.input-actions-btn {
+    margin-top: 15px;
 }
 
 /* Request Table Styles */
@@ -1559,6 +1563,102 @@ body::before {
     .empty-state {
         background: var(--card-bg);
     }
+}
+
+/* 绿幕控制面板样式 */
+.green-screen-controls {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.green-screen-controls .layui-form-item {
+    margin-bottom: 15px;
+}
+
+.green-screen-controls .layui-form-label {
+    width: 90px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.green-screen-controls .layui-input-block {
+    margin-left: 110px;
+}
+
+.slider-value {
+    text-align: center;
+    margin-top: 5px;
+    font-size: 12px;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+/* 绿幕效果样式 */
+.video-container {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#backgroundLayer {
+    z-index: 1;
+    transition: opacity 0.3s ease;
+}
+
+#processedCanvas {
+    z-index: 2;
+}
+
+#videoElement {
+    z-index: 0;
+}
+
+/* 性能监控样式 */
+.performance-monitor {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #0f0;
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.performance-monitor.active {
+    opacity: 1;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .preset-bg-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .green-screen-controls .layui-form-label {
+        width: 70px;
+        font-size: 12px;
+    }
+
+    .green-screen-controls .layui-input-block {
+        margin-left: 90px;
+    }
+}
+
+/* 动画效果 */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.processing-indicator {
+    animation: pulse 1.5s infinite;
 }
 
 /* 打印样式 */
