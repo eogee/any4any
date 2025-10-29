@@ -105,13 +105,6 @@ def __mirror_index(size, index):
         return size - res - 1 
 
 def inference(quit_event,batch_size,face_list_cycle,audio_feat_queue,audio_out_queue,res_frame_queue,model):
-    
-    #model = load_model("./models/wav2lip.pth")
-    # input_face_list = glob.glob(os.path.join(face_imgs_path, '*.[jpJP][pnPN]*[gG]'))
-    # input_face_list = sorted(input_face_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
-    # face_list_cycle = read_imgs(input_face_list)
-    
-    #input_latent_list_cycle = torch.load(latents_out_path)
     length = len(face_list_cycle)
     index = 0
     count=0
@@ -164,7 +157,7 @@ def inference(quit_event,batch_size,face_list_cycle,audio_feat_queue,audio_out_q
             count += batch_size
             #_totalframe += 1
             if count>=100:
-                logger.info(f"------actual avg infer fps:{count/counttime:.4f}")
+                logger.info(f"Actual avg infer fps:{count/counttime:.4f}")
                 count=0
                 counttime=0
             for i,res_frame in enumerate(pred):

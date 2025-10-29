@@ -336,6 +336,11 @@ def initialize_any4dh(config=None):
             self.m = 8   # 中间步长
             self.r = 10  # 右步长
 
+            # TTS引擎配置
+            self.tts_engine = cfg.ANY4DH_TTS
+            self.index_tts_model_dir = cfg.INDEX_TTS_MODEL_DIR
+            self.index_tts_device = cfg.INDEX_TTS_DEVICE
+
     opt = OptConfig(config)
 
     # 多进程启动方法由主应用设置，这里不再重复设置

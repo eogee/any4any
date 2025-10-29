@@ -15,7 +15,7 @@ class ExternalLLMService:
         from config import Config
 
         self.server_type = Config.LLM_SERVER_TYPE
-        self.api_key = Config.API_KEY
+        self.api_key = Config.EXTERNAL_API_KEY
         self.api_url = Config.API_URL
         self.base_url = Config.API_BASE_URL or Config.API_URL
         self.model_name = Config.MODEL_NAME
@@ -248,4 +248,4 @@ async def list_available_models() -> list:
 def is_external_llm_enabled() -> bool:
     """检查是否启用了外部LLM"""
     from config import Config
-    return Config.LLM_SERVER_TYPE == "api" and bool(Config.API_KEY)
+    return Config.LLM_SERVER_TYPE == "api" and bool(Config.EXTERNAL_API_KEY)

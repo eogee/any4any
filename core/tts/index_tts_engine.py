@@ -111,14 +111,28 @@ class IndexTTSEngine:
         #     logger.warning(f"Text too long: {len(text)} characters")
         #     return False        
         voice_id = voice or "default"
+        default_wav_path = os.path.join(os.path.dirname(__file__), "indextts", "default.wav")
+
         if voice_id == "default":
-            default_wav_path = os.path.join(os.path.dirname(__file__), "indextts", "default.wav")
             if os.path.exists(default_wav_path):
                 voice_id = default_wav_path
+            else:
+                logger.error(f"Default voice file not found: {default_wav_path}")
+                return False
 
-        if voice_id != default_wav_path and voice_id not in self.supported_voices:
+        # 如果传入的是文件路径，检查文件是否存在
+        if os.path.isfile(voice_id):
+            if not os.path.exists(voice_id):
+                logger.error(f"Voice file not found: {voice_id}")
+                return False
+        # 如果是声音名称，检查是否在支持列表中
+        elif voice_id not in self.supported_voices:
             logger.warning(f"Voice '{voice_id}' not in supported voices list, using default")
-            voice_id = "default"
+            if os.path.exists(default_wav_path):
+                voice_id = default_wav_path
+            else:
+                logger.error(f"Default voice file not found: {default_wav_path}")
+                return False
         
         logger.info(f"Generating speech, text: {text}, length: {len(text)}")
         

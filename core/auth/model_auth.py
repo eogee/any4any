@@ -25,6 +25,11 @@ async def verify_token(authorization: Optional[str] = Header(None)):
             headers={"WWW-Authenticate": "Bearer"}
         )
     token = authorization[7:]
+
+    # 如果API_KEY为空字符串或"EMPTY"，允许访问（开发模式）
+    if Config.API_KEY == "EMPTY" or Config.API_KEY == "":
+        return
+
     if token != Config.API_KEY:
         raise HTTPException(
             status_code=403,

@@ -5,7 +5,6 @@ import numpy as np
 import soundfile as sf
 import resampy
 import asyncio
-import edge_tts
 import logging
 from typing import Iterator
 import queue
@@ -13,6 +12,7 @@ from io import BytesIO
 from threading import Thread, Event
 from enum import Enum
 from typing import TYPE_CHECKING
+import os
 
 if TYPE_CHECKING:
     from basereal import BaseReal
@@ -63,14 +63,88 @@ class BaseTTS:
     def txt_to_audio(self, msg: tuple[str, dict]):
         pass
 
+class IndexTTS(BaseTTS):
+    def txt_to_audio(self, msg: tuple[str, dict]):
+        text, textevent = msg
+        t = time.time()
+
+        try:
+            from core.tts.index_tts_engine import IndexTTSEngine
+            import tempfile
+            import os
+
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:
+                engine = IndexTTSEngine.get_instance({
+                    'model_path': getattr(self.opt, 'index_tts_model_dir', '/mnt/c/models/IndexTTS-1.5'),
+                    'device': getattr(self.opt, 'index_tts_device', 'cpu')
+                })
+
+                # IndexTTS只支持"default"声音，系统会自动转换为default.wav文件路径
+                success = engine.generate_speech(text, tmp_file.name, "default")
+
+                if success and os.path.exists(tmp_file.name):
+                    stream, sample_rate = sf.read(tmp_file.name)
+                    os.unlink(tmp_file.name)
+                else:
+                    logger.warning('IndexTTS generation failed, falling back to edge-tts')
+                    return self._fallback_to_edge_tts(text, textevent)
+
+        except Exception as e:
+            logger.warning(f'IndexTTS error: {e}, falling back to edge-tts')
+            return self._fallback_to_edge_tts(text, textevent)
+
+        logger.info(f'Index tts time:{time.time() - t:.4f}s')
+        self._process_audio_stream(stream, sample_rate, text, textevent)
+
+    def _fallback_to_edge_tts(self, text, textevent):
+        voicename = getattr(self.opt, 'REF_FILE', 'zh-CN-YunxiaNeural')
+        t = time.time()
+
+        try:
+            import edge_tts
+            communicate = edge_tts.Communicate(text, voicename)
+
+            # 直接生成到临时文件
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:
+                asyncio.new_event_loop().run_until_complete(communicate.save(tmp_file.name))
+
+                if os.path.exists(tmp_file.name):
+                    stream, sample_rate = sf.read(tmp_file.name)
+                    os.unlink(tmp_file.name)
+                    self._process_audio_stream(stream, sample_rate, text, textevent)
+                else:
+                    logger.error('edge-tts fallback failed!')
+
+        except Exception as e:
+            logger.error(f'edge-tts fallback error: {e}')
+
+    def _process_audio_stream(self, stream, sample_rate, text, textevent):
+        if sample_rate != self.sample_rate and stream.shape[0] > 0:
+            stream = resampy.resample(x=stream, sr_orig=sample_rate, sr_new=self.sample_rate)
+
+        streamlen = stream.shape[0]
+        idx = 0
+        while streamlen >= self.chunk and self.state == State.RUNNING:
+            eventpoint = {}
+            streamlen -= self.chunk
+            if idx == 0:
+                eventpoint = {'status': 'start', 'text': text}
+                eventpoint.update(**textevent)
+            elif streamlen < self.chunk:
+                eventpoint = {'status': 'end', 'text': text}
+                eventpoint.update(**textevent)
+            self.parent.put_audio_frame(stream[idx:idx + self.chunk], eventpoint)
+            idx += self.chunk
+
 class EdgeTTS(BaseTTS):
     def txt_to_audio(self, msg: tuple[str, dict]):
-        voicename = self.opt.REF_FILE  # "zh-CN-YunxiaNeural"
+        voicename = getattr(self.opt, 'REF_FILE', 'zh-CN-YunxiaNeural')
         text, textevent = msg
         t = time.time()
         asyncio.new_event_loop().run_until_complete(self.__main(voicename, text))
         logger.info(f'-------edge tts time:{time.time() - t:.4f}s')
-        if self.input_stream.getbuffer().nbytes <= 0:  # edgetts err
+        if self.input_stream.getbuffer().nbytes <= 0:
             logger.error('edgetts error!')
             return
 
@@ -83,14 +157,12 @@ class EdgeTTS(BaseTTS):
             streamlen -= self.chunk
             if idx == 0:
                 eventpoint = {'status': 'start', 'text': text}
-                eventpoint.update(**textevent)  # eventpoint={'status':'start','text':text,'msgevent':textevent}
+                eventpoint.update(**textevent)
             elif streamlen < self.chunk:
                 eventpoint = {'status': 'end', 'text': text}
-                eventpoint.update(**textevent)  # eventpoint={'status':'end','text':text,'msgevent':textevent}
+                eventpoint.update(**textevent)
             self.parent.put_audio_frame(stream[idx:idx + self.chunk], eventpoint)
             idx += self.chunk
-        # if streamlen>0:  #skip last frame(not 20ms)
-        #    self.queue.put(stream[idx:])
         self.input_stream.seek(0)
         self.input_stream.truncate()
 

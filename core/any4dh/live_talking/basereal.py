@@ -23,7 +23,7 @@ from av import AudioFrame, VideoFrame
 import av
 from fractions import Fraction
 
-from .ttsreal import EdgeTTS
+from .ttsreal import EdgeTTS, IndexTTS
 import logging
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,14 @@ class BaseReal:
         self.chunk = self.sample_rate // opt.fps # 320 samples per chunk (20ms * 16000 / 1000)
         self.sessionid = self.opt.sessionid
 
-        # Only EdgeTTS is supported
-        logger.info(f"Using EdgeTTS for text-to-speech")
-        self.tts = EdgeTTS(opt, self)
+        # 根据配置选择TTS引擎
+        tts_engine = getattr(opt, 'tts_engine', 'edgetts')
+        if tts_engine == 'index':
+            logger.info(f"Using IndexTTS for text-to-speech")
+            self.tts = IndexTTS(opt, self)
+        else:
+            logger.info(f"Using EdgeTTS for text-to-speech")
+            self.tts = EdgeTTS(opt, self)
 
         self.speaking = False
 
@@ -369,11 +374,3 @@ class BaseReal:
             audio_thread.join()
             vircam.close()
         logger.info('basereal process_frames thread stop') 
-    
-    # def process_custom(self,audiotype:int,idx:int):
-    #     if self.curr_state!=audiotype: #从推理切到口播
-    #         if idx in self.switch_pos:  #在卡点位置可以切换
-    #             self.curr_state=audiotype
-    #             self.custom_index=0
-    #     else:
-    #         self.custom_index+=1
