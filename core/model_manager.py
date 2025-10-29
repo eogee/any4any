@@ -76,7 +76,7 @@ class ModelManager:
                 cls.available_voices = voices_manager.voices
                 logger.info(f"Loaded {len(cls.available_voices)} voices")
 
-            if load_index_tts and Config.INDEX_TTS_ENABLED and not cls.index_tts_engine:
+            if load_index_tts and Config.INDEX_TTS_MODEL_ENABLED and not cls.index_tts_engine:
                 try:
                     logger.info("Loading IndexTTS-1.5...")
 

@@ -114,7 +114,7 @@ async def create_speech(
         text = filter_special_chars(text)
 
         # Try to use IndexTTS-1.5 engine
-        if Config.INDEX_TTS_ENABLED:
+        if Config.INDEX_TTS_MODEL_ENABLED:
             try:
                 index_tts_engine = IndexTTSEngine.get_instance({
                     'model_path': Config.INDEX_TTS_MODEL_DIR,
@@ -357,7 +357,7 @@ The configuration parameters for the TTS module are defined in `config.py`:
 EDGE_DEFAULT_VOICE = os.getenv("EDGE_DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
 
 # IndexTTS-1.5 engine configuration
-INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"
+INDEX_TTS_MODEL_ENABLED = os.getenv("INDEX_TTS_MODEL_ENABLED", "False").lower() == "true"
 INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
 INDEX_TTS_DEVICE = os.getenv("INDEX_TTS_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))
@@ -436,7 +436,7 @@ When the IndexTTS-1.5 engine fails, the system automatically degrades to the Edg
 
 ```python
 # Engine degradation logic
-if Config.INDEX_TTS_ENABLED:
+if Config.INDEX_TTS_MODEL_ENABLED:
     try:
         # Try to use IndexTTS-1.5
         # ...
@@ -469,7 +469,7 @@ if Config.INDEX_TTS_ENABLED:
 ### 6.2 Usage Instructions
 
 1. **Enable IndexTTS-1.5**:
-   - Set environment variable `INDEX_TTS_ENABLED=true`
+   - Set environment variable `INDEX_TTS_MODEL_ENABLED=true`
    - Configure `INDEX_TTS_MODEL_DIR` to point to the model directory
    - Select appropriate device (CPU/GPU) through `INDEX_TTS_DEVICE`
 

@@ -33,7 +33,7 @@ async def create_speech(
 
         output_file = f"temp_{uuid.uuid4().hex}.mp3"
 
-        if Config.INDEX_TTS_ENABLED:
+        if Config.INDEX_TTS_MODEL_ENABLED:
             try:
                 index_tts_engine = IndexTTSEngine.get_instance({
                     'model_path': Config.INDEX_TTS_MODEL_DIR,

@@ -26,7 +26,7 @@ class RetrievalEngine:
             top_k = Config.TOP_K
         
         if use_rerank is None:
-            use_rerank = Config.RERANK_ENABLED
+            use_rerank = Config.RERANK_MODEL_ENABLED
 
         # 初步检索
         initial_top_k = top_k * Config.RERANK_CANDIDATE_FACTOR if use_rerank and self.reranker else top_k # rerank 候选文档数 默认10倍于top_k
@@ -42,7 +42,7 @@ class RetrievalEngine:
             }
         
         # rerank重排序
-        if use_rerank and self.reranker and Config.RERANK_ENABLED:            
+        if use_rerank and self.reranker and Config.RERANK_MODEL_ENABLED:            
             logger.info(f"Using rerank model to retriavaling...")
             documents = [metadata['chunk_text'] for _, metadata in similar_docs] # 准备重排序所需的数据
             

@@ -72,12 +72,13 @@ class Config:
     SUPPORTED_FILE_TYPES = ['.pdf', '.docx', '.txt']                                # 支持的文件类型
     
     # RERANK模型配置
-    RERANK_ENABLED = os.getenv("RERANK_ENABLED", "True").lower() == "true"          # 是否启用重排序
     RERANK_CANDIDATE_FACTOR = int(os.getenv("RERANK_CANDIDATE_FACTOR", "10"))       # 重排序候选文档倍数
     RERANK_BATCH_SIZE = int(os.getenv("RERANK_BATCH_SIZE", "16"))                   # 重排序批处理大小
 
     # IndexTTS-1.5引擎配置
-    INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"   # 是否启用IndexTTS-1.5引擎
+    INDEX_TTS_FAST_ENABLED = os.getenv("INDEX_TTS_FAST_ENABLED", "False").lower() == "true"  # 是否启用IndexTTS-1.5快速推理模式
+    INDEX_TTS_FAST_MAX_TOKENS = int(os.getenv("INDEX_TTS_FAST_MAX_TOKENS", "50"))   # 快速模式：分句的最大token数（越小越快，默认50）
+    INDEX_TTS_FAST_BATCH_SIZE = int(os.getenv("INDEX_TTS_FAST_BATCH_SIZE", "6"))   # 快速模式：分句分桶的最大容量（越大越快，默认6）
     INDEX_TTS_DEVICE = os.getenv("INDEX_TTS_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
     INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))            # IndexTTS-1.5最大并发数
     INDEX_TTS_TIMEOUT = int(os.getenv("INDEX_TTS_TIMEOUT", "60"))                   # IndexTTS-1.5超时时间，单位为秒

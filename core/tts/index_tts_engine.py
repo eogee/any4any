@@ -55,11 +55,24 @@ class IndexTTSEngine:
                 sys.path.insert(0, indextts_path)
             
             IndexTTSInference = self._import_model()
-            
+
             if IndexTTSInference is None:
                 raise ImportError("Failed to import IndexTTSInference class")
-            
-            self.model = IndexTTSInference(model_path=self.model_path, device=self.device)
+
+            # 根据配置决定是否启用快速模式
+            fast_mode = Config.INDEX_TTS_FAST_ENABLED
+            fast_max_tokens = Config.INDEX_TTS_FAST_MAX_TOKENS
+            fast_bucket_size = Config.INDEX_TTS_FAST_BATCH_SIZE
+
+            logger.info(f"IndexTTS fast mode: {'enabled' if fast_mode else 'disabled'}")
+            if fast_mode:
+                logger.info(f"Fast mode settings: max_tokens={fast_max_tokens}, bucket_size={fast_bucket_size}")
+
+            self.model = IndexTTSInference(
+                model_path=self.model_path,
+                device=self.device,
+                fast_mode=fast_mode
+            )
             logger.info(f"IndexTTS-1.5 engine loaded with {'CUDA' if self.device == 'cuda' else 'CPU'}")
             IndexTTSEngine._initialized = True
             
@@ -194,18 +207,22 @@ class IndexTTSEngine:
         instance = cls._instance
         status = {
             "initialized": cls._initialized,
-            "enabled": Config.INDEX_TTS_ENABLED,
+            "enabled": Config.INDEX_TTS_MODEL_ENABLED,
+            "fast_mode_enabled": Config.INDEX_TTS_FAST_ENABLED,
             "model_loaded": instance.model is not None if instance else False,
             "device": instance.device if instance else "unknown",
             "model_path": instance.model_path if instance else "unknown"
         }
-        
+
         # 添加更多实例相关的状态信息
         if instance:
             status.update({
                 "max_workers": instance.max_workers,
                 "timeout": instance.timeout,
-                "supported_voices": instance.supported_voices
+                "supported_voices": instance.supported_voices,
+                "fast_mode": getattr(instance.model, 'fast_mode', False) if instance.model else False,
+                "fast_max_tokens": Config.INDEX_TTS_FAST_MAX_TOKENS,
+                "fast_bucket_size": Config.INDEX_TTS_FAST_BATCH_SIZE
             })
-        
+
         return status

@@ -259,7 +259,7 @@ The system integrates rerank functionality to further optimize preliminary retri
 
 ```python
 # Rerank core logic
-if use_rerank and self.reranker and Config.RERANK_ENABLED:
+if use_rerank and self.reranker and Config.RERANK_MODEL_ENABLED:
     documents = [metadata['chunk_text'] for _, metadata in similar_docs]
     # Batch process to calculate relevance scores
     batch_pairs = [[question, doc] for doc in documents]
@@ -295,7 +295,7 @@ Key configuration items for the knowledge base system:
 | Configuration Item | Description | Default Value |
 |--------------------|-------------|---------------|
 | KNOWLEDGE_BASE_ENABLED | Whether to enable knowledge base functionality | Configurable |
-| RERANK_ENABLED | Whether to enable rerank functionality | Configurable |
+| RERANK_MODEL_ENABLED | Whether to enable rerank functionality | Configurable |
 | RERANK_CANDIDATE_FACTOR | Rerank candidate document multiplier | 10 |
 | RERANK_BATCH_SIZE | Rerank batch processing size | Configurable |
 | EMBEDDING_MODEL_DIR | Embedding model path | /mnt/c/models/bge-small-zh-v1.5 |

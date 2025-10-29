@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutting down...")
     
     # 清理IndexTTS-1.5引擎资源
-    if Config.INDEX_TTS_ENABLED:
+    if Config.INDEX_TTS_MODEL_ENABLED:
         try:
             from core.tts.index_tts_engine import IndexTTSEngine
             IndexTTSEngine.cleanup()

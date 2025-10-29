@@ -25,18 +25,19 @@ from .utils.front import TextNormalizer, TextTokenizer
 
 class IndexTTSInference:
     """IndexTTS-1.5推理类（用于any4any集成）"""
-    def __init__(self, model_path=None, device=None):
+    def __init__(self, model_path=None, device=None, fast_mode=False):
         """
         初始化IndexTTS推理引擎
-        
+
         Args:
             model_path: 模型路径
             device: 设备类型 ('cuda' 或 'cpu')
+            fast_mode: 是否使用快速推理模式
         """
         # 调用原有的IndexTTS类进行初始化
         # 自动检测是否使用CUDA内核，当使用CUDA设备时启用
         use_cuda = device.startswith('cuda') if device else torch.cuda.is_available()
-        
+
         self.tts = IndexTTS(
             cfg_path=os.path.join(model_path, "config.yaml"),
             model_dir=model_path,
@@ -44,22 +45,36 @@ class IndexTTSInference:
             is_fp16=use_cuda,
             use_cuda_kernel=use_cuda  # 当使用CUDA设备时，启用CUDA内核以加速生成
         )
+
+        self.fast_mode = fast_mode
         
     def infer(self, text, output_path, voice=None):
         """
         生成语音
-        
+
         Args:
             text: 文本内容
             output_path: 输出音频路径
             voice: 声音选项
         """
-        # 使用IndexTTS生成语音
-        self.tts.infer(
-            audio_prompt=voice,  # 直接使用传入的voice参数，不再设置默认值
-            text=text,
-            output_path=output_path
-        )
+        # 根据快速模式配置选择推理方法
+        if self.fast_mode:
+            # 使用快速推理模式，从配置文件读取参数
+            from config import Config
+            self.tts.infer_fast(
+                audio_prompt=voice,
+                text=text,
+                output_path=output_path,
+                max_text_tokens_per_sentence=Config.INDEX_TTS_FAST_MAX_TOKENS,
+                sentences_bucket_max_size=Config.INDEX_TTS_FAST_BATCH_SIZE
+            )
+        else:
+            # 使用普通推理模式
+            self.tts.infer(
+                audio_prompt=voice,
+                text=text,
+                output_path=output_path
+            )
 
 
 class IndexTTS:

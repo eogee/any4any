@@ -114,7 +114,7 @@ async def create_speech(
         text = filter_special_chars(text)
 
         # 尝试使用IndexTTS-1.5引擎
-        if Config.INDEX_TTS_ENABLED:
+        if Config.INDEX_TTS_MODEL_ENABLED:
             try:
                 index_tts_engine = IndexTTSEngine.get_instance({
                     'model_path': Config.INDEX_TTS_MODEL_DIR,
@@ -357,7 +357,7 @@ TTS模块的配置参数在`config.py`中定义：
 EDGE_DEFAULT_VOICE = os.getenv("EDGE_DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
 
 # IndexTTS-1.5引擎配置
-INDEX_TTS_ENABLED = os.getenv("INDEX_TTS_ENABLED", "False").lower() == "true"
+INDEX_TTS_MODEL_ENABLED = os.getenv("INDEX_TTS_MODEL_ENABLED", "False").lower() == "true"
 INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
 INDEX_TTS_DEVICE = os.getenv("INDEX_TTS_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 INDEX_TTS_MAX_WORKERS = int(os.getenv("INDEX_TTS_MAX_WORKERS", "2"))
@@ -436,7 +436,7 @@ return file_response_with_cleanup(
 
 ```python
 # 引擎降级逻辑
-if Config.INDEX_TTS_ENABLED:
+if Config.INDEX_TTS_MODEL_ENABLED:
     try:
         # 尝试使用IndexTTS-1.5
         # ...
@@ -469,7 +469,7 @@ if Config.INDEX_TTS_ENABLED:
 ### 6.2 使用说明
 
 1. **启用IndexTTS-1.5**：
-   - 设置环境变量`INDEX_TTS_ENABLED=true`
+   - 设置环境变量`INDEX_TTS_MODEL_ENABLED=true`
    - 配置`INDEX_TTS_MODEL_DIR`指向模型目录
    - 选择适当的设备（CPU/GPU）通过`INDEX_TTS_DEVICE`
 
