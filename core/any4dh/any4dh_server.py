@@ -2,6 +2,7 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from core.tts.file import file_response_with_cleanup
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -312,7 +313,7 @@ def register_any4dh_routes(app: FastAPI):
         语音对话接口：录音 -> ASR -> LLM -> TTS
         """
         try:
-            logger.info(f"收到语音对话请求: file={file.filename if file else 'None'}, sessionid={sessionid}")
+            logger.info(f"Received voice chat request: file={file.filename if file else 'None'}, sessionid={sessionid}")
             # 检查文件大小限制 (10MB)
             max_file_size = 10 * 1024 * 1024  # 10MB
             file_content = await file.read()
@@ -329,8 +330,6 @@ def register_any4dh_routes(app: FastAPI):
                     "error": "音频文件为空"
                 }
 
-            logger.info(f"收到语音对话请求，文件大小: {len(file_content)} bytes")
-
             # 1. ASR语音识别
             recognized_text = await transcribe_audio(file_content)
 
@@ -340,7 +339,7 @@ def register_any4dh_routes(app: FastAPI):
                     "error": "语音识别结果为空，请说话清晰一些"
                 }
 
-            logger.info(f"ASR识别结果: {recognized_text}")
+            logger.info(f"ASR recognition result: {recognized_text}")
 
             # 2. LLM对话处理
             response_text = await process_llm_chat(recognized_text)
@@ -348,72 +347,106 @@ def register_any4dh_routes(app: FastAPI):
             if not response_text or not response_text.strip():
                 response_text = "抱歉，我现在无法回答这个问题。"
 
-            logger.info(f"LLM响应结果: {response_text}")
+            logger.info(f"LLM response result: {response_text}")
 
             # 3. TTS语音合成
             audio_url = await synthesize_speech(response_text)
 
-            logger.info(f"TTS合成完成: {audio_url}")
-
             # 4. 如果有活动的数字人会话，将音频传递给数字人进行嘴唇同步
             audio_synced = False
-            if sessionid and sessionid in any4dh_reals:
+
+            # 尝试将sessionid转换为整数
+            sessionid_int = None
+            if sessionid:
                 try:
-                    # 读取生成的音频文件
-                    audio_file_path = audio_url.replace('/static/', 'static/')
+                    sessionid_int = int(sessionid)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid sessionid format: {sessionid}")
+
+            # 检查数字人会话是否存在
+            if not (sessionid_int and sessionid_int in any4dh_reals):
+                active_sessions = list(any4dh_reals.keys())
+                logger.warning(f"Failed to sync audio: sessionid={sessionid} (int: {sessionid_int}), active sessions={active_sessions}")
+
+            if sessionid_int and sessionid_int in any4dh_reals:
+                try:
+                    # 读取音频文件
+                    filename = audio_url[len('/temp_audio/'):]
+                    audio_file_path = filename
+
                     if os.path.exists(audio_file_path):
                         with open(audio_file_path, 'rb') as f:
                             audio_bytes = f.read()
-                        any4dh_reals[sessionid].put_audio_file(audio_bytes)
+                        any4dh_reals[sessionid_int].put_audio_file(audio_bytes)
                         audio_synced = True
-                        logger.info(f"音频已同步到数字人session {sessionid}")
+
+                        # 清理临时音频文件
+                        if audio_url.startswith('/temp_audio/'):
+                            try:
+                                os.remove(audio_file_path)
+                            except Exception as e:
+                                logger.warning(f"Failed to clean up temporary file: {e}")
                 except Exception as e:
-                    logger.warning(f"音频同步到数字人失败: {e}")
+                    logger.warning(f"Failed to sync audio to digital human: {e}")
             else:
-                # 添加调试信息
                 active_sessions = list(any4dh_reals.keys())
-                logger.warning(f"无法同步音频: sessionid={sessionid}, 活动会话={active_sessions}")
+                logger.warning(f"Failed to sync audio: sessionid={sessionid}, active sessions={active_sessions}")
 
                 # 尝试使用最新的活动会话
                 if active_sessions and len(active_sessions) > 0:
                     latest_session = active_sessions[-1]
                     try:
-                        audio_file_path = audio_url.replace('/static/', 'static/')
+                        # 临时音频文件，直接在根目录下
+                        filename = audio_url[len('/temp_audio/'):]
+                        audio_file_path = filename
+
                         if os.path.exists(audio_file_path):
                             with open(audio_file_path, 'rb') as f:
                                 audio_bytes = f.read()
                             any4dh_reals[latest_session].put_audio_file(audio_bytes)
                             audio_synced = True
-                            logger.info(f"音频已同步到最新的数字人session {latest_session}")
                     except Exception as e:
-                        logger.warning(f"音频同步到最新数字人失败: {e}")
+                        logger.warning(f"Failed to sync audio to latest digital human: {e}")
 
             # 5. 获取音频时长信息
             audio_duration = 0
             if audio_synced:
                 try:
                     import librosa
-                    audio_file_path = audio_url.replace('/static/', 'static/')
+                    filename = audio_url[len('/temp_audio/'):]
+                    audio_file_path = filename
+
                     if os.path.exists(audio_file_path):
                         # 使用librosa获取音频时长
                         y, sr = librosa.load(audio_file_path)
                         audio_duration = int(librosa.get_duration(y=y, sr=sr) * 1000)  # 转换为毫秒
                 except ImportError:
                     # 如果没有librosa，使用文件大小估算（假设平均比特率32kbps）
-                    audio_file_path = audio_url.replace('/static/', 'static/')
+                    filename = audio_url[len('/temp_audio/'):]
+                    audio_file_path = filename
+
                     if os.path.exists(audio_file_path):
                         file_size = os.path.getsize(audio_file_path)
                         audio_duration = (file_size * 8) // (32 * 1000) * 1000  # 估算毫秒
                 except Exception as e:
-                    logger.warning(f"获取音频时长失败: {e}")
+                    logger.warning(f"Failed to get audio duration: {e}")
                     audio_duration = 15000  # 默认15秒
+
+            # 清理临时文件
+            if audio_url.startswith('/temp_audio/'):
+                try:
+                    filename = audio_url[len('/temp_audio/'):]
+                    if os.path.exists(filename):
+                        os.remove(filename)
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temporary file: {e}")
 
             # 6. 返回完整结果 - 始终不返回前端音频URL，强制使用数字人播放
             return {
                 "success": True,
                 "recognized_text": recognized_text,
                 "response_text": response_text,
-                "audio_url": None,  # 始终不返回前端音频URL
+                "audio_url": None,
                 "audio_synced": audio_synced,
                 "audio_file": audio_url.split('/')[-1] if audio_synced else None,  # 返回文件名用于状态显示
                 "audio_duration": audio_duration,  # 音频时长（毫秒）
@@ -422,13 +455,13 @@ def register_any4dh_routes(app: FastAPI):
             }
 
         except HTTPException as he:
-            logger.error(f"HTTP异常: {he.status_code} - {he.detail}")
+            logger.error(f"HTTP exception: {he.status_code} - {he.detail}")
             return {
                 "success": False,
                 "error": f"HTTP错误 {he.status_code}: {he.detail}"
             }
         except Exception as e:
-            logger.exception('语音对话处理异常:')
+            logger.exception('Voice chat processing exception:')
             return {
                 "success": False,
                 "error": f"语音处理失败: {str(e)}"
@@ -458,9 +491,6 @@ def register_any4dh_routes(app: FastAPI):
                     yield f"data: {json.dumps({'type': 'error', 'message': '音频文件为空'})}\n\n"
                 return StreamingResponse(error_response(), media_type="text/plain")
 
-            logger.info(f"收到流式语音对话请求: file={file.filename if file else 'None'}, sessionid={sessionid}")
-            logger.info(f"收到流式语音对话请求，文件大小: {len(file_content)} bytes")
-
             # 1. ASR语音识别
             recognized_text = await transcribe_audio(file_content)
 
@@ -469,7 +499,7 @@ def register_any4dh_routes(app: FastAPI):
                     yield f"data: {json.dumps({'type': 'error', 'message': '语音识别结果为空，请说话清晰一些'})}\n\n"
                 return StreamingResponse(error_response(), media_type="text/plain")
 
-            logger.info(f"ASR识别结果: {recognized_text}")
+            logger.info(f"ASR recognition result: {recognized_text}")
 
             # 2. 创建流式处理器
             from .streaming_utils import StreamingTTSProcessor
@@ -481,7 +511,7 @@ def register_any4dh_routes(app: FastAPI):
                         # 使用SSE格式发送数据
                         yield f"data: {json.dumps(result, ensure_ascii=False)}\n\n"
                 except Exception as e:
-                    logger.error(f"流式处理异常: {str(e)}")
+                    logger.error(f"Stream processing exception: {str(e)}")
                     yield f"data: {json.dumps({'type': 'error', 'message': f'处理异常: {str(e)}'})}\n\n"
 
             return StreamingResponse(
@@ -495,14 +525,14 @@ def register_any4dh_routes(app: FastAPI):
             )
 
         except HTTPException as he:
-            logger.error(f"HTTP异常: {he.status_code} - {he.detail}")
+            logger.error(f"HTTP exception: {he.status_code} - {he.detail}")
 
             async def error_response():
                 yield f"data: {json.dumps({'type': 'error', 'message': f'HTTP错误 {he.status_code}: {he.detail}'})}\n\n"
             return StreamingResponse(error_response(), media_type="text/plain")
 
         except Exception as e:
-            logger.exception('流式语音对话处理异常:')
+            logger.exception('Stream voice chat processing exception:')
 
             async def error_response():
                 yield f"data: {json.dumps({'type': 'error', 'message': f'语音处理失败: {str(e)}'})}\n\n"
@@ -526,17 +556,13 @@ def register_any4dh_routes(app: FastAPI):
             if not audio_url:
                 return {"code": -1, "msg": "Audio URL is required"}
 
-            # 构建完整的音频文件路径
-            if audio_url.startswith('/static/'):
-                audio_path = audio_url[1:]  # 移除开头的 /
-            else:
-                audio_path = audio_url
-
-            full_audio_path = os.path.join(os.getcwd(), audio_path)
+            # 临时音频文件
+            filename = audio_url[len('/temp_audio/'):]
+            full_audio_path = filename
 
             if not os.path.exists(full_audio_path):
-                logger.error(f"Audio file not found: {full_audio_path}")
-                return {"code": -1, "msg": f"Audio file not found: {audio_url}"}
+                logger.error(f"Temporary audio file not found: {filename}")
+                return {"code": -1, "msg": f"Temporary audio file not found: {filename}"}
 
             # 读取音频文件并传给数字人
             try:
@@ -546,7 +572,13 @@ def register_any4dh_routes(app: FastAPI):
                 # 传递音频到数字人实例
                 any4dh_reals[sessionid].put_audio_file(audio_bytes)
 
-                logger.info(f"音频段已发送到数字人 sessionid={sessionid}, text={request.text[:20] if request.text else 'N/A'}...")
+                # 如果是临时音频文件，在发送后立即清理
+                if audio_url.startswith('/temp_audio/'):
+                    try:
+                        os.remove(full_audio_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to clean up temporary file: {e}")
+
                 return {"code": 0, "msg": "Audio playback started successfully"}
 
             except Exception as audio_error:
@@ -556,6 +588,39 @@ def register_any4dh_routes(app: FastAPI):
         except Exception as e:
             logger.exception('Audio playback exception:')
             return {"code": -1, "msg": f"Audio playback failed: {str(e)}"}
+
+    # 临时音频文件访问端点
+    @app.get("/temp_audio/{filename}")
+    async def get_temp_audio(filename: str):
+        """访问临时音频文件，使用自动清理机制"""
+        # 临时音频文件直接在根目录下
+        file_path = filename
+
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Temporary audio file not found")
+
+        # 使用带清理功能的文件响应
+        return file_response_with_cleanup(
+            file_path,
+            media_type="audio/mpeg",
+            filename=filename,
+            cleanup_file=file_path
+        )
+
+    # 临时文件管理状态端点
+    @app.get("/temp_audio/status")
+    async def get_temp_file_status():
+        """获取临时文件管理状态"""
+        from core.tts.temp_file_manager import temp_file_manager
+        return temp_file_manager.get_status()
+
+    # 清理临时文件端点
+    @app.post("/temp_audio/cleanup")
+    async def cleanup_temp_files():
+        """手动清理所有临时文件"""
+        from core.tts.temp_file_manager import temp_file_manager
+        temp_file_manager.cleanup_all()
+        return {"message": "Temporary files cleanup initiated"}
 
 # 语音对话辅助函数
 async def transcribe_audio(file_content: bytes) -> str:
@@ -583,7 +648,7 @@ async def transcribe_audio(file_content: bytes) -> str:
         )
 
         if not res or not res[0]:
-            logger.warning("ASR返回空结果")
+            logger.warning("ASR returned empty result")
             return ""
 
         # 处理识别结果
@@ -593,7 +658,7 @@ async def transcribe_audio(file_content: bytes) -> str:
         return final_text.strip()
 
     except Exception as e:
-        logger.error(f"ASR处理失败: {str(e)}")
+        logger.error(f"ASR processing failed: {str(e)}")
         return ""
 
 async def process_llm_chat(text: str) -> str:
@@ -617,7 +682,7 @@ async def process_llm_chat(text: str) -> str:
         return response if response else "抱歉，我现在无法回答这个问题。"
 
     except Exception as e:
-        logger.error(f"LLM处理失败: {str(e)}")
+        logger.error(f"LLM processing failed: {str(e)}")
         return "抱歉，我现在无法回答这个问题。"
 
 async def synthesize_speech(text: str) -> str:
@@ -630,13 +695,10 @@ async def synthesize_speech(text: str) -> str:
         import uuid
         from config import Config
 
-        # 创建输出目录
-        voice_dir = Path("static/voice")
-        voice_dir.mkdir(exist_ok=True)
-
-        # 生成唯一文件名
-        filename = f"voice_output_{int(time.time() * 1000)}.mp3"
-        output_path = voice_dir / filename
+        # 使用统一临时文件管理器
+        from core.tts.temp_file_manager import create_temp_voice_output_file
+        output_path = create_temp_voice_output_file()
+        filename = os.path.basename(output_path)
 
         # 首先尝试使用IndexTTS
         if Config.INDEX_TTS_MODEL_ENABLED:
@@ -654,14 +716,13 @@ async def synthesize_speech(text: str) -> str:
 
                 success = await asyncio.get_event_loop().run_in_executor(None, tts_call)
 
-                if success and output_path.exists():
-                    logger.info(f"IndexTTS语音合成成功: {filename}")
-                    return f"/static/voice/{filename}"
+                if success and os.path.exists(output_path):
+                    return f"/temp_audio/{filename}"
                 else:
-                    logger.warning("IndexTTS合成失败，尝试使用edge-tts")
+                    logger.warning("IndexTTS synthesis failed, trying edge-tts")
 
             except Exception as e:
-                logger.warning(f"IndexTTS合成失败: {e}，尝试使用edge-tts")
+                logger.warning(f"IndexTTS synthesis failed: {e}, trying edge-tts")
 
         # 备选方案：使用edge-tts
         def edge_tts_call():
@@ -679,15 +740,14 @@ async def synthesize_speech(text: str) -> str:
 
         success = await asyncio.get_event_loop().run_in_executor(None, edge_tts_call)
 
-        if success and output_path.exists():
-            logger.info(f"edge-tts语音合成成功: {filename}")
-            return f"/static/voice/{filename}"
+        if success and os.path.exists(output_path):
+            return f"/temp_audio/{filename}"
         else:
-            logger.error("TTS语音合成失败")
+            logger.error("TTS speech synthesis failed")
             raise Exception("TTS语音合成失败")
 
     except Exception as e:
-        logger.error(f"TTS处理失败: {str(e)}")
+        logger.error(f"TTS processing failed: {str(e)}")
         raise Exception(f"语音合成失败: {str(e)}")
 
 # 全局初始化状态

@@ -9,6 +9,7 @@ from edge_tts import Communicate
 from core.auth.model_auth import verify_token
 from core.model_manager import ModelManager
 from core.tts.file import file_response_with_cleanup
+from core.tts.temp_file_manager import create_temp_audio_file, register_existing_temp_file
 from utils.content_handle.filter import filter_special_chars
 from config import Config
 from core.tts.index_tts_engine import IndexTTSEngine
@@ -31,7 +32,7 @@ async def create_speech(
         
         text = filter_special_chars(text)
 
-        output_file = f"temp_{uuid.uuid4().hex}.mp3"
+        output_file = create_temp_audio_file()
 
         if Config.INDEX_TTS_MODEL_ENABLED:
             try:

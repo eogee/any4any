@@ -2,17 +2,23 @@ import os
 import logging
 from fastapi.responses import FileResponse
 import torchaudio
+from .temp_file_manager import temp_file_manager
 
 def cleanup_file(filepath: str):
     """清理临时文件"""
     if not filepath:
         return
-    try:
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            logging.info(f"Cleaned up temporary file: {filepath}")
-    except Exception as e:
-        logging.error(f"Error cleaning up file {filepath}: {str(e)}")
+        
+    success = temp_file_manager.cleanup_file(filepath)
+
+    # 如果管理器中没有注册，尝试直接清理
+    if not success:
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                logging.info(f"Cleaned up temporary file: {filepath}")
+        except Exception as e:
+            logging.error(f"Error cleaning up file {filepath}: {str(e)}")
 
 
 def get_audio_duration(file_path: str) -> float:

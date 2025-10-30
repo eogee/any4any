@@ -33,24 +33,19 @@ def split_text_by_punctuation(text: str) -> List[str]:
     except ImportError:
         pass  # 如果导入失败，继续处理原文本
 
-    # 定义断句标点符号
     sentence_endings = r'[。！？.!?；;]'
-
-    # 分割文本，保留标点符号
     sentences = []
     current_sentence = ""
 
     for char in text:
         current_sentence += char
 
-        # 检查是否遇到断句标点
         if re.match(sentence_endings, char):
             sentence = current_sentence.strip()
             if sentence:
                 sentences.append(sentence)
             current_sentence = ""
 
-    # 处理最后没有标点的句子
     if current_sentence.strip():
         sentences.append(current_sentence.strip())
 
@@ -62,30 +57,24 @@ def split_text_by_punctuation(text: str) -> List[str]:
     i = 0
     while i < len(sentences):
         sentence = sentences[i].strip()
-
         if len(sentence) < min_sentence_chars and i + 1 < len(sentences):
-            # 如果当前句子太短，尝试与下一句合并
             next_sentence = sentences[i + 1].strip()
             merged_sentence = sentence + next_sentence
-
-            # 如果合并后的长度适中，则使用合并后的句子
             if len(merged_sentence) <= min_sentence_chars * 2:
                 filtered_sentences.append(merged_sentence)
-                i += 2  # 跳过下一句，因为已经合并
+                i += 2
             else:
-                # 如果合并后太长，保留原短句（可能是语气词等）
                 if len(sentence) >= 2:
                     filtered_sentences.append(sentence)
                 i += 1
         else:
-            # 句子长度足够或者是最后一句，直接保留
             if len(sentence) >= 2:
                 filtered_sentences.append(sentence)
             i += 1
 
     return filtered_sentences
 
-# 全局TTS引擎实例，避免重复创建
+# 全局TTS引擎实例
 _tts_engine = None
 
 async def synthesize_speech_segment(text: str, sessionid: str, any4dh_reals: Dict) -> Dict[str, Any]:
@@ -109,14 +98,10 @@ async def synthesize_speech_segment(text: str, sessionid: str, any4dh_reals: Dic
         # 过滤特殊字符，确保TTS不会读出不合适的符号
         text = filter_special_chars(text)
 
-        # 创建输出目录
-        voice_dir = Path("static/voice")
-        voice_dir.mkdir(exist_ok=True)
-
-        # 生成唯一文件名
-        segment_id = int(time.time() * 1000000) % 1000000  # 微秒精度
-        filename = f"stream_{segment_id}.mp3"
-        output_path = voice_dir / filename
+        # 使用统一临时文件管理器
+        from core.tts.temp_file_manager import create_temp_stream_file
+        output_path = create_temp_stream_file()
+        filename = os.path.basename(output_path)
 
         # 使用IndexTTS生成音频
         if Config.INDEX_TTS_MODEL_ENABLED:
@@ -139,7 +124,6 @@ async def synthesize_speech_segment(text: str, sessionid: str, any4dh_reals: Dic
                         'timeout': Config.INDEX_TTS_TIMEOUT
                     }
                     _tts_engine = IndexTTSEngine.get_instance(optimized_config)
-                    logger.info(f"TTS引擎已初始化用于流式处理 (参数: max_tokens={Config.INDEX_TTS_FAST_MAX_TOKENS}, bucket_size={Config.INDEX_TTS_FAST_BATCH_SIZE})")
 
                 return _tts_engine.generate_speech(
                     text=text,
@@ -151,7 +135,7 @@ async def synthesize_speech_segment(text: str, sessionid: str, any4dh_reals: Dic
             success = await asyncio.get_event_loop().run_in_executor(None, tts_call)
             generation_time = time.time() - start_time
 
-            if success and output_path.exists():
+            if success and os.path.exists(output_path):
                 # 同步到数字人
                 audio_synced = False
                 if sessionid and sessionid in any4dh_reals:
@@ -165,20 +149,34 @@ async def synthesize_speech_segment(text: str, sessionid: str, any4dh_reals: Dic
                         audio_synced = True
 
                         sync_time = time.time() - start_time
-                        logger.info(f"音频段已同步到数字人: {text[:20]}... (生成:{generation_time:.2f}s, 总计:{sync_time:.2f}s)")
+
+                        # 清理临时文件
+                        try:
+                            os.remove(output_path)
+                        except Exception as e:
+                            logger.warning(f"Failed to cleanup temporary file: {e}")
                     except Exception as e:
-                        logger.warning(f"音频段同步失败: {e}")
+                        logger.warning(f"Audio segment sync failed: {e}")
+
+                # 临时文件访问URL（如果没有同步到数字人，才提供URL访问）
+                audio_url = f"/temp_audio/{filename}" if not audio_synced else None
 
                 return {
                     'success': True,
                     'text': text,
-                    'audio_url': f"/static/voice/{filename}",
+                    'audio_url': audio_url,
                     'audio_synced': audio_synced,
-                    'segment_id': segment_id,
                     'generation_time': generation_time
                 }
             else:
-                logger.warning(f"TTS合成失败: {text[:20]}... (耗时: {generation_time:.2f}s)")
+                logger.warning(f"TTS synthesis failed: {text[:20]}... (time: {generation_time:.2f}s)")
+                # 清理失败的文件
+                try:
+                    if os.path.exists(output_path):
+                        os.remove(output_path)
+                except Exception as e:
+                    logger.warning(f"Error cleaning up failed file: {e}")
+
                 return {
                     'success': False,
                     'text': text,
@@ -186,15 +184,15 @@ async def synthesize_speech_segment(text: str, sessionid: str, any4dh_reals: Dic
                     'generation_time': generation_time
                 }
         else:
-            logger.warning("IndexTTS未启用，无法合成语音")
+            logger.warning("IndexTTS not enabled, unable to synthesize speech")
             return {
                 'success': False,
                 'text': text,
-                'error': 'IndexTTS未启用'
+                'error': 'IndexTTS not enabled'
             }
 
     except Exception as e:
-        logger.error(f"语音段处理失败: {str(e)}")
+        logger.error(f"Speech segment processing failed: {str(e)}")
         return {
             'success': False,
             'text': text,
@@ -222,7 +220,7 @@ async def process_llm_stream(text: str) -> AsyncGenerator[str, None]:
                 yield chunk
 
     except Exception as e:
-        logger.error(f"LLM流式处理失败: {str(e)}")
+        logger.error(f"LLM streaming processing failed: {str(e)}")
         yield "抱歉，我现在无法回答这个问题。"
 
 class StreamingTTSProcessor:
@@ -287,7 +285,7 @@ class StreamingTTSProcessor:
                             await asyncio.sleep(delay_time)
 
                         except Exception as e:
-                            logger.error(f"处理音频段失败: {e}")
+                            logger.error(f"Audio segment processing failed: {e}")
                             continue
 
                     # 保留最后的不完整句子
@@ -311,7 +309,7 @@ class StreamingTTSProcessor:
                     }
 
                 except Exception as e:
-                    logger.error(f"处理最终音频段失败: {e}")
+                    logger.error(f"Final audio segment processing failed: {e}")
 
             # 发送完成状态
             yield {
@@ -321,7 +319,7 @@ class StreamingTTSProcessor:
             }
 
         except Exception as e:
-            logger.error(f"流式处理失败: {str(e)}")
+            logger.error(f"Streaming processing failed: {str(e)}")
             yield {
                 'type': 'error',
                 'message': f'处理失败: {str(e)}'
