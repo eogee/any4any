@@ -31,7 +31,7 @@ def filter_special_chars(text: str) -> str:
     # 6. 移除表情符号和特殊Unicode字符
     text = re.sub(r'[\U00010000-\U0010FFFF]', '', text)  # 补充平面字符
     text = re.sub(r'[\u2000-\u2FFF]', '', text)  # 各种符号区域
-    text = re.sub(r'[\u3000-\u303F]', '', text)  # CJK符号和标点（部分保留）
+    # 不再过滤 CJK符号区域，保留中文标点
     
     # 7. 移除控制字符和不可见字符
     text = re.sub(r'[\x00-\x1F\x7F]', '', text)  # ASCII控制字符
@@ -57,8 +57,8 @@ def filter_special_chars(text: str) -> str:
     # 移除括号及其内容，如 (注释内容) [说明文字]
     text = re.sub(r'[\[\(].*?[\]\)]', '', text)
     
-    # 13. 最终清理：移除首尾的特殊字符
-    text = re.sub(r'^[^\w\u4e00-\u9fff]+|[^\w\u4e00-\u9fff]+$', '', text)
+    # 13. 最终清理：移除首尾的特殊字符，但保留基本标点
+    text = re.sub(r'^[^\w\u4e00-\u9fff。！？，；：、""''（）【】]+|[^\w\u4e00-\u9fff。！？，；：、""''（）【】]+$', '', text)
     
     # 记录清理日志（如果变化较大）
     if len(original_text) != len(text) or original_text != text:

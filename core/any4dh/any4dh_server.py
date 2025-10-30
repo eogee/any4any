@@ -1,7 +1,7 @@
 # any4dh FastAPI 服务器
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -77,6 +77,12 @@ class RecordRequest(BaseModel):
 
 class IsSpeakingRequest(BaseModel):
     sessionid: int
+
+class PlayAudioRequest(BaseModel):
+    sessionid: int
+    audio_url: str
+    text: Optional[str] = None
+    segment_index: Optional[int] = None
 
 def register_any4dh_routes(app: FastAPI):
     """注册 any4dh 数字人相关路由"""
@@ -427,6 +433,129 @@ def register_any4dh_routes(app: FastAPI):
                 "success": False,
                 "error": f"语音处理失败: {str(e)}"
             }
+
+    @app.post("/any4dh/voice-chat-stream")
+    async def voice_chat_stream(
+        file: UploadFile = File(...),
+        sessionid: Optional[str] = Form(None)
+    ):
+        """
+        流式语音对话接口：录音 -> ASR -> 流式LLM -> 分段TTS -> 数字人播放
+        支持实时音频流输出，用户可以更快听到AI回复
+        """
+        try:
+            # 检查文件大小限制 (10MB)
+            max_file_size = 10 * 1024 * 1024  # 10MB
+            file_content = await file.read()
+
+            if len(file_content) > max_file_size:
+                async def error_response():
+                    yield f"data: {json.dumps({'type': 'error', 'message': '音频文件过大，请限制在10MB以内'})}\n\n"
+                return StreamingResponse(error_response(), media_type="text/plain")
+
+            if len(file_content) == 0:
+                async def error_response():
+                    yield f"data: {json.dumps({'type': 'error', 'message': '音频文件为空'})}\n\n"
+                return StreamingResponse(error_response(), media_type="text/plain")
+
+            logger.info(f"收到流式语音对话请求: file={file.filename if file else 'None'}, sessionid={sessionid}")
+            logger.info(f"收到流式语音对话请求，文件大小: {len(file_content)} bytes")
+
+            # 1. ASR语音识别
+            recognized_text = await transcribe_audio(file_content)
+
+            if not recognized_text or not recognized_text.strip():
+                async def error_response():
+                    yield f"data: {json.dumps({'type': 'error', 'message': '语音识别结果为空，请说话清晰一些'})}\n\n"
+                return StreamingResponse(error_response(), media_type="text/plain")
+
+            logger.info(f"ASR识别结果: {recognized_text}")
+
+            # 2. 创建流式处理器
+            from .streaming_utils import StreamingTTSProcessor
+            processor = StreamingTTSProcessor(sessionid, any4dh_reals)
+
+            async def generate_stream():
+                try:
+                    async for result in processor.process_streaming_response(recognized_text):
+                        # 使用SSE格式发送数据
+                        yield f"data: {json.dumps(result, ensure_ascii=False)}\n\n"
+                except Exception as e:
+                    logger.error(f"流式处理异常: {str(e)}")
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'处理异常: {str(e)}'})}\n\n"
+
+            return StreamingResponse(
+                generate_stream(),
+                media_type="text/plain",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            )
+
+        except HTTPException as he:
+            logger.error(f"HTTP异常: {he.status_code} - {he.detail}")
+
+            async def error_response():
+                yield f"data: {json.dumps({'type': 'error', 'message': f'HTTP错误 {he.status_code}: {he.detail}'})}\n\n"
+            return StreamingResponse(error_response(), media_type="text/plain")
+
+        except Exception as e:
+            logger.exception('流式语音对话处理异常:')
+
+            async def error_response():
+                yield f"data: {json.dumps({'type': 'error', 'message': f'语音处理失败: {str(e)}'})}\n\n"
+            return StreamingResponse(error_response(), media_type="text/plain")
+
+    @app.post("/any4dh/play-audio")
+    async def play_audio(request: PlayAudioRequest):
+        """
+        播放音频段到数字人
+        用于流式模式下的音频播放
+        """
+        try:
+            sessionid = request.sessionid
+
+            if sessionid not in any4dh_reals:
+                logger.warning(f"Session {sessionid} not found for audio playback")
+                return {"code": -1, "msg": "Session not found"}
+
+            # 获取音频文件路径
+            audio_url = request.audio_url
+            if not audio_url:
+                return {"code": -1, "msg": "Audio URL is required"}
+
+            # 构建完整的音频文件路径
+            if audio_url.startswith('/static/'):
+                audio_path = audio_url[1:]  # 移除开头的 /
+            else:
+                audio_path = audio_url
+
+            full_audio_path = os.path.join(os.getcwd(), audio_path)
+
+            if not os.path.exists(full_audio_path):
+                logger.error(f"Audio file not found: {full_audio_path}")
+                return {"code": -1, "msg": f"Audio file not found: {audio_url}"}
+
+            # 读取音频文件并传给数字人
+            try:
+                with open(full_audio_path, 'rb') as f:
+                    audio_bytes = f.read()
+
+                # 传递音频到数字人实例
+                any4dh_reals[sessionid].put_audio_file(audio_bytes)
+
+                logger.info(f"音频段已发送到数字人 sessionid={sessionid}, text={request.text[:20] if request.text else 'N/A'}...")
+                return {"code": 0, "msg": "Audio playback started successfully"}
+
+            except Exception as audio_error:
+                logger.error(f"Failed to process audio file: {str(audio_error)}")
+                return {"code": -1, "msg": f"Failed to process audio: {str(audio_error)}"}
+
+        except Exception as e:
+            logger.exception('Audio playback exception:')
+            return {"code": -1, "msg": f"Audio playback failed: {str(e)}"}
 
 # 语音对话辅助函数
 async def transcribe_audio(file_content: bytes) -> str:

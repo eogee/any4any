@@ -25,7 +25,7 @@ from .utils.front import TextNormalizer, TextTokenizer
 
 class IndexTTSInference:
     """IndexTTS-1.5推理类（用于any4any集成）"""
-    def __init__(self, model_path=None, device=None, fast_mode=False):
+    def __init__(self, model_path=None, device=None, fast_mode=False, fast_max_tokens=100, fast_bucket_size=4):
         """
         初始化IndexTTS推理引擎
 
@@ -33,6 +33,8 @@ class IndexTTSInference:
             model_path: 模型路径
             device: 设备类型 ('cuda' 或 'cpu')
             fast_mode: 是否使用快速推理模式
+            fast_max_tokens: 快速模式下每句最大token数
+            fast_bucket_size: 快速模式下分桶大小
         """
         # 调用原有的IndexTTS类进行初始化
         # 自动检测是否使用CUDA内核，当使用CUDA设备时启用
@@ -47,6 +49,8 @@ class IndexTTSInference:
         )
 
         self.fast_mode = fast_mode
+        self.fast_max_tokens = fast_max_tokens
+        self.fast_bucket_size = fast_bucket_size
         
     def infer(self, text, output_path, voice=None):
         """
@@ -59,14 +63,14 @@ class IndexTTSInference:
         """
         # 根据快速模式配置选择推理方法
         if self.fast_mode:
-            # 使用快速推理模式，从配置文件读取参数
-            from config import Config
+            # 使用快速推理模式，应用优化的参数
+            print(f">> 使用优化快速推理参数: max_tokens={self.fast_max_tokens}, bucket_size={self.fast_bucket_size}")
             self.tts.infer_fast(
                 audio_prompt=voice,
                 text=text,
                 output_path=output_path,
-                max_text_tokens_per_sentence=Config.INDEX_TTS_FAST_MAX_TOKENS,
-                sentences_bucket_max_size=Config.INDEX_TTS_FAST_BATCH_SIZE
+                max_text_tokens_per_sentence=self.fast_max_tokens,
+                sentences_bucket_max_size=self.fast_bucket_size
             )
         else:
             # 使用普通推理模式
@@ -315,6 +319,7 @@ class IndexTTS:
         try:
             if "cuda" in str(self.device):
                 torch.cuda.empty_cache()
+                torch.cuda.set_per_process_memory_fraction(0.9)
             elif "mps" in str(self.device):
                 torch.mps.empty_cache()
         except Exception as e:
@@ -487,7 +492,7 @@ class IndexTTS:
                         all_latents.append(latent)
         del all_batch_codes, all_text_tokens, all_sentences
         # bigvgan chunk
-        chunk_size = 2
+        chunk_size = 6
         all_latents = [all_latents[all_idxs.index(i)] for i in range(len(all_latents))]
         if verbose:
             print(">> all_latents:", len(all_latents))
@@ -513,10 +518,10 @@ class IndexTTS:
             wavs.append(wav.cpu()) # to cpu before saving
 
         # clear cache
-        tqdm_progress.close()  # 确保进度条被关闭
+        tqdm_progress.close()
         del all_latents, chunk_latents
-        end_time = time.perf_counter()
         self.torch_empty_cache()
+        end_time = time.perf_counter()
 
         # wav audio output
         self._set_gr_progress(0.9, "save audio...")

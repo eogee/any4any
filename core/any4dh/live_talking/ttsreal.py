@@ -186,6 +186,13 @@ class EdgeTTS(BaseTTS):
         max_retries = 3
         retry_delay = 1  # seconds
 
+        # 过滤特殊字符，确保TTS不会读出不合适的符号
+        try:
+            from utils.content_handle.filter import filter_special_chars
+            text = filter_special_chars(text)
+        except ImportError:
+            pass  # 如果导入失败，继续处理原文本
+
         for attempt in range(max_retries):
             try:
                 # 尝试不同的 voice 配置来提高成功率

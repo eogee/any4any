@@ -854,6 +854,11 @@ class DashboardController {
         // 创建语音录音器实例
         this.voiceRecorder = new VoiceRecorder();
 
+        // 初始化流式模式控件
+        if (typeof layui !== 'undefined' && layui.form) {
+            layui.form.render(); // 渲染所有表单
+        }
+
         // 检查浏览器是否支持录音
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             
@@ -922,8 +927,19 @@ class DashboardController {
             // 获取录音数据
             const audioBlob = await this.voiceRecorder.stopRecording();
 
-            // 发送到服务器处理
-            const result = await this.sendVoiceToServer(audioBlob);
+            // 检查是否启用流式模式
+            const streamingEnabled = document.getElementById('enableStreaming')?.checked ?? true;
+
+            // 根据模式选择处理方式
+            let result;
+            if (streamingEnabled) {
+                // 流式模式
+                await this.processVoiceChatStream(audioBlob);
+                return; // 流式模式会自行处理结果显示
+            } else {
+                // 标准模式
+                result = await this.sendVoiceToServer(audioBlob);
+            }
 
             if (result.success) {
                 this.displayVoiceChatResult(result);
@@ -969,7 +985,7 @@ class DashboardController {
         formData.append('file', audioBlob, `recording_${Date.now()}.webm`);
         // 传递当前的数字人会话ID
         if (this.sessionId) {
-            formData.append('sessionid', this.sessionId);
+            formData.append('sessionid', this.sessionId.toString());
         }
 
         try {
@@ -1028,8 +1044,287 @@ class DashboardController {
                 items[i].remove();
             }
         }
-    }    
-    
+    }
+
+    /**
+     * 流式语音处理 - 支持分段TTS响应
+     */
+    async processVoiceChatStream(audioBlob) {
+        if (!this.voiceChatHistory) return;
+
+        try {
+            // 创建流式对话项
+            this.createStreamChatItem();
+
+            // 发送流式请求
+            const formData = new FormData();
+            formData.append('file', audioBlob, `recording_${Date.now()}.webm`);
+            if (this.sessionId) {
+                formData.append('sessionid', this.sessionId.toString());
+            }
+
+            const response = await fetch('/any4dh/voice-chat-stream', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // 处理流式响应
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // 保留最后一行（可能不完整）
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            this.handleStreamData(data);
+                        } catch (e) {
+                            console.error('解析流式数据失败:', e, line);
+                        }
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error('流式语音处理失败:', error);
+            this.showVoiceError('流式语音处理失败: ' + error.message);
+            this.updateStreamChatItem('error', '处理失败');
+        }
+    }
+
+    /**
+     * 创建流式对话项
+     */
+    createStreamChatItem() {
+        // 移除占位符
+        const placeholder = this.voiceChatHistory.querySelector('.voice-chat-placeholder');
+        if (placeholder) {
+            placeholder.remove();
+        }
+
+        const chatItem = document.createElement('div');
+        chatItem.className = 'voice-chat-item streaming';
+        chatItem.innerHTML = `
+            <div class="voice-user-message">
+                <div class="voice-message-label">您</div>
+                <div class="voice-user-text">正在识别...</div>
+            </div>
+            <div class="voice-ai-message">
+                <div class="voice-message-label">AI助手</div>
+                <div class="voice-ai-text">
+                    <span class="streaming-indicator">正在思考...</span>
+                </div>
+            </div>
+        `;
+
+        this.voiceChatHistory.appendChild(chatItem);
+        this.voiceChatHistory.scrollTop = this.voiceChatHistory.scrollHeight;
+
+        return chatItem;
+    }
+
+    /**
+     * 处理流式数据
+     */
+    handleStreamData(data) {
+        switch (data.type) {
+            case 'status':
+                // 显示用户输入的文本
+                if (data.recognized_text) {
+                    this.updateStreamChatItem('user', data.recognized_text);
+                }
+                this.updateStreamChatItem('status', data.message);
+                break;
+
+            case 'audio_segment':
+            case 'final_segment':
+                // 显示AI回复文本
+                if (data.data.text) {
+                    this.updateStreamChatItem('ai', data.data.text);
+                }
+
+                if (data.data.audio_url) {
+                    // 在控制台显示音频生成状态，不在界面显示
+                    console.log('音频生成中...');
+                    // 在流式模式下，立即播放音频
+                    this.playAudioSegment(data.data.audio_url, data.data.text, data.segment_index);
+                }
+
+                if (data.type === 'final_segment') {
+                    this.updateStreamChatItem('status', '回复完成');
+                    // 流式模式结束后，更新状态
+                    setTimeout(() => {
+                        this.isProcessing = false;
+                        this.updateRecordingState(false);
+                    }, 2000);
+                }
+                break;
+
+            case 'completed':
+                this.updateStreamChatItem('status', `处理完成 (共${data.total_segments}段)`);
+                this.isProcessing = false;
+                this.updateRecordingState(false);
+                break;
+
+            case 'error':
+                this.updateStreamChatItem('error', data.message);
+                this.isProcessing = false;
+                this.updateRecordingState(false);
+                this.showError(data.message);
+                break;
+
+            default:
+                console.log('未知数据类型:', data);
+        }
+    }
+
+    /**
+     * 更新流式对话项
+     */
+    updateStreamChatItem(type, content) {
+        const chatItem = this.voiceChatHistory.querySelector('.voice-chat-item.streaming:last-child');
+        if (!chatItem) return;
+
+        const userText = chatItem.querySelector('.voice-user-text');
+        const aiText = chatItem.querySelector('.voice-ai-text');
+
+        switch (type) {
+            case 'user':
+                // 显示用户文本
+                if (userText) {
+                    userText.innerHTML = content;
+                }
+                break;
+
+            case 'status':
+                // 显示状态信息，但保留AI文本
+                const currentAiText = aiText.getAttribute('data-ai-text') || '';
+                if (currentAiText) {
+                    aiText.innerHTML = `${currentAiText}<br><span class="streaming-indicator">${content}</span>`;
+                } else {
+                    aiText.innerHTML = `<span class="streaming-indicator">${content}</span>`;
+                }
+                break;
+
+            case 'ai':
+                // 累积AI文本
+                let existingText = aiText.getAttribute('data-ai-text') || '';
+                existingText += content;
+                aiText.setAttribute('data-ai-text', existingText);
+                aiText.innerHTML = existingText;
+                break;
+
+            case 'final':
+                // 最终文本
+                aiText.setAttribute('data-ai-text', content);
+                aiText.innerHTML = content;
+                chatItem.classList.remove('streaming');
+                break;
+
+            case 'completed':
+                // 完成状态
+                const finalAiText = aiText.getAttribute('data-ai-text') || '';
+                if (finalAiText) {
+                    aiText.innerHTML = `${finalAiText}<br><span class="streaming-complete">${content}</span>`;
+                } else {
+                    aiText.innerHTML = `<span class="streaming-complete">${content}</span>`;
+                }
+                chatItem.classList.remove('streaming');
+                break;
+
+            case 'error':
+                // 错误状态
+                aiText.innerHTML = `<span class="streaming-error">${content}</span>`;
+                chatItem.classList.add('error');
+                chatItem.classList.remove('streaming');
+                break;
+        }
+
+        // 滚动到底部
+        this.voiceChatHistory.scrollTop = this.voiceChatHistory.scrollHeight;
+    }
+
+    /**
+     * 播放音频段 - 同步到数字人
+     */
+    async playAudioSegment(audioUrl, text, segmentIndex) {
+        try {
+            if (!this.isConnected || !this.sessionId) {
+                console.warn('数字人未连接，无法播放音频');
+                return;
+            }
+
+            // 确保sessionid是数字类型
+            const sessionId = parseInt(this.sessionId);
+            if (isNaN(sessionId)) {
+                console.warn('无效的sessionId:', this.sessionId);
+                return;
+            }
+
+            // 通知数字人播放音频
+            const response = await fetch('/any4dh/play-audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionid: sessionId,
+                    audio_url: audioUrl,
+                    text: text,
+                    segment_index: segmentIndex
+                })
+            });
+
+            if (response.ok) {
+                console.log(`音频段已发送到数字人: ${text ? text.substring(0, 20) : 'N/A'}...`);
+            } else {
+                console.error('音频播放请求失败:', await response.text());
+            }
+
+        } catch (error) {
+            console.error('播放音频段失败:', error);
+        }
+    }
+
+    /**
+     * 更新录音状态
+     */
+    updateRecordingState(isProcessing) {
+        if (isProcessing) {
+            this.isProcessing = true;
+            if (this.voiceRecordBtn) {
+                this.voiceRecordBtn.disabled = true;
+                this.voiceRecordBtn.innerHTML = '<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 处理中...';
+            }
+        } else {
+            this.isProcessing = false;
+            if (this.voiceRecordBtn) {
+                this.voiceRecordBtn.disabled = false;
+                this.voiceRecordBtn.innerHTML = '<i class="layui-icon layui-icon-record"></i> 开始录音';
+                this.voiceRecordBtn.className = 'layui-btn layui-btn-fluid layui-btn-danger';
+            }
+        }
+    }
+
+    /**
+     * 发送流式语音数据到服务器（备用方法）
+     */
+    async sendVoiceToServerStream(audioBlob) {
+        return this.processVoiceChatStream(audioBlob);
+    }
+
     /**
      * 显示语音错误
      */

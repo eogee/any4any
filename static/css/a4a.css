@@ -1788,6 +1788,53 @@ body::before {
     animation-fill-mode: forwards;
 }
 
+/* 流式处理样式 */
+.voice-chat-item.streaming {
+    border-left: 3px solid #2196f3;
+}
+
+.streaming-indicator {
+    color: #2196f3;
+    position: relative;
+}
+
+.streaming-indicator::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #2196f3;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+.streaming-complete {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+.streaming-error {
+    color: #f44336;
+    font-weight: bold;
+}
+
+.voice-chat-item.error {
+    border-left-color: #f44336;
+    background: #ffebee;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
 .voice-chat-item:nth-child(1) { animation-delay: 0s; }
 .voice-chat-item:nth-child(2) { animation-delay: 0.1s; }
 .voice-chat-item:nth-child(3) { animation-delay: 0.2s; }

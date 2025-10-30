@@ -146,10 +146,18 @@
                     </div>
                     <div class="voice-chat-controls">
                         <div class="layui-form-item">
+                            <div class="layui-form" lay-filter="streamingForm">
+                                <input type="checkbox" name="streaming" lay-skin="switch" lay-text="流式模式|标准模式" lay-filter="enableStreaming" id="enableStreaming" checked>
+                                <div class="layui-form-mid layui-word-aux">
+                                    <i class="layui-icon layui-icon-about" title="流式模式可以更快听到AI回复"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
                             <button type="button" class="layui-btn layui-btn-fluid layui-btn-danger" id="voiceRecordBtn">
                                 <i class="layui-icon layui-icon-record"></i> 开始录音
                             </button>
-                        </div>                        
+                        </div>
                     </div>
                 </div>
 

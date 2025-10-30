@@ -32,7 +32,13 @@ class IndexTTSEngine:
                     self.timeout = self.config.get('timeout', Config.INDEX_TTS_TIMEOUT)
                     self.supported_voices = self.config.get('supported_voices', Config.INDEX_TTS_SUPPORTED_VOICES)
                     self.model = None
-                    self._min_request_interval = self.config.get('min_request_interval', 0.5)
+
+                    # 优化参数：支持更精细的流式模式配置
+                    self._min_request_interval = self.config.get('min_request_interval', 0.001)
+                    self._fast_max_tokens = self.config.get('max_tokens', Config.INDEX_TTS_FAST_MAX_TOKENS)
+                    self._fast_bucket_size = self.config.get('bucket_size', Config.INDEX_TTS_FAST_BATCH_SIZE)
+                    self._force_fast_mode = self.config.get('fast_mode', None)  # None=使用默认配置，True/False=强制覆盖
+
                     self._last_request_time = 0
                     self._processing_lock = threading.Lock()
                     self._initialize()
@@ -60,18 +66,21 @@ class IndexTTSEngine:
                 raise ImportError("Failed to import IndexTTSInference class")
 
             # 根据配置决定是否启用快速模式
-            fast_mode = Config.INDEX_TTS_FAST_ENABLED
-            fast_max_tokens = Config.INDEX_TTS_FAST_MAX_TOKENS
-            fast_bucket_size = Config.INDEX_TTS_FAST_BATCH_SIZE
+            fast_mode = self._force_fast_mode if self._force_fast_mode is not None else Config.INDEX_TTS_FAST_ENABLED
+            fast_max_tokens = self._fast_max_tokens
+            fast_bucket_size = self._fast_bucket_size
 
-            logger.info(f"IndexTTS fast mode: {'enabled' if fast_mode else 'disabled'}")
+            logger.info(f"IndexTTS fast mode: {'enabled' if fast_mode else 'disabled'} (force_mode={self._force_fast_mode})")
             if fast_mode:
                 logger.info(f"Fast mode settings: max_tokens={fast_max_tokens}, bucket_size={fast_bucket_size}")
 
+            # 将优化参数传递给推理引擎
             self.model = IndexTTSInference(
                 model_path=self.model_path,
                 device=self.device,
-                fast_mode=fast_mode
+                fast_mode=fast_mode,
+                fast_max_tokens=fast_max_tokens,
+                fast_bucket_size=fast_bucket_size
             )
             logger.info(f"IndexTTS-1.5 engine loaded with {'CUDA' if self.device == 'cuda' else 'CPU'}")
             IndexTTSEngine._initialized = True
@@ -120,9 +129,17 @@ class IndexTTSEngine:
         if not text or len(text.strip()) == 0:
             logger.error("Empty text provided")
             return False
+
+        # 过滤特殊字符，确保TTS不会读出不合适的符号
+        try:
+            from utils.content_handle.filter import filter_special_chars
+            text = filter_special_chars(text)
+        except ImportError:
+            pass  # 如果导入失败，继续处理原文本
+
         # if len(text) > 30:
         #     logger.warning(f"Text too long: {len(text)} characters")
-        #     return False        
+        #     return False
         voice_id = voice or "default"
         default_wav_path = os.path.join(os.path.dirname(__file__), "indextts", "default.wav")
 
