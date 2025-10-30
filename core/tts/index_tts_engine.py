@@ -141,7 +141,7 @@ class IndexTTSEngine:
         #     logger.warning(f"Text too long: {len(text)} characters")
         #     return False
         voice_id = voice or "default"
-        default_wav_path = os.path.join(os.path.dirname(__file__), "indextts", "default.wav")
+        default_wav_path = os.path.join(os.path.dirname(__file__), "indextts", Config.INDEX_TTS_REFERENCE_AUDIO)
 
         if voice_id == "default":
             if os.path.exists(default_wav_path):

@@ -91,6 +91,28 @@ class ChatController {
             });
         }
 
+        // 流式模式切换
+        const streamModeToggle = document.getElementById('streamModeToggle');
+        if (streamModeToggle) {
+            streamModeToggle.addEventListener('change', (e) => {
+                this.options.stream = e.target.checked;
+                const mode = this.options.stream ? '流式' : '普通';
+                this.showMessage(`已切换到${mode}模式`, 'success');
+            });
+            // 初始化开关状态
+            streamModeToggle.checked = this.options.stream;
+        }
+
+        // 自动保存切换
+        const autoSaveToggle = document.getElementById('autoSaveToggle');
+        if (autoSaveToggle) {
+            autoSaveToggle.addEventListener('change', (e) => {
+                // 可以在这里实现自动保存逻辑
+                const enabled = e.target.checked;
+                this.showMessage(`自动保存已${enabled ? '开启' : '关闭'}`, 'success');
+            });
+        }
+
         // 页面关闭前清理
         window.addEventListener('beforeunload', () => {
             this.cleanup();
@@ -99,7 +121,11 @@ class ChatController {
         // 错误处理
         window.addEventListener('unhandledrejection', (e) => {
             console.error('Unhandled promise rejection:', e);
-            UiUtils.showMessage('发生未知错误，请刷新页面重试', 'error');
+            if (typeof UiUtils !== 'undefined' && UiUtils.showMessage) {
+                UiUtils.showMessage('发生未知错误，请刷新页面重试', 'error');
+            } else {
+                showMessage('发生未知错误，请刷新页面重试', 'error');
+            }
         });
     }
 
@@ -179,12 +205,12 @@ class ChatController {
         }
 
         if (!this.isConnected) {
-            UiUtils.showMessage('网络连接已断开，请检查网络后重试', 'error');
+            this.showMessage('网络连接已断开，请检查网络后重试', 'error');
             return;
         }
 
         if (this.isTyping) {
-            UiUtils.showMessage('AI正在回复中，请稍候', 'warning');
+            this.showMessage('AI正在回复中，请稍候', 'warning');
             return;
         }
 
@@ -288,7 +314,7 @@ class ChatController {
                             const parsed = JSON.parse(data);
                             const content = parsed.choices?.[0]?.delta?.content;
 
-                            if (content) {
+                            if (content && content.trim()) {
                                 accumulatedContent += content;
 
                                 if (!assistantMessage) {
@@ -373,7 +399,7 @@ class ChatController {
             errorMessage = '请求超时，请稍后重试';
         }
 
-        UiUtils.showMessage(errorMessage, 'error');
+        this.showMessage(errorMessage, 'error');
 
         // 添加错误消息
         const errorAssistantMessage = {
@@ -562,6 +588,19 @@ class ChatController {
     }
 
     /**
+     * 显示消息
+     */
+    showMessage(message, type = 'info', duration = 2000) {
+        if (typeof showMessage === 'function') {
+            showMessage(message, type, duration);
+        } else if (typeof UiUtils !== 'undefined' && UiUtils.showMessage) {
+            UiUtils.showMessage(message, type, duration);
+        } else {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+    }
+
+    /**
      * 清理资源
      */
     cleanup() {
@@ -588,7 +627,7 @@ class ChatController {
             this.messages = [];
             this.renderMessages();
             localStorage.removeItem('chatHistory');
-            UiUtils.showMessage('聊天记录已清空', 'success');
+            this.showMessage('聊天记录已清空', 'success');
         }
     }
 
@@ -598,7 +637,7 @@ class ChatController {
     toggleStreamMode() {
         this.options.stream = !this.options.stream;
         const mode = this.options.stream ? '流式' : '普通';
-        UiUtils.showMessage(`已切换到${mode}模式`, 'success');
+        this.showMessage(`已切换到${mode}模式`, 'success');
     }
 
     /**
@@ -606,7 +645,7 @@ class ChatController {
      */
     exportChatHistory() {
         if (this.messages.length === 0) {
-            UiUtils.showMessage('没有可导出的聊天记录', 'warning');
+            this.showMessage('没有可导出的聊天记录', 'warning');
             return;
         }
 
@@ -621,10 +660,10 @@ class ChatController {
             link.click();
 
             URL.revokeObjectURL(url);
-            UiUtils.showMessage('聊天记录已导出', 'success');
+            this.showMessage('聊天记录已导出', 'success');
         } catch (error) {
             console.error('Export failed:', error);
-            UiUtils.showMessage('导出失败，请重试', 'error');
+            this.showMessage('导出失败，请重试', 'error');
         }
     }
 
