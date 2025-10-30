@@ -3,6 +3,150 @@
  * 依赖: LayUI 框架
  */
 
+/**
+ * 语音录音器类
+ */
+class VoiceRecorder {
+    constructor() {
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.isRecording = false;
+        this.stream = null;
+    }
+
+    /**
+     * 开始录音
+     */
+    async startRecording() {
+        try {
+            // 获取麦克风权限
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+
+            // 创建MediaRecorder实例
+            const options = { mimeType: 'audio/webm;codecs=opus' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options.mimeType = 'audio/webm';
+            }
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options.mimeType = 'audio/mp4';
+            }
+
+            this.mediaRecorder = new MediaRecorder(this.stream, options);
+            this.audioChunks = [];
+
+            // 处理录音数据
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
+
+            // 处理录音错误
+            this.mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder错误:', event.error);
+                this.cleanup();
+            };
+
+            // 开始录音
+            this.mediaRecorder.start(100); // 每100ms收集一次数据
+            this.isRecording = true;
+
+            console.log('录音开始');
+
+        } catch (error) {
+            console.error('录音启动失败:', error);
+            this.cleanup();
+            throw error;
+        }
+    }
+
+    /**
+     * 停止录音
+     */
+    stopRecording() {
+        return new Promise((resolve, reject) => {
+            if (!this.mediaRecorder || !this.isRecording) {
+                resolve(new Blob());
+                return;
+            }
+
+            // 设置停止回调
+            this.mediaRecorder.onstop = () => {
+                try {
+                    const audioBlob = new Blob(this.audioChunks, {
+                        type: this.mediaRecorder.mimeType || 'audio/webm'
+                    });
+                    console.log('录音停止，音频大小:', audioBlob.size, 'bytes');
+                    resolve(audioBlob);
+                } catch (error) {
+                    console.error('音频Blob创建失败:', error);
+                    reject(error);
+                } finally {
+                    this.cleanup();
+                }
+            };
+
+            // 停止录音
+            try {
+                this.mediaRecorder.stop();
+                this.isRecording = false;
+            } catch (error) {
+                console.error('停止录音失败:', error);
+                this.cleanup();
+                reject(error);
+            }
+        });
+    }
+
+    /**
+     * 清理资源
+     */
+    cleanup() {
+        this.isRecording = false;
+
+        // 停止音频流
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                } catch (error) {
+                    console.error('停止音轨失败:', error);
+                }
+            });
+            this.stream = null;
+        }
+
+        // 清理MediaRecorder
+        if (this.mediaRecorder) {
+            this.mediaRecorder.ondataavailable = null;
+            this.mediaRecorder.onerror = null;
+            this.mediaRecorder.onstop = null;
+            this.mediaRecorder = null;
+        }
+
+        // 清理音频数据
+        this.audioChunks = [];
+    }
+
+    /**
+     * 取消录音
+     */
+    cancelRecording() {
+        if (this.isRecording) {
+            this.cleanup();
+            console.log('录音已取消');
+        }
+    }
+}
+
 class DashboardController {
     constructor() {
         this.layer = null;
@@ -29,6 +173,11 @@ class DashboardController {
         this.bgImageInput = null;
         this.uploadBgBtn = null;
         this.resetGreenScreenBtn = null;
+
+        // 语音对话相关
+        this.voiceRecorder = null;
+        this.voiceRecordBtn = null;
+        this.voiceChatHistory = null;
 
         // WebRTC相关
         this.pc = null;
@@ -96,6 +245,10 @@ class DashboardController {
         this.uploadBgBtn = document.getElementById('uploadBg');
         this.resetGreenScreenBtn = document.getElementById('resetGreenScreen');
 
+        // 语音对话元素
+        this.voiceRecordBtn = document.getElementById('voiceRecordBtn');
+                        this.voiceChatHistory = document.getElementById('voiceChatHistory');
+
         
         if (!this.sendBtn || !this.messageText || !this.connectionStatus || !this.statusText || !this.systemInfo ||
             !this.connectBtn || !this.disconnectBtn || !this.videoElement || !this.placeholderMessage) {
@@ -133,6 +286,13 @@ class DashboardController {
                 this.sendMessage();
             }
         });
+
+        // 语音录音按钮点击事件
+        if (this.voiceRecordBtn) {
+            this.voiceRecordBtn.addEventListener('click', () => {
+                this.toggleVoiceRecording();
+            });
+        }
     }
 
     /**
@@ -141,6 +301,7 @@ class DashboardController {
     initializeUI() {
         this.updateConnectionUI(false);
         this.messageText.focus();
+        this.initVoiceChat();
     }
 
     /**
@@ -684,6 +845,239 @@ class DashboardController {
         if (greenScreenInfoElement) {
             greenScreenInfoElement.innerHTML = info;
         }
+    }
+
+    /**
+     * 初始化语音对话功能
+     */
+    initVoiceChat() {
+        // 创建语音录音器实例
+        this.voiceRecorder = new VoiceRecorder();
+
+        // 检查浏览器是否支持录音
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            
+            if (this.voiceRecordBtn) {
+                this.voiceRecordBtn.disabled = true;
+                this.voiceRecordBtn.innerHTML = '<i class="layui-icon layui-icon-close"></i> 浏览器不支持录音';
+            }
+            return;
+        }        
+    }
+
+    /**
+     * 切换语音录音状态
+     */
+    async toggleVoiceRecording() {
+        if (!this.voiceRecorder) {
+            this.showVoiceError('语音录音器未初始化');
+            return;
+        }
+
+        try {
+            if (this.voiceRecorder.isRecording) {
+                await this.stopVoiceRecording();
+            } else {
+                await this.startVoiceRecording();
+            }
+        } catch (error) {
+            console.error('语音录音切换失败:', error);
+            this.showVoiceError('录音操作失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 开始语音录音
+     */
+    async startVoiceRecording() {
+        try {
+            await this.voiceRecorder.startRecording();
+            
+            // 更新按钮状态
+            this.voiceRecordBtn.innerHTML = '<i class="layui-icon layui-icon-close"></i> 停止录音';
+            this.voiceRecordBtn.className = 'layui-btn layui-btn-fluid layui-btn-warm recording';
+
+            // 开始录音计时
+            this.startRecordingTimer();
+
+        } catch (error) {
+            console.error('录音启动失败:', error);
+            this.showVoiceError('录音启动失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 停止语音录音
+     */
+    async stopVoiceRecording() {
+        try {
+            
+            // 停止录音计时
+            this.stopRecordingTimer();
+
+            // 更新按钮状态
+            this.voiceRecordBtn.innerHTML = '<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 处理中...';
+            this.voiceRecordBtn.disabled = true;
+
+            // 获取录音数据
+            const audioBlob = await this.voiceRecorder.stopRecording();
+
+            // 发送到服务器处理
+            const result = await this.sendVoiceToServer(audioBlob);
+
+            if (result.success) {
+                this.displayVoiceChatResult(result);
+
+                // 音频始终通过数字人播放，不使用前端音频播放器
+                if (result.audio_synced) {
+                    // 音频已同步到数字人，显示播放状态
+                    
+                    // 使用服务器返回的准确音频时长
+                    const duration = result.audio_duration || 15000; // 默认15秒
+                    console.log(`音频播放时长: ${duration}ms`);
+                    setTimeout(() => {
+                        
+                        console.log('数字人音频播放完成');
+                    }, duration);
+                } else {
+                    this.showVoiceError('音频同步失败，请稍后重试');
+                    setTimeout(() => {
+                        
+                    }, 3000);
+                }
+            } else {
+                this.showVoiceError(result.error || '语音处理失败');
+            }
+
+        } catch (error) {
+            console.error('录音处理失败:', error);
+            this.showVoiceError('录音处理失败: ' + error.message);
+        } finally {
+            // 恢复按钮状态
+            this.voiceRecordBtn.innerHTML = '<i class="layui-icon layui-icon-record"></i> 开始录音';
+            this.voiceRecordBtn.className = 'layui-btn layui-btn-fluid layui-btn-danger';
+            this.voiceRecordBtn.disabled = false;
+            
+        }
+    }
+
+    /**
+     * 发送语音数据到服务器
+     */
+    async sendVoiceToServer(audioBlob) {
+        const formData = new FormData();
+        formData.append('file', audioBlob, `recording_${Date.now()}.webm`);
+        // 传递当前的数字人会话ID
+        if (this.sessionId) {
+            formData.append('sessionid', this.sessionId);
+        }
+
+        try {
+            const response = await fetch('/any4dh/voice-chat', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('服务器错误详情:', errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+            }
+
+            return await response.json();
+
+        } catch (error) {
+            console.error('发送语音数据失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 显示语音对话结果
+     */
+    displayVoiceChatResult(result) {
+        if (!this.voiceChatHistory) return;
+
+        // 移除占位符
+        const placeholder = this.voiceChatHistory.querySelector('.voice-chat-placeholder');
+        if (placeholder) {
+            placeholder.remove();
+        }
+
+        const chatItem = document.createElement('div');
+        chatItem.className = 'voice-chat-item';
+        chatItem.innerHTML = `
+            <div class="voice-user-message">
+                <div class="voice-message-label">您</div>
+                <div>${this.escapeHtml(result.recognized_text)}</div>
+            </div>
+            <div class="voice-ai-message">
+                <div class="voice-message-label">AI助手</div>
+                <div>${this.escapeHtml(result.response_text)}</div>
+            </div>
+        `;
+
+        // 插入到顶部
+        this.voiceChatHistory.insertBefore(chatItem, this.voiceChatHistory.firstChild);
+
+        // 限制历史记录数量
+        const maxItems = 10;
+        const items = this.voiceChatHistory.querySelectorAll('.voice-chat-item');
+        if (items.length > maxItems) {
+            for (let i = maxItems; i < items.length; i++) {
+                items[i].remove();
+            }
+        }
+    }    
+    
+    /**
+     * 显示语音错误
+     */
+    showVoiceError(message) {
+        // 更新状态显示
+        
+
+        // 显示错误提示
+        if (typeof layui !== 'undefined' && layui.layer) {
+            layui.layer.msg(message, {icon: 2, time: 3000});
+        } else {
+            alert(message);
+        }
+
+        console.error('语音对话错误:', message);
+    }
+
+    /**
+     * 开始录音计时
+     */
+    startRecordingTimer() {
+        this.recordingStartTime = Date.now();
+        this.recordingTimer = setInterval(() => {
+            const duration = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+            const minutes = Math.floor(duration / 60);
+            const seconds = duration % 60;
+            const timeText = `正在录音... ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+        }, 1000);
+    }
+
+    /**
+     * 停止录音计时
+     */
+    stopRecordingTimer() {
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+    }
+
+    /**
+     * HTML转义
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 

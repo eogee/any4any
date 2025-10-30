@@ -29,6 +29,9 @@ from .live_talking.llm import llm_response
 import argparse
 import random
 import shutil
+import time
+import tempfile
+from pathlib import Path
 
 # 全局变量
 any4dh_reals: Dict[int, BaseReal] = {}
@@ -250,6 +253,7 @@ def register_any4dh_routes(app: FastAPI):
             logger.exception('exception:')
             return {"code": -1, "msg": str(e)}
 
+    
     @app.post("/any4dh/set_audiotype")
     async def set_audiotype(request: SetAudioTypeRequest):
         """设置会话音频类型"""
@@ -292,6 +296,270 @@ def register_any4dh_routes(app: FastAPI):
             raise HTTPException(status_code=404, detail="Session not found")
 
         return {"code": 0, "data": any4dh_reals[sessionid].is_speaking()}
+
+    @app.post("/any4dh/voice-chat")
+    async def voice_chat(
+        file: UploadFile = File(...),
+        sessionid: Optional[str] = Form(None)
+    ):
+        """
+        语音对话接口：录音 -> ASR -> LLM -> TTS
+        """
+        try:
+            logger.info(f"收到语音对话请求: file={file.filename if file else 'None'}, sessionid={sessionid}")
+            # 检查文件大小限制 (10MB)
+            max_file_size = 10 * 1024 * 1024  # 10MB
+            file_content = await file.read()
+
+            if len(file_content) > max_file_size:
+                return {
+                    "success": False,
+                    "error": "音频文件过大，请限制在10MB以内"
+                }
+
+            if len(file_content) == 0:
+                return {
+                    "success": False,
+                    "error": "音频文件为空"
+                }
+
+            logger.info(f"收到语音对话请求，文件大小: {len(file_content)} bytes")
+
+            # 1. ASR语音识别
+            recognized_text = await transcribe_audio(file_content)
+
+            if not recognized_text or not recognized_text.strip():
+                return {
+                    "success": False,
+                    "error": "语音识别结果为空，请说话清晰一些"
+                }
+
+            logger.info(f"ASR识别结果: {recognized_text}")
+
+            # 2. LLM对话处理
+            response_text = await process_llm_chat(recognized_text)
+
+            if not response_text or not response_text.strip():
+                response_text = "抱歉，我现在无法回答这个问题。"
+
+            logger.info(f"LLM响应结果: {response_text}")
+
+            # 3. TTS语音合成
+            audio_url = await synthesize_speech(response_text)
+
+            logger.info(f"TTS合成完成: {audio_url}")
+
+            # 4. 如果有活动的数字人会话，将音频传递给数字人进行嘴唇同步
+            audio_synced = False
+            if sessionid and sessionid in any4dh_reals:
+                try:
+                    # 读取生成的音频文件
+                    audio_file_path = audio_url.replace('/static/', 'static/')
+                    if os.path.exists(audio_file_path):
+                        with open(audio_file_path, 'rb') as f:
+                            audio_bytes = f.read()
+                        any4dh_reals[sessionid].put_audio_file(audio_bytes)
+                        audio_synced = True
+                        logger.info(f"音频已同步到数字人session {sessionid}")
+                except Exception as e:
+                    logger.warning(f"音频同步到数字人失败: {e}")
+            else:
+                # 添加调试信息
+                active_sessions = list(any4dh_reals.keys())
+                logger.warning(f"无法同步音频: sessionid={sessionid}, 活动会话={active_sessions}")
+
+                # 尝试使用最新的活动会话
+                if active_sessions and len(active_sessions) > 0:
+                    latest_session = active_sessions[-1]
+                    try:
+                        audio_file_path = audio_url.replace('/static/', 'static/')
+                        if os.path.exists(audio_file_path):
+                            with open(audio_file_path, 'rb') as f:
+                                audio_bytes = f.read()
+                            any4dh_reals[latest_session].put_audio_file(audio_bytes)
+                            audio_synced = True
+                            logger.info(f"音频已同步到最新的数字人session {latest_session}")
+                    except Exception as e:
+                        logger.warning(f"音频同步到最新数字人失败: {e}")
+
+            # 5. 获取音频时长信息
+            audio_duration = 0
+            if audio_synced:
+                try:
+                    import librosa
+                    audio_file_path = audio_url.replace('/static/', 'static/')
+                    if os.path.exists(audio_file_path):
+                        # 使用librosa获取音频时长
+                        y, sr = librosa.load(audio_file_path)
+                        audio_duration = int(librosa.get_duration(y=y, sr=sr) * 1000)  # 转换为毫秒
+                except ImportError:
+                    # 如果没有librosa，使用文件大小估算（假设平均比特率32kbps）
+                    audio_file_path = audio_url.replace('/static/', 'static/')
+                    if os.path.exists(audio_file_path):
+                        file_size = os.path.getsize(audio_file_path)
+                        audio_duration = (file_size * 8) // (32 * 1000) * 1000  # 估算毫秒
+                except Exception as e:
+                    logger.warning(f"获取音频时长失败: {e}")
+                    audio_duration = 15000  # 默认15秒
+
+            # 6. 返回完整结果 - 始终不返回前端音频URL，强制使用数字人播放
+            return {
+                "success": True,
+                "recognized_text": recognized_text,
+                "response_text": response_text,
+                "audio_url": None,  # 始终不返回前端音频URL
+                "audio_synced": audio_synced,
+                "audio_file": audio_url.split('/')[-1] if audio_synced else None,  # 返回文件名用于状态显示
+                "audio_duration": audio_duration,  # 音频时长（毫秒）
+                "session_id": sessionid or "voice_chat_session",
+                "timestamp": int(time.time())
+            }
+
+        except HTTPException as he:
+            logger.error(f"HTTP异常: {he.status_code} - {he.detail}")
+            return {
+                "success": False,
+                "error": f"HTTP错误 {he.status_code}: {he.detail}"
+            }
+        except Exception as e:
+            logger.exception('语音对话处理异常:')
+            return {
+                "success": False,
+                "error": f"语音处理失败: {str(e)}"
+            }
+
+# 语音对话辅助函数
+async def transcribe_audio(file_content: bytes) -> str:
+    """ASR语音识别"""
+    try:
+        import torchaudio
+        from io import BytesIO
+        from funasr.utils.postprocess_utils import rich_transcription_postprocess
+        from core.model_manager import ModelManager
+
+        # 直接加载音频数据
+        data, fs = torchaudio.load(BytesIO(file_content))
+        data = data.mean(0)  # 转换为单声道
+
+        # 获取ASR模型并进行推理
+        m, kwargs = ModelManager.get_asr_model()
+        res = m.inference(
+            data_in=[data],
+            language="auto",
+            use_itn=False,
+            ban_emo_unk=False,
+            key=["voice_chat"],
+            fs=fs,
+            **kwargs,
+        )
+
+        if not res or not res[0]:
+            logger.warning("ASR返回空结果")
+            return ""
+
+        # 处理识别结果
+        raw_text = res[0][0]["text"]
+        final_text = rich_transcription_postprocess(raw_text.replace("<|startoftranscript|>", "").replace("<|endofttranscript|>", ""))
+
+        return final_text.strip()
+
+    except Exception as e:
+        logger.error(f"ASR处理失败: {str(e)}")
+        return ""
+
+async def process_llm_chat(text: str) -> str:
+    """LLM对话处理"""
+    try:
+        # 调用LLM服务
+        from core.chat.llm import get_llm_service
+
+        def llm_call():
+            llm_service = get_llm_service()
+            # 使用同步方式调用异步方法
+            import asyncio
+            loop = asyncio.new_event_loop()
+            try:
+                result = loop.run_until_complete(llm_service.generate_response(text))
+                return result
+            finally:
+                loop.close()
+
+        response = await asyncio.get_event_loop().run_in_executor(None, llm_call)
+        return response if response else "抱歉，我现在无法回答这个问题。"
+
+    except Exception as e:
+        logger.error(f"LLM处理失败: {str(e)}")
+        return "抱歉，我现在无法回答这个问题。"
+
+async def synthesize_speech(text: str) -> str:
+    """TTS语音合成"""
+    try:
+        from core.tts.speech import create_speech
+        from core.tts.index_tts_engine import IndexTTSEngine
+        from fastapi import Request
+        from io import BytesIO
+        import uuid
+        from config import Config
+
+        # 创建输出目录
+        voice_dir = Path("static/voice")
+        voice_dir.mkdir(exist_ok=True)
+
+        # 生成唯一文件名
+        filename = f"voice_output_{int(time.time() * 1000)}.mp3"
+        output_path = voice_dir / filename
+
+        # 首先尝试使用IndexTTS
+        if Config.INDEX_TTS_MODEL_ENABLED:
+            try:
+                def tts_call():
+                    index_tts_engine = IndexTTSEngine.get_instance({
+                        'model_path': Config.INDEX_TTS_MODEL_DIR,
+                        'device': Config.INDEX_TTS_DEVICE
+                    })
+                    return index_tts_engine.generate_speech(
+                        text=text,
+                        output_path=str(output_path),
+                        voice="default"
+                    )
+
+                success = await asyncio.get_event_loop().run_in_executor(None, tts_call)
+
+                if success and output_path.exists():
+                    logger.info(f"IndexTTS语音合成成功: {filename}")
+                    return f"/static/voice/{filename}"
+                else:
+                    logger.warning("IndexTTS合成失败，尝试使用edge-tts")
+
+            except Exception as e:
+                logger.warning(f"IndexTTS合成失败: {e}，尝试使用edge-tts")
+
+        # 备选方案：使用edge-tts
+        def edge_tts_call():
+            import asyncio
+            from edge_tts import Communicate
+
+            # 创建新的事件循环来运行异步edge-tts
+            loop = asyncio.new_event_loop()
+            try:
+                communicate = Communicate(text, Config.EDGE_DEFAULT_VOICE)
+                loop.run_until_complete(communicate.save(str(output_path)))
+                return True
+            finally:
+                loop.close()
+
+        success = await asyncio.get_event_loop().run_in_executor(None, edge_tts_call)
+
+        if success and output_path.exists():
+            logger.info(f"edge-tts语音合成成功: {filename}")
+            return f"/static/voice/{filename}"
+        else:
+            logger.error("TTS语音合成失败")
+            raise Exception("TTS语音合成失败")
+
+    except Exception as e:
+        logger.error(f"TTS处理失败: {str(e)}")
+        raise Exception(f"语音合成失败: {str(e)}")
 
 # 全局初始化状态
 _any4dh_initialized = False
@@ -487,7 +755,7 @@ if __name__ == '__main__':
     # 初始化 any4dh
     initialize_any4dh()
 
-    logger.info(f'Starting FastAPI server: http://<serverip>:{opt.listenport}/dashboard.html')
+    logger.info(f'Starting FastAPI server: http://<serverip>:{opt.listenport}/dh/dashboard')
 
     # 启动服务器
     import uvicorn

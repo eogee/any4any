@@ -319,7 +319,7 @@ body::before {
 }
 
 .sidebar-section {
-    margin-bottom: 25px;
+    margin-bottom: 5px;
     display: flex;
     flex-direction: column;
 }
@@ -327,7 +327,6 @@ body::before {
 .sidebar-section:first-child {
     flex: 1;
     min-height: auto;
-    margin-bottom: 20px;
     overflow: visible;
     display: flex;
     flex-direction: column;
@@ -1681,4 +1680,156 @@ body::before {
     .chat-messages {
         overflow: visible;
     }
+}
+
+
+.voice-chat-history {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e6e6e6;
+    border-radius: 6px;
+    padding: 12px;
+    background: #fafafa;
+    font-size: 13px;
+}
+
+.voice-chat-placeholder {
+    text-align: center;
+    color: #999;
+    padding: 20px 0;
+}
+
+.voice-chat-placeholder i {
+    display: block;
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #ccc;
+}
+
+.voice-chat-item {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.voice-chat-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.voice-user-message {
+    color: #1976d2;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: #e3f2fd;
+    border-radius: 4px;
+}
+
+.voice-ai-message {
+    color: #388e3c;
+    padding: 8px;
+    background: #e8f5e8;
+    border-radius: 4px;
+}
+
+.voice-message-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#voiceRecordBtn.recording {
+    animation: recordingPulse 1.5s infinite;
+}
+
+@keyframes recordingPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.7);
+        transform: scale(1);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 152, 0, 0);
+        transform: scale(1.02);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
+        transform: scale(1);
+    }
+}
+
+
+/* 录音时长显示 */
+.voice-recording-duration {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+}
+
+/* 语音对话错误提示 */
+.voice-chat-error {
+    background: #ffebee;
+    color: #c62828;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border-left: 3px solid #c62828;
+    margin: 8px 0;
+    font-size: 12px;
+}
+
+
+/* 语音对话项动画 */
+.voice-chat-item {
+    animation: slideInUp 0.3s ease-out;
+    opacity: 0;
+    transform: translateY(20px);
+    animation-fill-mode: forwards;
+}
+
+.voice-chat-item:nth-child(1) { animation-delay: 0s; }
+.voice-chat-item:nth-child(2) { animation-delay: 0.1s; }
+.voice-chat-item:nth-child(3) { animation-delay: 0.2s; }
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 录音按钮改进效果 */
+#voiceRecordBtn {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+#voiceRecordBtn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+#voiceRecordBtn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }

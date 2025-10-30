@@ -114,9 +114,7 @@
                                     <span id="smoothingValue">5</span>
                                 </div>
                             </div>
-                        </div>
-
-         
+                        </div>         
          
                         <div class="layui-form-item">
                             <label class="layui-form-label">背景图片</label>
@@ -128,14 +126,31 @@
                             </div>
                         </div>   
                         <div class="layui-form-item">
-                            <div class="layui-input-block">
-                                <button type="button" class="layui-btn layui-btn-fluid" id="resetGreenScreen">
-                                    <i class="layui-icon layui-icon-refresh"></i> 重置设置
-                                </button>
-                            </div>
+                            <button type="button" class="layui-btn layui-btn-fluid layui-btn-primary layui-border-green" id="resetGreenScreen">
+                                <i class="layui-icon layui-icon-refresh"></i> 重置设置
+                            </button>
                         </div>
                       </div>
                     </form>
+                </div>
+
+                <div class="sidebar-section">                    
+                    <h3><i class="fas fa-microphone"></i> 语音对话</h3>
+                    <div class="layui-form-item">
+                        <div id="voiceChatHistory" class="voice-chat-history">
+                            <div class="voice-chat-placeholder">
+                                <i class="layui-icon layui-icon-dialogue"></i>
+                                <span>语音对话记录将显示在这里</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="voice-chat-controls">
+                        <div class="layui-form-item">
+                            <button type="button" class="layui-btn layui-btn-fluid layui-btn-danger" id="voiceRecordBtn">
+                                <i class="layui-icon layui-icon-record"></i> 开始录音
+                            </button>
+                        </div>                        
+                    </div>
                 </div>
 
                 <div class="sidebar-section">
