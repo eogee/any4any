@@ -177,7 +177,6 @@ class EdgeTTS(BaseTTS):
             stream = stream[:, 0]
 
         if sample_rate != self.sample_rate and stream.shape[0] > 0:
-            logger.info(f'[WARN] audio sample rate is {sample_rate}, resampling into {self.sample_rate}.')
             stream = resampy.resample(x=stream, sr_orig=sample_rate, sr_new=self.sample_rate)
 
         return stream

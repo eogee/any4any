@@ -28,7 +28,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 device = "cuda" if torch.cuda.is_available() else ("mps" if (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()) else "cpu")
-print('Using {} for inference.'.format(device))
 
 def _load(checkpoint_path):
 	if device == 'cuda':
@@ -109,7 +108,6 @@ def inference(quit_event,batch_size,face_list_cycle,audio_feat_queue,audio_out_q
     index = 0
     count=0
     counttime=0
-    logger.info('start inference')
     while not quit_event.is_set():
         starttime=time.perf_counter()
         mel_batch = []
@@ -131,7 +129,6 @@ def inference(quit_event,batch_size,face_list_cycle,audio_feat_queue,audio_out_q
                 res_frame_queue.put((None,__mirror_index(length,index),audio_frames[i*2:i*2+2]))
                 index = index + 1
         else:
-            # print('infer=======')
             t=time.perf_counter()
             img_batch = []
             for i in range(batch_size):
@@ -163,8 +160,7 @@ def inference(quit_event,batch_size,face_list_cycle,audio_feat_queue,audio_out_q
             for i,res_frame in enumerate(pred):
                 #self.__pushmedia(res_frame,loop,audio_track,video_track)
                 res_frame_queue.put((res_frame,__mirror_index(length,index),audio_frames[i*2:i*2+2]))
-                index = index + 1
-            #print('total batch time:',time.perf_counter()-starttime)            
+                index = index + 1         
     logger.info('lipreal inference processor stop')
 
 class LipReal(BaseReal):
@@ -227,16 +223,9 @@ class LipReal(BaseReal):
             t = time.perf_counter()
             self.asr.run_step()
 
-            # if video_track._queue.qsize()>=2*self.opt.batch_size:
-            #     print('sleep qsize=',video_track._queue.qsize())
-            #     time.sleep(0.04*video_track._queue.qsize()*0.8)
             if video_track and video_track._queue.qsize()>=5:
                 logger.debug('sleep qsize=%d',video_track._queue.qsize())
                 time.sleep(0.04*video_track._queue.qsize()*0.8)
                 
-            # delay = _starttime+_totalframe*0.04-time.perf_counter() #40ms
-            # if delay > 0:
-            #     time.sleep(delay)
-        #self.render_event.clear() #end infer process render
         logger.info('lipreal thread stop')
             

@@ -133,7 +133,6 @@ def register_any4dh_routes(app: FastAPI):
 
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
-            logger.info("Connection state is %s" % pc.connectionState)
             if pc.connectionState == "failed":
                 await pc.close()
                 pcs.discard(pc)
@@ -611,15 +610,15 @@ def register_any4dh_routes(app: FastAPI):
     @app.get("/temp_audio/status")
     async def get_temp_file_status():
         """获取临时文件管理状态"""
-        from core.tts.temp_file_manager import temp_file_manager
-        return temp_file_manager.get_status()
+        from core.tts.temp_file_manager import get_temp_file_manager
+        return get_temp_file_manager().get_status()
 
     # 清理临时文件端点
     @app.post("/temp_audio/cleanup")
     async def cleanup_temp_files():
         """手动清理所有临时文件"""
-        from core.tts.temp_file_manager import temp_file_manager
-        temp_file_manager.cleanup_all()
+        from core.tts.temp_file_manager import get_temp_file_manager
+        get_temp_file_manager().cleanup_all()
         return {"message": "Temporary files cleanup initiated"}
 
 # 语音对话辅助函数
@@ -847,7 +846,6 @@ async def run_push(push_url, sessionid):
 
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
-        logger.info("Connection state is %s" % pc.connectionState)
         if pc.connectionState == "failed":
             await pc.close()
             pcs.discard(pc)

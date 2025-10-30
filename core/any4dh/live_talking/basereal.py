@@ -62,10 +62,8 @@ class BaseReal:
         # 根据配置选择TTS引擎
         tts_engine = getattr(opt, 'tts_engine', 'edgetts')
         if tts_engine == 'index':
-            logger.info(f"Using IndexTTS for text-to-speech")
             self.tts = IndexTTS(opt, self)
         else:
-            logger.info(f"Using EdgeTTS for text-to-speech")
             self.tts = EdgeTTS(opt, self)
 
         self.speaking = False
@@ -102,7 +100,6 @@ class BaseReal:
     def __create_bytes_stream(self,byte_stream):
         #byte_stream=BytesIO(buffer)
         stream, sample_rate = sf.read(byte_stream) # [T*sample_rate,] float64
-        logger.info(f'[INFO]put audio stream {sample_rate}: {stream.shape}')
         stream = stream.astype(np.float32)
 
         if stream.ndim > 1:
@@ -110,7 +107,6 @@ class BaseReal:
             stream = stream[:, 0]
     
         if sample_rate != self.sample_rate and stream.shape[0]>0:
-            logger.info(f'[WARN] audio sample rate is {sample_rate}, resampling into {self.sample_rate}.')
             stream = resampy.resample(x=stream, sr_orig=sample_rate, sr_new=self.sample_rate)
 
         return stream

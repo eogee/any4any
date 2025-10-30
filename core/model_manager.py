@@ -11,7 +11,7 @@ from FlagEmbedding import FlagReranker
 from core.auth.model_auth import verify_token
 from core.chat.llm import get_llm_service
 from core.tts.index_tts_engine import IndexTTSEngine
-from utils.funasr.model import SenseVoiceSmall
+from core.asr.model import SenseVoiceSmall
 
 # 多进程启动方法由主应用统一设置
 try:

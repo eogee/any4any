@@ -70,7 +70,6 @@ class IndexTTSEngine:
             fast_max_tokens = self._fast_max_tokens
             fast_bucket_size = self._fast_bucket_size
 
-            logger.info(f"IndexTTS fast mode: {'enabled' if fast_mode else 'disabled'} (force_mode={self._force_fast_mode})")
             if fast_mode:
                 logger.info(f"Fast mode settings: max_tokens={fast_max_tokens}, bucket_size={fast_bucket_size}")
 
@@ -82,7 +81,6 @@ class IndexTTSEngine:
                 fast_max_tokens=fast_max_tokens,
                 fast_bucket_size=fast_bucket_size
             )
-            logger.info(f"IndexTTS-1.5 engine loaded with {'CUDA' if self.device == 'cuda' else 'CPU'}")
             IndexTTSEngine._initialized = True
             
         except Exception as e:
@@ -176,7 +174,6 @@ class IndexTTSEngine:
             
             # 检查输出文件
             if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                logger.info(f"Successfully generated: {output_path}")
                 return True
             else:
                 logger.error("Output file not found or empty")

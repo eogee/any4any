@@ -35,7 +35,6 @@ class LipASR(BaseASR):
         mel_chunks = []
         while i < (len(self.frames)-self.stride_left_size-self.stride_right_size)/2:
             start_idx = int(left + i * mel_idx_multiplier)
-            #print(start_idx)
             if start_idx + mel_step_size > len(mel[0]):
                 mel_chunks.append(mel[:, len(mel[0]) - mel_step_size:])
             else:

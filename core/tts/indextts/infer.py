@@ -63,8 +63,7 @@ class IndexTTSInference:
         """
         # 根据快速模式配置选择推理方法
         if self.fast_mode:
-            # 使用快速推理模式，应用优化的参数
-            print(f">> 使用优化快速推理参数: max_tokens={self.fast_max_tokens}, bucket_size={self.fast_bucket_size}")
+            
             self.tts.infer_fast(
                 audio_prompt=voice,
                 text=text,
@@ -73,13 +72,11 @@ class IndexTTSInference:
                 sentences_bucket_max_size=self.fast_bucket_size
             )
         else:
-            # 使用普通推理模式
             self.tts.infer(
                 audio_prompt=voice,
                 text=text,
                 output_path=output_path
             )
-
 
 class IndexTTS:
     def __init__(

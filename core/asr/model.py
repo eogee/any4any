@@ -13,7 +13,7 @@ from funasr.train_utils.device_funcs import force_gatherable
 from funasr.losses.label_smoothing_loss import LabelSmoothingLoss
 from funasr.metrics.compute_acc import compute_accuracy, th_accuracy
 from funasr.utils.load_utils import load_audio_text_image_video, extract_fbank
-from utils.funasr.ctc_alignment import ctc_forced_align
+from core.asr.ctc_alignment import ctc_forced_align
 
 class SinusoidalPositionEncoder(torch.nn.Module):
     """ """

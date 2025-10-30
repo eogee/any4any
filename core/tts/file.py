@@ -2,14 +2,14 @@ import os
 import logging
 from fastapi.responses import FileResponse
 import torchaudio
-from .temp_file_manager import temp_file_manager
+from .temp_file_manager import get_temp_file_manager
 
 def cleanup_file(filepath: str):
     """清理临时文件"""
     if not filepath:
         return
         
-    success = temp_file_manager.cleanup_file(filepath)
+    success = get_temp_file_manager().cleanup_file(filepath)
 
     # 如果管理器中没有注册，尝试直接清理
     if not success:

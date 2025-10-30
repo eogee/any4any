@@ -22,7 +22,6 @@ parser.add_argument('--face_det_batch_size', type=int,
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print('Using {} for inference.'.format(device))
 
 def osmakedirs(path_list):
     for path in path_list:

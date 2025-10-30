@@ -412,7 +412,6 @@ class LegacyLLMService:
             )
 
             self._model_initialized = True
-            logger.info(f"Legacy LLM model loaded")
             return True
 
         except Exception as e:

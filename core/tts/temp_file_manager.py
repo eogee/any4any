@@ -13,10 +13,24 @@ logger = logging.getLogger(__name__)
 class TempFileManager:
     """临时文件管理器"""
 
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, temp_dir: Optional[str] = None, max_file_age: int = 3600, cleanup_interval: int = 300):
+        if cls._instance is None:
+            cls._instance = super(TempFileManager, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self,
                  temp_dir: Optional[str] = None,
                  max_file_age: int = 3600,  # 1小时
                  cleanup_interval: int = 300):  # 5分钟
+
+        # 防止重复初始化
+        if self._initialized:
+            return
+
+        self._initialized = True
         """
         初始化临时文件管理器
 
@@ -192,21 +206,28 @@ class TempFileManager:
             if self.cleanup_file(filepath):
                 cleanup_count += 1
 
-# 全局临时文件管理器实例
-temp_file_manager = TempFileManager()  # 默认使用当前目录
+# 全局临时文件管理器实例（延迟初始化）
+temp_file_manager = None
+
+def get_temp_file_manager() -> TempFileManager:
+    """获取全局临时文件管理器实例（单例）"""
+    global temp_file_manager
+    if temp_file_manager is None:
+        temp_file_manager = TempFileManager()
+    return temp_file_manager
 
 # 便捷函数
 def create_temp_audio_file() -> str:
     """创建临时音频文件"""
-    return temp_file_manager.create_temp_file(suffix=".mp3", prefix="temp_")
+    return get_temp_file_manager().create_temp_file(suffix=".mp3", prefix="temp_")
 
 def create_temp_stream_file() -> str:
     """创建临时流式音频文件（数字人TTS用）"""
-    return temp_file_manager.create_temp_file(suffix=".mp3", prefix="stream_")
+    return get_temp_file_manager().create_temp_file(suffix=".mp3", prefix="stream_")
 
 def create_temp_voice_output_file() -> str:
     """创建临时语音输出文件（数字人TTS用）"""
-    return temp_file_manager.create_temp_file(suffix=".mp3", prefix="voice_output_")
+    return get_temp_file_manager().create_temp_file(suffix=".mp3", prefix="voice_output_")
 
 def register_existing_temp_file(filepath: str):
     """
@@ -215,4 +236,4 @@ def register_existing_temp_file(filepath: str):
     Args:
         filepath: 现有临时文件路径
     """
-    temp_file_manager.register_temp_file(filepath)
+    get_temp_file_manager().register_temp_file(filepath)
