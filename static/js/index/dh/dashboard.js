@@ -1174,7 +1174,6 @@ class DashboardController {
 
             case 'audio_file':
                 // 处理预录音频文件
-                // 显示AI回复文本
                 if (data.data.text) {
                     this.updateStreamChatItem('ai', data.data.text);
                 }
