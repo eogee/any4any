@@ -2,6 +2,7 @@ import logging
 import re
 from typing import Dict, Any, List, Tuple
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import QueuePool
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ class SQLExecutor:
         self._initialize_connection()
 
     def _initialize_connection(self):
-        """初始化数据库连接"""
+        """初始化数据库连接池"""
         try:
             if self.db_type == 'mysql':
                 connection_string = (
@@ -29,12 +30,39 @@ class SQLExecutor:
             else:
                 raise ValueError(f"不支持的数据库类型: {self.db_type}")
 
-            self.engine = create_engine(connection_string)
-            logger.info("SQL Executor initialized successfully.")
+            # 连接池引擎
+            self.engine = create_engine(
+                connection_string,
+                poolclass=QueuePool,
+                pool_size=5,          # 连接池大小
+                max_overflow=10,      # 最大溢出连接数
+                pool_pre_ping=True,   # 连接前检查连接有效性
+                pool_recycle=3600,    # 连接回收时间（秒）
+                echo=False
+            )
+            logger.info("SQL Executor initialized successfully with connection pool.")
 
         except Exception as e:
             logger.error(f"SQL Executor database connection initialization failed: {e}")
             self.engine = None
+
+    def _ensure_connection(self):
+        """确保数据库连接可用"""
+        try:
+            if self.engine is None:
+                logger.warning("Database engine is None, reinitializing...")
+                self._initialize_connection()
+
+            # 测试连接
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+
+        except Exception as e:
+            logger.error(f"Database connection test failed, reinitializing: {e}")
+            self._initialize_connection()
+            if self.engine:
+                with self.engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
 
     def _validate_sql_safety(self, sql_query: str) -> Tuple[bool, str]:
         """
@@ -150,6 +178,9 @@ class SQLExecutor:
             查询执行结果
         """
         try:
+            # 确保连接可用
+            self._ensure_connection()
+
             if not self.engine:
                 return {
                     'success': False,
@@ -201,9 +232,15 @@ class SQLExecutor:
                 'formatted_output': f'SQL执行失败: {str(e)}'
             }
 
+# 全局单例实例
+_sql_executor_instance = None
+
 def get_sql_executor() -> SQLExecutor:
-    """获取SQL执行器实例"""
-    return SQLExecutor()
+    """获取SQL执行器单例实例"""
+    global _sql_executor_instance
+    if _sql_executor_instance is None:
+        _sql_executor_instance = SQLExecutor()
+    return _sql_executor_instance
 
 async def generate_and_execute_sql(question: str, table_schemas: str, context: str = "") -> Dict[str, Any]:
     """

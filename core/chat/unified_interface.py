@@ -41,6 +41,22 @@ class UnifiedLLMInterface:
         **kwargs
     ):
         try:
+            # 检查是否为voice_kb问题 仅对any4dh平台生效
+            if platform == "any4dh":
+                try:
+                    from .tool_manager import get_tool_manager
+                    tool_manager = get_tool_manager()
+
+                    if tool_manager.is_voice_kb_question(content):
+
+                        voice_result = await tool_manager._process_voice_kb_query(content)
+                        if voice_result and voice_result.startswith("[VOICE_KB_RESPONSE:"):
+                            # 直接返回完整的voice响应，不进行流式处理
+                            yield voice_result
+                            return
+                except Exception as e:
+                    logger.warning(f"Voice KB processing failed: {e}")
+
             from .conversation_manager import get_conversation_manager
             conversation_manager = get_conversation_manager()
 

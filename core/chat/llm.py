@@ -53,8 +53,15 @@ class ToolProcessor:
         """统一的SQL问题检测 - 使用tool_manager中的实现"""
         if not user_message or not user_message.strip():
             return False
-            
+
         return self.tool_manager.is_sql_question(user_message)
+
+    def _is_voice_kb_question(self, user_message: str) -> bool:
+        """统一的语音知识库问题检测"""
+        if not user_message or not user_message.strip():
+            return False
+
+        return self.tool_manager.is_voice_kb_question(user_message)
 
     def _build_tool_context(self, tool_results: List[Dict[str, Any]]) -> str:
         """构建工具结果上下文 - 智能格式化"""
@@ -115,6 +122,12 @@ class ToolProcessor:
             return await self._process_with_knowledge_base(user_message, generate_response_func)
 
         try:
+            # 检查是否是语音知识库问题
+            if self._is_voice_kb_question(user_message):
+                voice_result = await self._process_voice_kb(user_message)
+                if voice_result:
+                    return voice_result  # 返回语音回复标记
+
             # 检查是否是SQL查询问题
             if self._is_sql_question(user_message):
                 from core.tools.nl2sql.workflow import get_nl2sql_workflow
@@ -125,7 +138,7 @@ class ToolProcessor:
                 else:
                     return await self._process_with_knowledge_base(user_message, generate_response_func)
             else:
-                # 非SQL问题，使用一般的工具分析逻辑
+                # 其它问题，使用一般的工具分析逻辑
                 return await self._process_general_tools(user_message, generate_response_func)
 
         except Exception as e:
@@ -171,6 +184,36 @@ class ToolProcessor:
         except Exception as e:
             logger.error(f"Knowledge base processing in tool processor failed: {e}")
             return await generate_response_func(user_message)
+
+    async def _process_voice_kb(self, user_message: str) -> str:
+        """处理语音知识库查询"""
+        try:
+            from config import Config
+            if not Config.ANY4DH_VOICE_KB_ENABLED:
+                return None
+
+            from core.tools.voice_kb.voice_workflow import get_voice_workflow
+
+            workflow = get_voice_workflow()
+            result = await workflow.process_voice_query(user_message)
+
+            if result["success"] and result["should_use_voice"]:
+                voice_info = result["voice_info"]
+                if voice_info:
+                    # 返回特殊标记，告诉any4dh使用语音文件
+                    # 格式: [VOICE_KB_RESPONSE:filename:text_content]
+                    return f"[VOICE_KB_RESPONSE:{voice_info['audio_file']}:{voice_info['response_text']}]"
+                else:
+                    logger.warning("Voice info is empty, falling back to text")
+                    return None
+            else:
+                # 不使用语音，返回None让系统继续处理
+                logger.info(f"Voice KB not suitable: confidence={result.get('confidence', 0):.3f}, threshold={result.get('threshold', 0.8)}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Voice KB processing failed: {e}")
+            return None
 
     async def _process_general_tools(self, user_message: str, generate_response_func) -> str:
         """处理通用工具调用"""

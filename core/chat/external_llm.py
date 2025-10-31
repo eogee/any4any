@@ -3,6 +3,7 @@ import json
 import logging
 import aiohttp
 import asyncio
+import time
 from typing import Optional, Dict, Any, AsyncGenerator
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ class ExternalLLMService:
         self.timeout = Config.API_TIMEOUT
         self.max_tokens = Config.MAX_TOKENS
         self.stream_enabled = Config.STREAM_ENABLED
+        self.max_retries = Config.API_MAX_RETRIES
+        self.retry_delay = Config.API_RETRY_DELAY
         self.session = None
 
         if self.server_type == "api" and self.api_key and self.base_url:
@@ -32,36 +35,80 @@ class ExternalLLMService:
             logger.info("Using local LLM service (external API disabled)")
 
     async def _get_session(self) -> aiohttp.ClientSession:
-        """获取或创建HTTP会话 - OpenAI标准认证"""
+        """获取或创建HTTP会话 - 优化的连接池配置"""
         if self.session is None or self.session.closed:
+            # 配置连接器以优化连接池
+            connector = aiohttp.TCPConnector(
+                limit=100,              # 总连接池大小
+                limit_per_host=30,      # 每个主机的连接数
+                ttl_dns_cache=300,      # DNS缓存时间
+                use_dns_cache=True,
+                keepalive_timeout=30,   # 保持连接时间
+                enable_cleanup_closed=True
+            )
+
             self.session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
+                connector=connector,
+                timeout=aiohttp.ClientTimeout(
+                    total=self.timeout,
+                    connect=30,          # 连接超时
+                    sock_read=60         # 读取超时
+                ),
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "User-Agent": "any4any/1.0"
                 }
             )
         return self.session
 
     async def _make_api_request(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """发起API请求 - OpenAI chat/completions格式"""
+        """发起API请求  chat/completions格式"""
         if self.server_type != "api" or not self.api_key or not self.base_url:
             raise ValueError("External LLM API is not properly configured")
 
         session = await self._get_session()
         url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
 
-        try:
-            async with session.post(url, json=data) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    logger.error(f"API request failed: {response.status} - {error_text}")
-                    raise Exception(f"API request failed: {response.status}")
-        except Exception as e:
-            logger.error(f"API request exception: {str(e)}")
-            raise Exception(f"API request exception: {str(e)}")
+        last_exception = None
+
+        for attempt in range(self.max_retries + 1):  # +1 包含初始尝试
+            try:
+                start_time = time.time()
+
+                async with session.post(url, json=data) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        request_time = time.time() - start_time
+                        logger.info(f"API request successful on attempt {attempt + 1}, took {request_time:.2f}s")
+                        return result
+                    else:
+                        error_text = await response.text()
+                        last_exception = Exception(f"API request failed: {response.status} - {error_text}")
+
+                        # 某些错误码不重试
+                        if response.status in [401, 403, 404]:
+                            logger.error(f"API request failed with non-retryable status {response.status}: {error_text}")
+                            raise last_exception
+
+                        logger.warning(f"API request attempt {attempt + 1} failed with status {response.status}: {error_text}")
+
+            except asyncio.TimeoutError as e:
+                last_exception = Exception(f"API request timeout on attempt {attempt + 1}: {str(e)}")
+                logger.warning(f"API request attempt {attempt + 1} timed out")
+
+            except Exception as e:
+                last_exception = Exception(f"API request exception on attempt {attempt + 1}: {str(e)}")
+                logger.warning(f"API request attempt {attempt + 1} failed: {str(e)}")
+
+            if attempt < self.max_retries:
+                wait_time = self.retry_delay * (2 ** attempt)
+                logger.info(f"Retrying API request in {wait_time:.1f}s... (attempt {attempt + 2}/{self.max_retries + 1})")
+                await asyncio.sleep(wait_time)
+
+        # 所有重试都失败了
+        logger.error(f"API request failed after {self.max_retries + 1} attempts: {last_exception}")
+        raise last_exception
 
     async def generate_response(self, messages: list, temperature: float = None,
                           max_tokens: int = None, stream: bool = False) -> str:
@@ -75,7 +122,7 @@ class ExternalLLMService:
             "messages": messages,
             "temperature": temperature or 0.7,
             "max_tokens": max_tokens or self.max_tokens,
-            "stream": stream  # 使用传入的 stream 参数
+            "stream": stream
         }
 
         response = await self._make_api_request("chat/completions", data)
@@ -90,6 +137,18 @@ class ExternalLLMService:
         else:
             logger.error(f"No choices in response: {response}")
             raise Exception("No valid choices in API response")
+
+    async def close(self):
+        """清理HTTP会话"""
+        if self.session and not self.session.closed:
+            await self.session.close()
+            logger.info("External LLM service session closed")
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     async def generate_stream_response(self, messages: list, temperature: float = None,
                                  max_tokens: int = None) -> AsyncGenerator[str, None]:
@@ -128,18 +187,16 @@ class ExternalLLMService:
                             # 将字节转换为字符串
                             line_str = line.decode('utf-8').strip()
                             logger.debug(f"Received SSE line: {line_str}")
-                            # 解析OpenAI SSE格式的数据行
+
                             if line_str.startswith("data: "):
                                 try:
                                     json_data = json.loads(line_str[6:])
                                     logger.debug(f"Parsed JSON data: {json_data}")
 
-                                    # OpenAI标准格式解析
                                     if "choices" in json_data and len(json_data["choices"]) > 0:
                                         choice = json_data["choices"][0]
                                         logger.debug(f"Choice data: {choice}")
 
-                                        # 流式响应使用delta字段
                                         if "delta" in choice and "content" in choice["delta"]:
                                             content = choice["delta"]["content"]
                                             if content:  # 确保content不为空
@@ -196,19 +253,15 @@ def generate_chat_response(messages: list, temperature: float = None,
     if Config.LLM_SERVER_TYPE == "api":
         service = get_external_llm_service()
         if stream:
-            # 对于流式响应，直接返回异步生成器
             return service.generate_stream_response(messages, temperature, max_tokens)
         else:
-            # 对于非流式响应，返回协程
             return service.generate_response(messages, temperature, max_tokens, stream)
     else:
-        # 回退到本地LLM - 传入单个消息字符串
         if messages and len(messages) > 0:
             user_message = messages[0].get("content", "") if isinstance(messages[0], dict) else str(messages[0])
         else:
             user_message = ""
 
-        # 延迟导入避免循环依赖
         from core.chat.llm import get_llm_service
         local_service = get_llm_service()
         if stream:
@@ -221,7 +274,6 @@ async def list_available_models() -> list:
     from config import Config
 
     if Config.LLM_SERVER_TYPE == "api":
-        # 对于外部API，返回配置的模型
         return [{
             "id": Config.MODEL_NAME or "gpt-3.5-turbo",
             "name": Config.MODEL_NAME or "gpt-3.5-turbo",
@@ -229,9 +281,7 @@ async def list_available_models() -> list:
             "provider": "external"
         }]
     else:
-        # 对于本地模型，返回本地模型信息
         try:
-            # 延迟导入避免循环依赖
             from core.chat.llm import get_llm_service
             local_service = get_llm_service()
             if hasattr(local_service, 'legacy_service') and local_service.legacy_service and hasattr(local_service.legacy_service, 'model'):

@@ -145,7 +145,7 @@ class NL2SQLWorkflow:
             tables_summary = []
             for table in all_tables:
                 tables_summary.append(
-                    f"表名: {table['table_name']}, 注释: {table['comment']}, 预估行数: {table['estimated_rows']}"
+                    f"表名: {table['table_name']}, 注释: {table['comment']}"
                 )
 
             tables_text = "\n".join(tables_summary)
@@ -283,6 +283,25 @@ SQL语句:"""
             sql_query = re.sub(r'^.*?(SELECT\b)', r'\1', sql_query, flags=re.IGNORECASE | re.DOTALL)
             sql_query = sql_query.rstrip(';').strip()
 
+            # 转义包含特殊字符的表名和列名
+            def quote_identifiers(text):
+                # 匹配FROM, JOIN, INTO等子句后的表名
+                def quote_table_name(match):
+                    prefix = match.group(1)
+                    table_name = match.group(2)
+                    # 如果已经包含反引号，跳过
+                    if table_name.startswith('`') and table_name.endswith('`'):
+                        return match.group(0)
+                    # 如果包含特殊字符，添加反引号
+                    if '-' in table_name or ' ' in table_name:
+                        return f"{prefix}`{table_name}`"
+                    return match.group(0)
+
+                pattern = r'(\b(?:FROM|JOIN|INTO|UPDATE)\s+)([a-zA-Z_][a-zA-Z0-9_-]*)'
+                return re.sub(pattern, quote_table_name, text, flags=re.IGNORECASE)
+
+            sql_query = quote_identifiers(sql_query)
+
             if not sql_query.upper().startswith('SELECT'):
                 return {
                     'success': False,
@@ -304,6 +323,7 @@ SQL语句:"""
     async def _execute_sql_async(self, sql_query: str) -> Dict[str, Any]:
         """异步执行SQL查询"""
         try:
+            logger.info(f"Executing SQL query: {sql_query}")
             result = self.sql_executor.execute_sql_query(sql_query)
             return result
         except Exception as e:

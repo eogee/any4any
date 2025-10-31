@@ -56,8 +56,6 @@ class TempFileManager:
             self._cleanup_thread.start()
             Path(self.temp_dir).mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"TempFileManager initialized with directory: {self.temp_dir}")
-
     def create_temp_file(self, suffix: str = ".mp3", prefix: str = "temp_") -> str:
         """
         创建临时文件路径

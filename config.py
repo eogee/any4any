@@ -133,6 +133,14 @@ class Config:
     ANY4DH_WAV2LIP_MODEL_DIR = os.getenv("ANY4DH_WAV2LIP_MODEL_DIR", "/mnt/c/models/wav2lip256/wav2lip.pth")
     ANY4DH_AVATARS_DIR = os.getenv("ANY4DH_AVATARS_DIR", "data/avatars")
 
+    # any4dh 语音知识库配置
+    ANY4DH_VOICE_KB_ENABLED = os.getenv("ANY4DH_VOICE_KB_ENABLED", "False").lower() == "true"
+    ANY4DH_VOICE_KB_LANGUAGE = os.getenv("ANY4DH_VOICE_KB_LANGUAGE", "zh")
+    ANY4DH_VOICE_KB_FALLBACK_TO_TTS = os.getenv("ANY4DH_VOICE_KB_FALLBACK_TO_TTS", "True").lower() == "true"
+    ANY4DH_VOICE_KB_SEMANTIC_THRESHOLD = float(os.getenv("ANY4DH_VOICE_KB_SEMANTIC_THRESHOLD", "0.1"))
+    VOICE_KB_CSV_PATH = os.getenv("VOICE_KB_CSV_PATH", "data/csv/en_voice_list.csv")
+    VOICE_KB_AUDIO_DIR = os.getenv("VOICE_KB_AUDIO_DIR", "data/en_answer")
+
     # 确保目录存在
     os.makedirs(ASR_MODEL_DIR, exist_ok=True)
     os.makedirs(RERANK_MODEL_DIR, exist_ok=True)
@@ -146,13 +154,15 @@ class Config:
 
     # 外部LLM API配置
     LLM_SERVER_TYPE = os.getenv("LLM_SERVER_TYPE", "local")
-    API_KEY = os.getenv("API_KEY", "")
+    EXTERNAL_API_KEY = os.getenv("EXTERNAL_API_KEY", "")
     API_URL = os.getenv("API_URL", "")
     MODEL_NAME = os.getenv("MODEL_NAME", "")
     API_BASE_URL = os.getenv("API_BASE_URL", "")
-    API_TIMEOUT = int(os.getenv("API_TIMEOUT", "30"))
+    API_TIMEOUT = int(os.getenv("API_TIMEOUT", "120"))
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
     STREAM_ENABLED = os.getenv("STREAM_ENABLED", "true").lower() == "true"
+    API_MAX_RETRIES = int(os.getenv("API_MAX_RETRIES", "3"))
+    API_RETRY_DELAY = float(os.getenv("API_RETRY_DELAY", "1.0"))
 
     # 本地LLM模型名称配置
     LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen3-0.6b")

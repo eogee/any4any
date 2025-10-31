@@ -157,6 +157,55 @@ class ToolManager:
 
         return has_sql_keywords or has_data_question
 
+    def is_voice_kb_question(self, question: str) -> bool:
+        """
+        判断问题是否适合使用语音知识库回复
+
+        基于问题类型和内容特征进行判断
+        """
+        try:
+            # 检查是否启用
+            from config import Config
+            if not Config.ANY4DH_VOICE_KB_ENABLED:
+                return False
+
+            from core.tools.voice_kb.voice_workflow import get_voice_workflow
+            workflow = get_voice_workflow()
+            return workflow.is_voice_kb_question(question)
+        except Exception as e:
+            logger.error(f"Voice KB question detection failed: {e}")
+            return False
+
+    async def _process_voice_kb_query(self, question: str) -> str:
+        """
+        处理voice_kb查询并返回标准格式响应
+
+        Returns:
+            str: 格式为 "[VOICE_KB_RESPONSE:filename:text]" 的字符串
+        """
+        try:
+            from core.tools.voice_kb.voice_workflow import get_voice_workflow
+            workflow = get_voice_workflow()
+
+            result = await workflow.process_voice_query(question)
+
+            if result.get("success") and result.get("should_use_voice"):
+                voice_info = result.get("voice_info")
+                if voice_info:
+                    filename = voice_info.get('audio_file', '')
+                    text = voice_info.get('response_text', '')
+                    return f"[VOICE_KB_RESPONSE:{filename}:{text}]"
+                else:
+                    logger.warning("Voice info is empty")
+                    return None
+            else:
+                logger.info(f"Voice KB not suitable: confidence={result.get('confidence', 0):.3f}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Voice KB processing failed: {e}")
+            return None
+
 # 全局工具管理器实例
 _tool_manager_instance = None
 

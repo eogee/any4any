@@ -30,6 +30,7 @@ einops                  # 张量操作库
 scipy                   # 科学计算库
 soundfile               # 音频文件处理库
 packaging               # 用于处理Python包的元数据
+pandas                  # 数据处理库
 huggingface_hub
 WeTextProcessing; platform_machine != "Darwin"
 wetext; platform_system == "Darwin"
@@ -49,7 +50,6 @@ python_speech_features      # 语音特征提取
 numba                       # 数值计算加速
 resampy                     # 音频重采样
 aiortc                      # WebRTC 实时通信
-websockets==12.0            # WebSocket 支持
 aiohttp                     # 异步HTTP客户端
 av                          # 音视频处理库
 face_alignment              # 人脸对齐库

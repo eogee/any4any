@@ -555,13 +555,21 @@ def register_any4dh_routes(app: FastAPI):
             if not audio_url:
                 return {"code": -1, "msg": "Audio URL is required"}
 
-            # 临时音频文件
-            filename = audio_url[len('/temp_audio/'):]
-            full_audio_path = filename
+            # 处理不同类型的音频路径
+            if audio_url.startswith('/temp_audio/'):
+                # 临时音频文件
+                filename = audio_url[len('/temp_audio/'):]
+                full_audio_path = filename
+            elif audio_url.startswith('data/'):
+                # 预录音频文件
+                full_audio_path = audio_url
+            else:
+                # 其他情况，直接使用原路径
+                full_audio_path = audio_url
 
             if not os.path.exists(full_audio_path):
-                logger.error(f"Temporary audio file not found: {filename}")
-                return {"code": -1, "msg": f"Temporary audio file not found: {filename}"}
+                logger.error(f"Audio file not found: {full_audio_path}")
+                return {"code": -1, "msg": f"Audio file not found: {full_audio_path}"}
 
             # 读取音频文件并传给数字人
             try:
@@ -577,7 +585,7 @@ def register_any4dh_routes(app: FastAPI):
                         os.remove(full_audio_path)
                     except Exception as e:
                         logger.warning(f"Failed to clean up temporary file: {e}")
-
+                
                 return {"code": 0, "msg": "Audio playback started successfully"}
 
             except Exception as audio_error:
@@ -620,6 +628,19 @@ def register_any4dh_routes(app: FastAPI):
         from core.tts.temp_file_manager import get_temp_file_manager
         get_temp_file_manager().cleanup_all()
         return {"message": "Temporary files cleanup initiated"}
+
+    # 语音知识库文件服务端点
+    @app.get("/any4dh/voice/{audio_file}")
+    async def get_voice_file(audio_file: str):
+        """获取语音知识库文件"""
+        from .voice_file_service import VoiceFileService
+        return VoiceFileService.serve_voice_file(audio_file)
+
+    @app.get("/any4dh/voice/info/{audio_file}")
+    async def get_voice_file_info(audio_file: str):
+        """获取语音文件信息"""
+        from .voice_file_service import VoiceFileService
+        return VoiceFileService.get_voice_file_info(audio_file)
 
 # 语音对话辅助函数
 async def transcribe_audio(file_content: bytes) -> str:

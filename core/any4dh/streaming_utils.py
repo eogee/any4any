@@ -264,48 +264,69 @@ class StreamingTTSProcessor:
                 'recognized_text': user_input
             }
 
-            # 流式处理LLM响应
+            # 检查是否包含语音回复标记
             accumulated_text = ""
+            voice_response_found = False
 
             async for chunk in process_llm_stream(user_input):
                 accumulated_text += chunk
 
-                # 检查是否有完整句子
-                sentences = split_text_by_punctuation(accumulated_text)
+                # 检查是否有语音回复标记
+                if not voice_response_found and "[VOICE_KB_RESPONSE:" in accumulated_text:
+                    voice_response_found = True
+                    voice_info = self._parse_voice_response(accumulated_text)
+                    if voice_info:
+                        # 直接处理语音文件
+                        result = await self._process_voice_file(voice_info)
 
-                if len(sentences) > 1:
-                    # 有完整句子，处理前面的句子
-                    for sentence in sentences[:-1]:
-                        try:
-                            # 使用信号量控制并发
-                            async with self.semaphore:
-                                result = await synthesize_speech_segment(
-                                    sentence,
-                                    self.sessionid,
-                                    self.any4dh_reals
-                                )
-
-                            yield {
-                                'type': 'audio_segment',
-                                'data': result,
-                                'partial_text': accumulated_text,
-                                'segment_index': self.processed_segments
+                        yield {
+                            'type': 'audio_file',
+                            'data': {
+                                'audio_path': result['audio_path'],
+                                'text': result['text'],
+                                'is_predefined': True
                             }
+                        }
+                        return  # 语音回复直接结束，不再继续文本处理
 
-                            self.processed_segments += 1
+                # 如果没有语音回复，继续文本处理
+                if not voice_response_found:
+                    # 检查是否有完整句子
+                    sentences = split_text_by_punctuation(accumulated_text)
 
-                            delay_time = 0.001
-                            await asyncio.sleep(delay_time)
+                    if len(sentences) > 1:
+                        # 有完整句子，处理前面的句子
+                        for sentence in sentences[:-1]:
+                            try:
+                                # 使用信号量控制并发
+                                async with self.semaphore:
+                                    result = await synthesize_speech_segment(
+                                        sentence,
+                                        self.sessionid,
+                                        self.any4dh_reals
+                                    )
 
-                        except Exception as e:
-                            logger.error(f"Audio segment processing failed: {e}")
-                            continue
+                                yield {
+                                    'type': 'audio_segment',
+                                    'data': result,
+                                    'partial_text': accumulated_text,
+                                    'segment_index': self.processed_segments
+                                }
 
-                    # 保留最后的不完整句子
-                    accumulated_text = sentences[-1] if sentences else accumulated_text
+                                self.processed_segments += 1
+
+                                delay_time = 0.001
+                                await asyncio.sleep(delay_time)
+
+                            except Exception as e:
+                                logger.error(f"Audio segment processing failed: {e}")
+                                continue
+
+                        # 保留最后的不完整句子
+                        accumulated_text = sentences[-1] if sentences else accumulated_text
 
             # 处理最后的文本
-            if accumulated_text.strip():
+            if not voice_response_found and accumulated_text.strip():
                 try:
                     result = await synthesize_speech_segment(
                         accumulated_text,
@@ -337,3 +358,56 @@ class StreamingTTSProcessor:
                 'type': 'error',
                 'message': f'处理失败: {str(e)}'
             }
+
+    def _parse_voice_response(self, response_text: str) -> Dict[str, Any]:
+        """解析语音回复标记"""
+        try:
+            # 格式: [VOICE_KB_RESPONSE:filename:text_content]
+            import re
+            pattern = r'\[VOICE_KB_RESPONSE:([^:]+):(.+)\]'
+            match = re.search(pattern, response_text)
+            if match:
+                return {
+                    "audio_file": match.group(1),
+                    "text": match.group(2)
+                }
+        except Exception as e:
+            logger.error(f"Failed to parse voice response: {e}")
+        return None
+
+    async def _process_voice_file(self, voice_info: Dict[str, Any]) -> Dict[str, Any]:
+        """处理语音文件"""
+        try:
+            from pathlib import Path
+
+            def get_config():
+                try:
+                    from config import Config
+                    return Config
+                except ImportError as e:
+                    logger.error(f"Failed to import Config: {e}")
+                    return None
+
+            config = get_config()
+            if not config:
+                return {"error": "Config not available"}
+
+            audio_file = voice_info["audio_file"]
+            audio_dir = Path(config.VOICE_KB_AUDIO_DIR)
+            audio_path = audio_dir / audio_file
+
+            if not audio_path.exists():
+                logger.error(f"Voice file not found: {audio_path}")
+                return {"error": "Voice file not found"}
+
+            # 返回音频文件信息，any4dh前端可以直接使用
+            return {
+                "audio_path": str(audio_path),
+                "text": voice_info["text"],
+                "is_predefined": True,
+                "audio_file": audio_file
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to process voice file: {e}")
+            return {"error": str(e)}

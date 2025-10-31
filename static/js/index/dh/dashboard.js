@@ -1168,8 +1168,28 @@ class DashboardController {
                     setTimeout(() => {
                         this.isProcessing = false;
                         this.updateRecordingState(false);
-                    }, 2000);
+                    }, 1000);
                 }
+                break;
+
+            case 'audio_file':
+                // 处理预录音频文件
+                // 显示AI回复文本
+                if (data.data.text) {
+                    this.updateStreamChatItem('ai', data.data.text);
+                }
+
+                // 直接播放音频文件
+                if (data.data.audio_path) {
+                    this.playAudioSegment(data.data.audio_path, data.data.text, 0);
+                }
+
+                // 更新状态并结束处理
+                this.updateStreamChatItem('status', '回复完成');
+                setTimeout(() => {
+                    this.isProcessing = false;
+                    this.updateRecordingState(false);
+                }, 1000);
                 break;
 
             case 'completed':
