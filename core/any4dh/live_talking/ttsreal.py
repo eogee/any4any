@@ -187,7 +187,7 @@ class EdgeTTS(BaseTTS):
 
         # 过滤特殊字符，确保TTS不会读出不合适的符号
         try:
-            from utils.content_handle.filter import filter_special_chars
+            from core.tts.filter import filter_special_chars
             text = filter_special_chars(text)
         except ImportError:
             pass  # 如果导入失败，继续处理原文本

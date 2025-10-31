@@ -12,7 +12,7 @@ from typing import Any, Optional
 from config import Config
 from dingtalk_stream import AckMessage
 from core.log import setup_logging
-from utils.content_handle.filter import filter_think_content
+from core.tts.filter import filter_think_content
 from alibabacloud_dingtalk.oauth2_1_0.client import Client as dingtalkoauth2_1_0Client
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_dingtalk.oauth2_1_0 import models as dingtalkoauth_2__1__0_models

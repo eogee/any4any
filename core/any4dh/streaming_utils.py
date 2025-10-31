@@ -28,7 +28,7 @@ def split_text_by_punctuation(text: str) -> List[str]:
 
     # 预处理：过滤特殊字符，确保文本干净
     try:
-        from utils.content_handle.filter import filter_special_chars
+        from core.tts.filter import filter_special_chars
         text = filter_special_chars(text)
     except ImportError:
         pass  # 如果导入失败，继续处理原文本
@@ -93,7 +93,7 @@ async def synthesize_speech_segment(text: str, sessionid: str, any4dh_reals: Dic
     try:
         from core.tts.index_tts_engine import IndexTTSEngine
         from config import Config
-        from utils.content_handle.filter import filter_special_chars
+        from core.tts.filter import filter_special_chars
 
         # 过滤特殊字符，确保TTS不会读出不合适的符号
         text = filter_special_chars(text)
