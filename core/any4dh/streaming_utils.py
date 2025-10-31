@@ -210,14 +210,27 @@ async def process_llm_stream(text: str) -> AsyncGenerator[str, None]:
         LLM响应文本片段
     """
     try:
-        from core.chat.llm import get_llm_service
+        from config import Config
 
-        llm_service = get_llm_service()
+        if getattr(Config, 'ANY4DH_USE_UNIFIED_INTERFACE', True):
+            from core.chat.unified_interface import UnifiedLLMInterface
 
-        # 使用流式生成
-        async for chunk in llm_service.generate_stream(text):
-            if chunk and chunk.strip():
-                yield chunk
+            async for chunk in UnifiedLLMInterface.generate_response_stream(
+                content=text,
+                sender="any4dh_user",
+                user_nick="数字人用户",
+                platform="any4dh",
+                generation_id=f"any4dh_{int(time.time())}"
+            ):
+                if chunk and chunk.strip():
+                    yield chunk
+        else:
+            from core.chat.llm import get_llm_service
+            llm_service = get_llm_service()
+
+            async for chunk in llm_service.generate_stream(text):
+                if chunk and chunk.strip():
+                    yield chunk
 
     except Exception as e:
         logger.error(f"LLM streaming processing failed: {str(e)}")

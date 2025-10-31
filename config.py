@@ -109,7 +109,7 @@ class Config:
     # 工具服务器配置
     TOOLS_ENABLED = os.getenv("TOOLS_ENABLED", "True").lower() == "true"
     TOOLS_DEBUG = os.getenv("TOOLS_DEBUG", "False").lower() == "true"
-    TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))
+    TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))  
 
     # 钉钉配置
     CLIENT_ID = os.getenv("CLIENT_ID", "")
@@ -119,6 +119,7 @@ class Config:
 
     # any4dh 数字人配置
     ANY4DH_ENABLED = os.getenv("ANY4DH_ENABLED", "False").lower() == "true"
+    ANY4DH_USE_UNIFIED_INTERFACE = os.getenv("ANY4DH_USE_UNIFIED_INTERFACE", "True").lower() == "true"
     ANY4DH_TRANSPORT = os.getenv("ANY4DH_TRANSPORT", "webrtc")
     ANY4DH_MODEL = os.getenv("ANY4DH_MODEL", "wav2lip")
     ANY4DH_AVATAR_ID = os.getenv("ANY4DH_AVATAR_ID", "001")
