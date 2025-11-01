@@ -942,21 +942,6 @@ body::before {
     gap: 15px;
 }
 
-/* 对话统计 */
-.chat-stats {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.chat-stats .stat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    background: var(--light-bg);
-    border-radius: 8px;
-}
 
 .stat-value {
     font-size: 18px;
@@ -1038,7 +1023,8 @@ body::before {
 
 /* 模式状态徽章 */
 .preview-mode-badge,
-.delay-mode-badge {
+.delay-mode-badge,
+.tools-mode-badge {
     background: #f59e0b;
     color: white;
     padding: 2px 8px;
@@ -1051,6 +1037,10 @@ body::before {
 
 .delay-mode-badge {
     background: #10b981;
+}
+
+.tools-mode-badge {
+    background: #3b82f6;
 }
 
 /* 模式提示文字 */
@@ -1386,26 +1376,7 @@ body::before {
         font-size: 13px;
     }
 
-    .chat-stats {
-        flex-direction: row;
-        justify-content: space-around;
-        gap: 10px;
-    }
-
-    .stat-item {
-        min-width: 0;
-        flex: 1;
-        text-align: center;
-    }
-
-    .stat-value {
-        font-size: 18px;
-    }
-
-    .stat-label {
-        font-size: 12px;
-    }
-
+  
     .app-main {
         height: calc(100vh - 280px);
     }
@@ -1464,18 +1435,7 @@ body::before {
         font-size: 12px;
     }
 
-    .chat-stats {
-        gap: 8px;
-    }
-
-    .stat-value {
-        font-size: 16px;
-    }
-
-    .stat-label {
-        font-size: 11px;
-    }
-
+    
     .app-main {
         height: calc(100vh - 250px);
     }

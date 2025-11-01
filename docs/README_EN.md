@@ -182,8 +182,8 @@ git clone https://huggingface.co/FunAudioLLM/SenseVoiceSmall
 # Download reranking model: bge-reranker-base
 git clone https://huggingface.co/BAAI/bge-reranker-base
 
-# Download LLM model: Qwen3-1.7B
-git clone https://huggingface.co/Qwen/Qwen3-1.7B
+# Download LLM model: Qwen3-0.6B
+git clone https://huggingface.co/Qwen/Qwen3-0.6B
 
 # Download Embedding model: bge-small-zh-v1.5
 git clone https://huggingface.co/BAAI/bge-small-zh-v1.5
@@ -242,7 +242,7 @@ SQL_DB_PASSWORD=root
 SQL_DB_DATABASE=your_database_name
 
 # Model path configuration
-LLM_MODEL_DIR=/path/to/Qwen3-1.7B
+LLM_MODEL_DIR=/path/to/Qwen3-0.6B
 ASR_MODEL_DIR=/path/to/SenseVoiceSmall
 RERANK_MODEL_DIR=/path/to/bge-reranker-base
 EMBEDDING_MODEL_DIR=/path/to/bge-small-zh-v1.5
@@ -342,7 +342,7 @@ API endpoint URL: http://host.docker.internal:8888/v1
 #### LLM Model Configuration
 ```bash
 Model Type: LLM
-Model Name: Qwen3-1.7B
+Model Name: Qwen3-0.6B
 API Key: EMPTY
 API endpoint URL: http://host.docker.internal:8888/v1
 ```
@@ -428,7 +428,7 @@ any4any/
 - **Wav2Lip**: Lip sync technology - https://github.com/Rudrabha/Wav2Lip
 - **bge-reranker-base**: Document reranking model - https://huggingface.co/BAAI/bge-reranker-base
 - **bge-small-zh-v1.5**: Chinese text embedding - https://huggingface.co/BAAI/bge-small-zh-v1.5
-- **Qwen3-1.7B**: High-performance language model - https://huggingface.co/Qwen/Qwen3-1.7B
+- **Qwen3-0.6B**: High-performance language model - https://huggingface.co/Qwen/Qwen3-0.6B
 - **FastAPI**: Modern Web framework - https://github.com/fastapi/fastapi
 - **ChromaDB**: Vector database - https://github.com/chroma-core/chroma
 

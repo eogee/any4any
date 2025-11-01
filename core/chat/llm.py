@@ -806,15 +806,26 @@ class UnifiedLLMService:
             return ""
 
     def _format_messages_for_external(self, messages: List[Dict[str, str]]) -> str:
-        """为外部LLM格式化消息"""
-        # 简单的消息格式化
-        prompt = ""
-        for message in messages:
-            if message["role"] == "system":
-                prompt += f"System: {message['content']}\n\n"
-            elif message["role"] == "user":
-                prompt += f"User: {message['content']}\n\nAssistant: "
-        return prompt
+        """为外部LLM格式化消息 - 支持系统提示词"""
+        from config import Config
+
+        system_prompt = getattr(Config, 'LLM_PROMPT', '').strip()
+
+        prompt_parts = []
+
+        if system_prompt:
+            prompt_parts.append(f"System: {system_prompt}\n\n")
+            for message in messages:
+                if message["role"] == "user":
+                    prompt_parts.append(f"User: {message['content']}\n\nAssistant: ")
+        else:
+            for message in messages:
+                if message["role"] == "system":
+                    prompt_parts.append(f"System: {message['content']}\n\n")
+                elif message["role"] == "user":
+                    prompt_parts.append(f"User: {message['content']}\n\nAssistant: ")
+
+        return "".join(prompt_parts)
 
     def _format_messages_for_local(self, messages: List[Dict[str, str]]) -> str:
         """为本地LLM格式化消息"""
@@ -855,13 +866,24 @@ class UnifiedLLMService:
     async def generate_stream(self, user_message: str, generation_id: str = None, **kwargs) -> AsyncGenerator[str, None]:
         """流式生成回复"""
         if self.service_type == "external":
+            from config import Config
+
+            system_prompt = getattr(Config, 'LLM_PROMPT', '').strip()
+
+            messages = []
+
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+
             # 检查user_message是否已经是OpenAI格式的messages数组
             if isinstance(user_message, list) and all(isinstance(msg, dict) and 'role' in msg and 'content' in msg for msg in user_message):
-                # 已经是OpenAI格式，直接使用
-                messages = user_message
+
+                for msg in user_message:
+                    if msg["role"] != "system":
+                        messages.append(msg)
             else:
                 # 是字符串，转换为OpenAI格式
-                messages = self._format_messages(user_message)
+                messages.append({"role": "user", "content": user_message})
 
             async for chunk in generate_chat_response(
                 messages=messages,
@@ -882,13 +904,24 @@ class UnifiedLLMService:
     async def generate_response(self, user_message: str, **kwargs) -> str:
         """生成完整回复"""
         if self.service_type == "external":
+            from config import Config
+
+            system_prompt = getattr(Config, 'LLM_PROMPT', '').strip()
+
+            messages = []
+
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+
             # 检查user_message是否已经是OpenAI格式的messages数组
             if isinstance(user_message, list) and all(isinstance(msg, dict) and 'role' in msg and 'content' in msg for msg in user_message):
-                # 已经是OpenAI格式，直接使用
-                messages = user_message
+
+                for msg in user_message:
+                    if msg["role"] != "system":
+                        messages.append(msg)
             else:
                 # 是字符串，转换为OpenAI格式
-                messages = self._format_messages(user_message)
+                messages.append({"role": "user", "content": user_message})
 
             return await generate_chat_response(
                 messages=messages,

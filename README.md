@@ -182,8 +182,8 @@ git clone https://huggingface.co/FunAudioLLM/SenseVoiceSmall
 # 下载重排序模型：bge-reranker-base
 git clone https://huggingface.co/BAAI/bge-reranker-base
 
-# 下载LLM模型：Qwen3-1.7B
-git clone https://huggingface.co/Qwen/Qwen3-1.7B
+# 下载LLM模型：Qwen3-0.6B
+git clone https://huggingface.co/Qwen/Qwen3-0.6B
 
 # 下载Embedding模型：bge-small-zh-v1.5
 git clone https://huggingface.co/BAAI/bge-small-zh-v1.5
@@ -242,7 +242,7 @@ SQL_DB_PASSWORD=root
 SQL_DB_DATABASE=your_database_name
 
 # 模型路径配置
-LLM_MODEL_DIR=/path/to/Qwen3-1.7B
+LLM_MODEL_DIR=/path/to/Qwen3-0.6B
 ASR_MODEL_DIR=/path/to/SenseVoiceSmall
 RERANK_MODEL_DIR=/path/to/bge-reranker-base
 EMBEDDING_MODEL_DIR=/path/to/bge-small-zh-v1.5
@@ -342,7 +342,7 @@ API endpoint URL：http://host.docker.internal:8888/v1
 #### LLM模型配置
 ```bash
 模型类型：LLM
-模型名称：Qwen3-1.7B
+模型名称：Qwen3-0.6B
 API Key：EMPTY
 API endpoint URL：http://host.docker.internal:8888/v1
 ```
@@ -428,7 +428,7 @@ any4any/
 - **Wav2Lip**: 唇形同步技术 - https://github.com/Rudrabha/Wav2Lip
 - **bge-reranker-base**: 文档重排序模型 - https://huggingface.co/BAAI/bge-reranker-base
 - **bge-small-zh-v1.5**: 中文文本嵌入 - https://huggingface.co/BAAI/bge-small-zh-v1.5
-- **Qwen3-1.7B**: 高性能语言模型 - https://huggingface.co/Qwen/Qwen3-1.7B
+- **Qwen3-0.6B**: 高性能语言模型 - https://huggingface.co/Qwen/Qwen3-0.6B
 - **FastAPI**: 现代Web框架 - https://github.com/fastapi/fastapi
 - **ChromaDB**: 向量数据库 - https://github.com/chroma-core/chroma
 

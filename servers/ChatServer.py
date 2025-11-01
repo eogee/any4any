@@ -90,13 +90,23 @@ class ChatServer(Server):
             if not await self._verify_request_auth(request):
                 raise HTTPException(status_code=401, detail="Unauthorized")
 
-            # 设置默认参数
-            if not chat_request.sender_id:
-                chat_request.sender_id = "web_user"
-            if not chat_request.sender_nickname:
-                chat_request.sender_nickname = "Web用户"
-            if not chat_request.platform:
-                chat_request.platform = "web"
+            # 从session获取用户信息，如果没有则使用默认值
+            if await check_user_login(request):
+                # 用户已登录，使用session中的用户信息
+                if not chat_request.sender_id:
+                    chat_request.sender_id = request.session.get('username', 'web_user')
+                if not chat_request.sender_nickname:
+                    chat_request.sender_nickname = request.session.get('nickname', 'Web用户')
+                if not chat_request.platform:
+                    chat_request.platform = "any4chat"
+            else:
+                # 用户未登录，使用默认值
+                if not chat_request.sender_id:
+                    chat_request.sender_id = "web_user"
+                if not chat_request.sender_nickname:
+                    chat_request.sender_nickname = "Web用户"
+                if not chat_request.platform:
+                    chat_request.platform = "any4chat"
 
             # 调用OpenAI API处理
             response = await OpenAIAPI.chat_completions(request, chat_request)
@@ -176,11 +186,18 @@ class ChatServer(Server):
             if not await self._verify_request_auth(request):
                 raise HTTPException(status_code=401, detail="Unauthorized")
 
-            # 从请求中获取用户信息
-            user_data = await request.json() if request.headers.get("content-type") == "application/json" else {}
-            sender_id = user_data.get('sender_id', 'web_user')
-            sender_nickname = user_data.get('sender_nickname', 'Web用户')
-            platform = user_data.get('platform', 'web')
+            # 从session获取用户信息，如果没有则使用请求中的数据
+            if await check_user_login(request):
+                # 用户已登录，使用session中的用户信息
+                sender_id = request.session.get('username', 'web_user')
+                sender_nickname = request.session.get('nickname', 'Web用户')
+                platform = 'any4chat'
+            else:
+                # 用户未登录，使用请求中的数据或默认值
+                user_data = await request.json() if request.headers.get("content-type") == "application/json" else {}
+                sender_id = user_data.get('sender_id', 'web_user')
+                sender_nickname = user_data.get('sender_nickname', 'Web用户')
+                platform = user_data.get('platform', 'any4chat')
 
             # 创建新对话
             try:
@@ -350,6 +367,63 @@ class ChatServer(Server):
                 "error": str(e)
             }, status_code=500)
 
+    async def get_tools_enabled_config(self, request: Request):
+        """获取工具系统配置状态"""
+        self.log_request("/api/chat/config/tools-enabled")
+
+        try:
+            # 权限验证
+            if not await self._verify_request_auth(request):
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            return JSONResponse({
+                "tools_enabled": Config.TOOLS_ENABLED,
+                "description": "Tools system is enabled - NL2SQL and other tools are available" if Config.TOOLS_ENABLED else "Tools system is disabled - only basic chat functionality is available"
+            })
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.log_error("/api/chat/config/tools-enabled", e)
+            return JSONResponse({
+                "tools_enabled": False,
+                "description": "Unable to determine tools enabled status",
+                "error": str(e)
+            }, status_code=500)
+
+    async def get_current_user(self, request: Request):
+        """获取当前登录用户信息"""
+        self.log_request("/api/chat/current-user")
+
+        try:
+            # 权限验证
+            if not await self._verify_request_auth(request):
+                return JSONResponse({
+                    "success": False,
+                    "message": "User not logged in"
+                }, status_code=401)
+
+            # 获取用户信息
+            if hasattr(request, 'session') and request.session.get('logged_in'):
+                return JSONResponse({
+                    "success": True,
+                    "username": request.session.get('username'),
+                    "nickname": request.session.get('nickname'),
+                    "user_id": request.session.get('user_id')
+                })
+            else:
+                return JSONResponse({
+                    "success": False,
+                    "message": "User not logged in"
+                }, status_code=401)
+
+        except Exception as e:
+            self.log_error("/api/chat/current-user", e)
+            return JSONResponse({
+                "success": False,
+                "message": "Failed to get user information",
+                "error": str(e)
+            }, status_code=500)
+
     def register_routes(self, app: FastAPI):
         """注册聊天相关路由"""
 
@@ -425,6 +499,16 @@ class ChatServer(Server):
         async def delay_mode_config(request: Request):
             """获取延迟模式配置状态"""
             return await self.get_delay_mode_config(request)
+
+        @app.get("/api/chat/config/tools-enabled")
+        async def tools_enabled_config(request: Request):
+            """获取工具系统配置状态"""
+            return await self.get_tools_enabled_config(request)
+
+        @app.get("/api/chat/current-user")
+        async def current_user(request: Request):
+            """获取当前用户信息"""
+            return await self.get_current_user(request)
 
         @app.get("/api/chat/models")
         async def chat_models(request: Request):

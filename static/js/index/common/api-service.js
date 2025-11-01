@@ -80,6 +80,13 @@ async function login(username, password) {
     });
 }
 
+// 获取当前用户信息
+async function getCurrentUser() {
+    return await apiRequest('/api/chat/current-user', {
+        method: 'GET'
+    });
+}
+
 // 数据库查询
 async function queryDatabase(query) {
     const formData = new FormData();
@@ -100,5 +107,6 @@ window.ApiService = {
     confirmPreview,
     savePreviewContent,
     login,
+    getCurrentUser,
     queryDatabase
 };

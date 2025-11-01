@@ -47,8 +47,8 @@ class Config:
     ASR_MODEL_DIR = os.getenv("ASR_MODEL_DIR", "/mnt/c/models/SenseVoiceSmall")
     RERANK_MODEL_DIR = os.getenv("RERANK_MODEL_DIR", "/mnt/c/models/bge-reranker-base")
     EMBEDDING_MODEL_DIR = os.getenv("EMBEDDING_MODEL_DIR", "/mnt/c/models/bge-small-zh-v1.5")
-    LLM_MODEL_DIR = os.getenv("LLM_MODEL_DIR", "/mnt/c/models/Qwen3-1.7B")
-    LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen3-1.7B")
+    LLM_MODEL_DIR = os.getenv("LLM_MODEL_DIR", "/mnt/c/models/Qwen3-0.6B")
+    LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen3-0.6B")
     NO_THINK = get_bool_env("NO_THINK", True)
     ASR_PROMPT = os.getenv("ASR_PROMPT", "")
 
@@ -64,7 +64,7 @@ class Config:
     TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
     TOP_P = float(os.getenv("TOP_P", "0.9"))
     REPETITION_PENALTY = float(os.getenv("REPETITION_PENALTY", "1.1"))
-    LLM_PROMPT = os.getenv("LLM_PROMPT", "")
+    LLM_PROMPT = os.getenv("LLM_PROMPT", "").replace("\\n", "\n")
 
     # EMBEDDING模型配置
     TOP_K = int(os.getenv("TOP_K", "3"))

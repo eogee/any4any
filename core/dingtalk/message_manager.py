@@ -425,8 +425,21 @@ class EchoTextHandler(dingtalk_stream.ChatbotHandler):
 async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: str, request_data=None) -> bool:
     logger = logging.getLogger('core.dingtalk.message_manager')
     current_process_id = os.getpid()
-    
+
     try:
+        # 检查平台来源，只有钉钉平台才发送钉钉消息
+        platform = 'unknown'
+        if request_data and isinstance(request_data, dict):
+            platform = request_data.get('platform', 'unknown')
+
+        if platform != 'dingtalk':
+            logger.info(f"Skipping DingTalk send for non-dingtalk platform: {platform} (preview_id: {preview_id})")
+            # 清理内存存储并返回成功，避免阻塞其他平台的预览确认
+            memory_store.delete(preview_id)
+            return True
+
+        logger.info(f"Processing DingTalk preview confirm for platform: {platform} (preview_id: {preview_id})")
+
         message_data = memory_store.get(preview_id)
         
         if not message_data:
@@ -460,8 +473,7 @@ async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: s
                 return False
         
         sender_id = message_data.get('sender')
-        if not sender_id:
-            return False
+        logger.info(f"Processing preview {preview_id} for DingTalk user: {sender_id}")
         
         content_to_send = confirmed_content or message_data.get('content', '')
         if hasattr(Config, 'NO_THINK') and Config.NO_THINK:

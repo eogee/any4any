@@ -29,6 +29,10 @@ class ChatController {
         this.isPreviewMode = false;
         this.isDelayMode = false;
         this.delayTime = 3;
+        this.isToolsEnabled = false;
+
+        // 用户信息
+        this.currentUser = null;
 
         // 配置选项
         this.options = {
@@ -44,8 +48,10 @@ class ChatController {
      */
     async initialize() {
         this.initializeElements();
+        await this.getCurrentUserInfo();
         await this.checkPreviewMode();
         await this.checkDelayMode();
+        await this.checkToolsEnabled();
         this.setupEventListeners();
         this.loadChatHistory();
     }
@@ -113,6 +119,16 @@ class ChatController {
                 delayModeBadge.title = `延迟模式已启用，消息将在${this.delayTime}秒后合并处理`;
             } else {
                 delayModeStatus.style.display = 'none';
+            }
+        }
+
+        // 更新工具系统状态显示
+        const toolsStatus = document.getElementById('toolsStatus');
+        if (toolsStatus) {
+            if (this.isToolsEnabled) {
+                toolsStatus.style.display = 'flex';
+            } else {
+                toolsStatus.style.display = 'none';
             }
         }
 
@@ -233,6 +249,73 @@ class ChatController {
     }
 
     /**
+     * 检测工具系统状态
+     */
+    async checkToolsEnabled() {
+        try {
+            const response = await fetch('/api/chat/config/tools-enabled', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.isToolsEnabled = data.tools_enabled === true;
+            } else {
+                console.warn('Failed to check tools enabled status');
+                this.isToolsEnabled = false;
+            }
+        } catch (error) {
+            console.warn('Failed to check tools enabled:', error);
+            this.isToolsEnabled = false;
+        }
+    }
+
+    /**
+     * 获取当前用户信息
+     */
+    async getCurrentUserInfo() {
+        try {
+            if (typeof ApiService !== 'undefined' && ApiService.getCurrentUser) {
+                const result = await ApiService.getCurrentUser();
+                if (result && result.success) {
+                    this.currentUser = {
+                        username: result.username,
+                        nickname: result.nickname,
+                        user_id: result.user_id
+                    };
+                } else {
+                    console.warn('Failed to get current user info:', result?.message || 'Unknown error');
+                    this.currentUser = null;
+                }
+            } else {
+                // 如果ApiService不可用，直接使用fetch
+                const response = await fetch('/api/chat/current-user', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        this.currentUser = {
+                            username: data.username,
+                            nickname: data.nickname,
+                            user_id: data.user_id
+                        };
+                    }
+                } else {
+                    console.warn('Failed to get current user info, status:', response.status);
+                    this.currentUser = null;
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to get current user info:', error);
+            this.currentUser = null;
+        }
+    }
+
+    /**
      * 加载聊天历史（可选功能）
      */
     async loadChatHistory() {
@@ -315,9 +398,9 @@ class ChatController {
                 stream: shouldUseStream,
                 temperature: this.options.temperature,
                 max_tokens: this.options.max_tokens,
-                sender_id: 'web_user',
-                sender_nickname: 'Web用户',
-                platform: 'web',
+                sender_id: this.currentUser?.username || 'web_user',
+                sender_nickname: this.currentUser?.nickname || 'Web用户',
+                platform: 'any4chat',
                 delay_time: this.isDelayMode ? this.delayTime : undefined
             };
 
