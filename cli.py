@@ -56,12 +56,15 @@ def signal_handler(sig, frame, processes):
 def main():
     if multiprocessing.get_start_method(allow_none=True) is None:
         multiprocessing.set_start_method("spawn")
-    
+
     processes = {
         'fastapi': Process(target=run_fastapi_server),
-        'mcp': Process(target=run_mcp_server),
-        'dingtalk': Process(target=run_dingtalk_server)
+        'mcp': Process(target=run_mcp_server)
     }
+
+    # 仅在钉钉服务启用时添加钉钉进程
+    if Config.DINGTALK_ENABLED:
+        processes['dingtalk'] = Process(target=run_dingtalk_server)
 
     signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, processes))
     signal.signal(signal.SIGTERM, lambda sig, frame: signal_handler(sig, frame, processes))

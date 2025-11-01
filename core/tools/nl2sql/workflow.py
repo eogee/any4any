@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from .table_info import get_table_manager, get_all_tables
 from .sql_executor import get_sql_executor
+from .context_manager import SQLContextManager
 
 logger = logging.getLogger(__name__)
 
@@ -11,29 +12,66 @@ class NL2SQLWorkflow:
     def __init__(self):
         self.table_manager = get_table_manager()
         self.sql_executor = get_sql_executor()
+        self.context_manager = SQLContextManager()
 
-    async def process_sql_question(self, question: str, context: str = "") -> Dict[str, Any]:
+    async def process_sql_question(
+        self,
+        question: str,
+        context: str = "",
+        conversation_manager=None,
+        user_id: str = None,
+        platform: str = None
+    ) -> Dict[str, Any]:
         """
         处理SQL相关问题的完整工作流程
 
-        工作流程：
+        增强工作流程：
         1. 判断为SQL问题 → 进入NL2SQL流程
-        2. 调用get_relevant_tables()获取初步表信息
-        3. LLM分析问题并确定需要的表结构
-        4. 调用get_table_schemas()获取详细表结构
-        5. LLM基于表结构生成SQL语句
-        6. 执行SQL查询
-        7. LLM基于结果生成最终回答
+        2. 自动获取相关会话历史记录
+        3. 调用get_relevant_tables()获取初步表信息
+        4. LLM分析问题并确定需要的表结构（基于增强上下文）
+        5. 调用get_table_schemas()获取详细表结构
+        6. LLM基于表结构和历史上下文生成SQL语句
+        7. 执行SQL查询
+        8. LLM基于结果和历史上下文生成最终回答
 
         参数:
             question: 用户问题
-            context: 对话上下文
+            context: 手动提供的对话上下文
+            conversation_manager: 会话管理器实例（用于自动获取历史记录）
+            user_id: 用户ID（用于获取历史记录）
+            platform: 平台标识（用于获取历史记录）
 
         返回:
             包含处理结果或错误信息的字典
         """
         try:
             logger.info(f"Start processing SQL question: {question}")
+
+            # 步骤0: 自动获取增强上下文
+            enhanced_context = ""
+            if conversation_manager and user_id:
+                logger.info("Step 0: Auto-enhancing context with conversation history")
+                try:
+                    enhanced_context = await self.context_manager.get_enhanced_context(
+                        current_question=question,
+                        conversation_manager=conversation_manager,
+                        user_id=user_id,
+                        platform=platform,
+                        manual_context=context,
+                        max_history=self.context_manager.max_history_items
+                    )
+
+                    if enhanced_context:
+                        logger.info(f"Enhanced context generated with {len(enhanced_context)} characters")
+                    else:
+                        logger.info("No relevant conversation history found for context enhancement")
+
+                except Exception as e:
+                    logger.error(f"Failed to generate enhanced context: {e}")
+                    enhanced_context = context or ""
+            else:
+                enhanced_context = context or ""
 
             # 步骤1: 获取所有表的基本信息
             logger.info("Step 1: Get all tables' basic information")
@@ -48,9 +86,9 @@ class NL2SQLWorkflow:
 
             all_tables = all_tables_result['data']['tables']
 
-            # 步骤2: LLM分析问题并确定需要的表
-            logger.info("Step 2: Analyze tables needed for the question")
-            required_tables = await self._analyze_tables_needed(question, all_tables, context)
+            # 步骤2: LLM分析问题并确定需要的表-使用增强上下文
+            logger.info("Step 2: Analyze tables needed for the question with enhanced context")
+            required_tables = await self._analyze_tables_needed(question, all_tables, enhanced_context)
 
             if not required_tables:
                 return {
@@ -70,9 +108,9 @@ class NL2SQLWorkflow:
                     'step': 'get_schemas'
                 }
 
-            # 步骤4: LLM生成SQL语句
-            logger.info("Step 4: Generate SQL statement")
-            sql_result = await self._generate_sql(question, table_schemas_result['formatted_output'], context)
+            # 步骤4: LLM生成SQL语句-使用增强上下文
+            logger.info("Step 4: Generate SQL statement with enhanced context")
+            sql_result = await self._generate_sql(question, table_schemas_result['formatted_output'], enhanced_context)
 
             if not sql_result['success']:
                 return {
@@ -93,13 +131,13 @@ class NL2SQLWorkflow:
                     'generated_sql': sql_result['generated_sql']
                 }
 
-            # 步骤6: LLM生成最终回答
-            logger.info("Step 6: Generate final answer")
+            # 步骤6: LLM生成最终回答-使用增强上下文
+            logger.info("Step 6: Generate final answer with enhanced context")
             final_answer = await self._generate_final_answer(
                 question,
                 sql_result['generated_sql'],
                 execution_result['formatted_table'],
-                context
+                enhanced_context
             )
 
             return {
@@ -109,7 +147,10 @@ class NL2SQLWorkflow:
                 'query_result': execution_result['formatted_table'],
                 'final_answer': final_answer,
                 'row_count': execution_result['row_count'],
-                'step': 'completed'
+                'step': 'completed',
+                'context_used': bool(enhanced_context),
+                'context_source': 'conversation_history' if enhanced_context and not context else 'manual' if context else 'none',
+                'enhanced_context_length': len(enhanced_context) if enhanced_context else 0
             }
 
         except Exception as e:
@@ -332,6 +373,32 @@ SQL语句:"""
                 'success': False,
                 'error': str(e)
             }
+
+    def should_use_enhanced_context(self, question: str, user_id: str = None) -> bool:
+        """
+        判断是否应该使用增强的上下文功能
+
+        Args:
+            question: 当前问题
+            user_id: 用户ID
+
+        Returns:
+            是否启用增强上下文
+        """
+        return self.context_manager.should_use_enhanced_context(question, user_id)
+
+    async def process_sql_question_legacy(self, question: str, context: str = "") -> Dict[str, Any]:
+        """
+        处理SQL相关问题的传统工作流程（向后兼容）
+
+        Args:
+            question: 用户问题
+            context: 对话上下文
+
+        Returns:
+            包含处理结果或错误信息的字典
+        """
+        return await self.process_sql_question(question, context)
 
     async def _generate_final_answer(self, question: str, sql_query: str, query_result: str, context: str) -> str:
         """LLM生成最终回答"""

@@ -102,15 +102,21 @@ class OpenAIAPI:
                     }
                 })
             
+            # 预览模式检查和警告
+            if Config.PREVIEW_MODE and chat_request.stream:
+                OpenAIAPI.logger.info("Preview mode enabled: converting streaming request to non-streaming")
+                # 强制转换为非流式响应
+                chat_request.stream = False
+
             # 处理流式/非流式响应
             if chat_request.stream:
                 return await OpenAIAPI._handle_streaming_response(
-                    chat_request, sender, user_nick, platform, 
+                    chat_request, sender, user_nick, platform,
                     user_message_content, Config.PREVIEW_MODE
                 )
             else:
                 return await OpenAIAPI._handle_non_streaming_response(
-                    chat_request, sender, user_nick, platform, 
+                    chat_request, sender, user_nick, platform,
                     user_message_content, Config.PREVIEW_MODE
                 )
                 
@@ -252,12 +258,13 @@ class OpenAIAPI:
         """处理流式响应"""
         generation_id = f"chatcmpl-{int(time.time())}"
         preview_id = None
-        
+
         # 检查延迟模式
         delay_mode_enabled = getattr(Config, 'DELAY_MODE', False)
-        
+
         # 预览模式初始化
         if preview_mode:
+            OpenAIAPI.logger.warning("Streaming response requested in preview mode - should have been converted to non-streaming")
             preview = await preview_service.create_preview(chat_request.dict())
             preview_id = preview.preview_id
         

@@ -337,7 +337,12 @@ class ConversationManager:
             # 生成响应 - 检查是否启用工具
             if (hasattr(self.llm_service, 'process_with_tools') and
                 self.llm_service.is_tool_supported()):
-                response_text = await self.llm_service.process_with_tools(content)
+                response_text = await self.llm_service.process_with_tools(
+                    content,
+                    conversation_manager=self,
+                    user_id=sender,
+                    platform=platform
+                )
             else:
                 # 检查LLM服务类型，为外部API提供正确的消息格式
                 if self.llm_service.service_type == "external":
@@ -476,7 +481,12 @@ class ConversationManager:
             if (hasattr(self.llm_service, 'process_with_tools') and
                 self.llm_service.is_tool_supported()):
                 # 对于流式处理，先获取完整响应，然后分段返回
-                full_response = await self.llm_service.process_with_tools(content)
+                full_response = await self.llm_service.process_with_tools(
+                    content,
+                    conversation_manager=self,
+                    user_id=sender,
+                    platform=platform
+                )
                 accumulated_response = full_response
 
                 # 模拟流式输出 - 分段返回响应

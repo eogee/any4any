@@ -8,8 +8,6 @@ class Config:
     # 服务器配置
     HOST = os.getenv("HOST", "0.0.0.0")
     PORT = int(os.getenv("PORT", 8888))
-    RELOAD = os.getenv("RELOAD", "False").lower() == "false"
-    DEV_MODE = os.getenv("DEV_MODE", "False").lower() == "false"
     PREVIEW_MODE = os.getenv("PREVIEW_MODE", "True").lower() == "true"
     PREVIEW_TIMEOUT = int(os.getenv("PREVIEW_TIMEOUT", "60"))
     DELAY_MODE = os.getenv("DELAY_MODE", "False").lower() == "true"
@@ -112,6 +110,7 @@ class Config:
     TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))  
 
     # 钉钉配置
+    DINGTALK_ENABLED = os.getenv("DINGTALK_ENABLED", "False").lower() == "true"
     CLIENT_ID = os.getenv("CLIENT_ID", "")
     CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
     ROBOT_CODE = os.getenv("ROBOT_CODE", "")
@@ -155,9 +154,8 @@ class Config:
     # 外部LLM API配置
     LLM_SERVER_TYPE = os.getenv("LLM_SERVER_TYPE", "local")
     EXTERNAL_API_KEY = os.getenv("EXTERNAL_API_KEY", "")
-    API_URL = os.getenv("API_URL", "")
-    MODEL_NAME = os.getenv("MODEL_NAME", "")
     API_BASE_URL = os.getenv("API_BASE_URL", "")
+    MODEL_NAME = os.getenv("MODEL_NAME", "")
     API_TIMEOUT = int(os.getenv("API_TIMEOUT", "120"))
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
     STREAM_ENABLED = os.getenv("STREAM_ENABLED", "true").lower() == "true"

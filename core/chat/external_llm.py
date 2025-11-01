@@ -17,8 +17,7 @@ class ExternalLLMService:
 
         self.server_type = Config.LLM_SERVER_TYPE
         self.api_key = Config.EXTERNAL_API_KEY
-        self.api_url = Config.API_URL
-        self.base_url = Config.API_BASE_URL or Config.API_URL
+        self.base_url = Config.API_BASE_URL
         self.model_name = Config.MODEL_NAME
         self.timeout = Config.API_TIMEOUT
         self.max_tokens = Config.MAX_TOKENS

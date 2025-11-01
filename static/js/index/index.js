@@ -263,7 +263,7 @@ function renderPreviewDetail(preview) {
     }
 
     const renderedResponse = typeof ContentProcessor !== 'undefined' ?
-        ContentProcessor.renderMarkdown(responseContent) : responseContent;
+        `<div class="markdown-body">${ContentProcessor.renderMarkdown(responseContent)}</div>` : responseContent;
 
     previewContent.innerHTML = `
         <div class="preview-section">
@@ -292,7 +292,7 @@ function renderPreviewDetail(preview) {
         </div>
         <div class="preview-section">
             <h3><i class="fas fa-robot"></i> AI响应</h3>
-            <div class="preview-response markdown-body">${renderedResponse}</div>
+            <div class="preview-response">${renderedResponse}</div>
         </div>
 
         <div class="preview-actions">
@@ -507,7 +507,7 @@ function startEditMode(preview) {
         elements.contentEditor.value = preview.generated_content || '';
 
         if (typeof ContentProcessor !== 'undefined') {
-            elements.contentPreview.innerHTML = ContentProcessor.renderMarkdown(elements.contentEditor.value);
+            elements.contentPreview.innerHTML = `<div class="markdown-body">${ContentProcessor.renderMarkdown(elements.contentEditor.value)}</div>`;
         } else {
             elements.contentPreview.textContent = elements.contentEditor.value;
         }
@@ -592,7 +592,7 @@ function initializeEditor() {
     // 编辑器输入事件
     elements.contentEditor.addEventListener('input', function() {
         if (typeof ContentProcessor !== 'undefined') {
-            elements.contentPreview.innerHTML = ContentProcessor.renderMarkdown(this.value);
+            elements.contentPreview.innerHTML = `<div class="markdown-body">${ContentProcessor.renderMarkdown(this.value)}</div>`;
         } else {
             elements.contentPreview.textContent = this.value;
         }

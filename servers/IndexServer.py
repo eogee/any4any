@@ -116,42 +116,42 @@ class IndexServer(Server):
                 "success": False,
                 "error": "Invalid conversation_id"
             }, status_code=400)
-        
+
         try:
             db = ConversationDatabase()
             conversation = db.get_conversation_by_id(conversation_id)
-            
+
             if not conversation:
                 return JSONResponse({
                     "success": False,
                     "error": "Conversation not found"
                 }, status_code=404)
-            
+
             # 序列化datetime字段
             def safe_serialize(value):
                 if hasattr(value, 'isoformat'):
                     return value.isoformat()
                 return value
-            
+
             conversation_info = {
                 "conversation_id": conversation.get("conversation_id"),
                 "user_nick": conversation.get("user_nick"),
                 "platform": conversation.get("platform"),
                 "message_count": conversation.get("message_count", 0)
             }
-            
+
             for field in ['created_at', 'updated_at', 'last_message_time']:
                 if field in conversation:
                     conversation_info[field] = safe_serialize(conversation[field])
-            
+
             messages = conversation.get("messages", [])
-            
+
             return JSONResponse({
                 "success": True,
                 "conversation_info": conversation_info,
                 "messages": messages
             })
-            
+
         except ConnectionError:
             return JSONResponse({
                 "success": False,
@@ -163,7 +163,8 @@ class IndexServer(Server):
                 "success": False,
                 "error": "Internal server error"
             }, status_code=500)
-    
+
+        
     def register_routes(self, app: FastAPI):
         """注册路由"""
 
@@ -230,3 +231,5 @@ class IndexServer(Server):
             if redirect := await require_login(request):
                 return redirect
             return await self.get_conversation_messages(conversation_id)
+
+        

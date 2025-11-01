@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
         logger.info("Delay manager initialized and set to conversation manager")
     
     # 预览模式下注册回调
-    if Config.PREVIEW_MODE:
+    if Config.PREVIEW_MODE and Config.DINGTALK_ENABLED:
         from core.dingtalk import message_manager
         message_manager.register_preview_confirm_callback()
         logger.info("Preview confirm callback registered")
@@ -59,11 +59,11 @@ async def lifespan(app: FastAPI):
         if getattr(Config, 'TOOLS_ENABLED', False):
             from core.tools.nl2sql.table_info import get_table_manager
             table_manager = get_table_manager()            
-            logger.info("NL2SQL table manager initialized")
+            logger.info("NL2SQL tool initialized")
     except ImportError as e:
-        logger.warning(f"NL2SQL table manager initialization skipped, module not available: {e}")
+        logger.warning(f"NL2SQL tool initialization skipped, module not available: {e}")
     except Exception as e:
-        logger.error(f"Failed to initialize NL2SQL table manager: {e}")
+        logger.error(f"Failed to initialize NL2SQL tool: {e}")
 
     if current_port != str(Config.MCP_PORT):
 
@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
         chat_server = get_server_instance(ChatServer, "ChatServer")
         chat_server.register_routes(app)
 
-        if Config.ANY4DH_ENABLED: # 初始化 any4dh 数字人系统（如果启用）
+        if Config.ANY4DH_ENABLED:
             try:
                 from core.any4dh.any4dh_server import initialize_any4dh, register_any4dh_routes
                 from servers.DHServer import DHServer

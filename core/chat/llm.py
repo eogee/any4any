@@ -115,8 +115,23 @@ class ToolProcessor:
 
         return context
 
-    async def process_with_tools(self, user_message: str, generate_response_func) -> str:
-        """统一的工具处理逻辑"""
+    async def process_with_tools(
+        self,
+        user_message: str,
+        generate_response_func,
+        conversation_manager=None,
+        user_id: str = None,
+        platform: str = None
+    ) -> str:
+        """统一的工具处理逻辑
+
+        Args:
+            user_message: 用户消息
+            generate_response_func: 响应生成函数
+            conversation_manager: 会话管理器实例（用于获取历史记录）
+            user_id: 用户ID（用于获取历史记录）
+            platform: 平台标识（用于获取历史记录）
+        """
         if not self._tools_enabled:
             # 如果不启用工具，仍然要检查知识库
             return await self._process_with_knowledge_base(user_message, generate_response_func)
@@ -132,7 +147,13 @@ class ToolProcessor:
             if self._is_sql_question(user_message):
                 from core.tools.nl2sql.workflow import get_nl2sql_workflow
                 workflow = get_nl2sql_workflow()
-                workflow_result = await workflow.process_sql_question(user_message)
+                workflow_result = await workflow.process_sql_question(
+                    question=user_message,
+                    context="",
+                    conversation_manager=conversation_manager,
+                    user_id=user_id,
+                    platform=platform
+                )
                 if workflow_result['success']:
                     return workflow_result['final_answer']
                 else:
@@ -913,11 +934,20 @@ class UnifiedLLMService:
         if self.legacy_service:
             return self.legacy_service.cleanup()
 
-    async def process_with_tools(self, user_message: str) -> str:
+    async def process_with_tools(
+        self,
+        user_message: str,
+        conversation_manager=None,
+        user_id: str = None,
+        platform: str = None
+    ) -> str:
         """使用工具处理用户消息"""
         return await self.tool_processor.process_with_tools(
-            user_message, 
-            self.generate_response
+            user_message,
+            self.generate_response,
+            conversation_manager,
+            user_id,
+            platform
         )
 
     def is_tool_supported(self) -> bool:

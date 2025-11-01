@@ -302,6 +302,54 @@ class ChatServer(Server):
             self.log_error("/api/chat/status", e)
             raise HTTPException(status_code=500, detail="Internal server error")
 
+    async def get_preview_mode_config(self, request: Request):
+        """获取预览模式配置状态"""
+        self.log_request("/api/chat/config/preview-mode")
+
+        try:
+            # 权限验证
+            if not await self._verify_request_auth(request):
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            return JSONResponse({
+                "preview_mode": Config.PREVIEW_MODE,
+                "description": "Preview mode is enabled - streaming will be disabled" if Config.PREVIEW_MODE else "Preview mode is disabled - streaming is available"
+            })
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.log_error("/api/chat/config/preview-mode", e)
+            return JSONResponse({
+                "preview_mode": False,
+                "description": "Unable to determine preview mode status",
+                "error": str(e)
+            }, status_code=500)
+
+    async def get_delay_mode_config(self, request: Request):
+        """获取延迟模式配置状态"""
+        self.log_request("/api/chat/config/delay-mode")
+
+        try:
+            # 权限验证
+            if not await self._verify_request_auth(request):
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            return JSONResponse({
+                "delay_mode": Config.DELAY_MODE,
+                "delay_time": Config.DELAY_TIME,
+                "description": f"Delay mode is enabled - messages will be combined within {Config.DELAY_TIME}s" if Config.DELAY_MODE else "Delay mode is disabled - messages will be processed immediately"
+            })
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.log_error("/api/chat/config/delay-mode", e)
+            return JSONResponse({
+                "delay_mode": False,
+                "delay_time": 3,
+                "description": "Unable to determine delay mode status",
+                "error": str(e)
+            }, status_code=500)
+
     def register_routes(self, app: FastAPI):
         """注册聊天相关路由"""
 
@@ -367,6 +415,16 @@ class ChatServer(Server):
         async def chat_status(request: Request):
             """获取聊天服务状态"""
             return await self.get_chat_status(request)
+
+        @app.get("/api/chat/config/preview-mode")
+        async def preview_mode_config(request: Request):
+            """获取预览模式配置状态"""
+            return await self.get_preview_mode_config(request)
+
+        @app.get("/api/chat/config/delay-mode")
+        async def delay_mode_config(request: Request):
+            """获取延迟模式配置状态"""
+            return await self.get_delay_mode_config(request)
 
         @app.get("/api/chat/models")
         async def chat_models(request: Request):

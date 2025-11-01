@@ -136,6 +136,12 @@ class ToolManager:
             'MAX', 'MIN', 'ORDER BY', 'GROUP BY', '产品', '商品', '订单', '库存'
         ]
 
+        # 增加追问相关的关键词
+        follow_up_keywords = [
+            '分别', '都', '谁', '什么', '哪个', '哪些', '详情', '具体',
+            '分别都', '都是谁', '是什么', '有什么', '有哪些'
+        ]
+
         data_question_patterns = [
             r'多少.*?个',
             r'多少.*?台',
@@ -146,16 +152,26 @@ class ToolManager:
             r'最低.*?是',
             r'列表.*?显示',
             r'统计.*?数据',
-            r'查询.*?信息'
+            r'查询.*?信息',
+            r'分别.*?是',
+            r'都.*?是',
+            r'谁.*?是',
+            r'有哪些',
+            r'什么.*?是'
         ]
 
         import re
 
         question_lower = question.lower()
         has_sql_keywords = any(keyword.lower() in question_lower for keyword in sql_keywords)
+        has_follow_up_keywords = any(keyword.lower() in question_lower for keyword in follow_up_keywords)
         has_data_question = any(re.search(pattern, question, re.IGNORECASE) for pattern in data_question_patterns)
 
-        return has_sql_keywords or has_data_question
+        # 如果有追问关键词，且有数据相关的上下文（简化的判断）
+        # 这里可以通过检查对话历史来增强判断
+        has_context_related = any(word in question_lower for word in ['谁', '什么', '哪个', '详情', '具体'])
+
+        return has_sql_keywords or has_data_question or (has_follow_up_keywords and has_context_related)
 
     def is_voice_kb_question(self, question: str) -> bool:
         """
@@ -164,7 +180,6 @@ class ToolManager:
         基于问题类型和内容特征进行判断
         """
         try:
-            # 检查是否启用
             from config import Config
             if not Config.ANY4DH_VOICE_KB_ENABLED:
                 return False

@@ -479,13 +479,18 @@ body::before {
     line-height: 1.6;
 }
 
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+    color: #1e293b;
+}
+
 .markdown-body pre {
     background: rgba(0, 0, 0, 0.03);
     border-radius: 8px;
     padding: 12px;
     overflow-x: auto;
     margin: 10px 0;
-    border-left: 3px solid var(--primary);
 }
 
 .markdown-body code {
@@ -498,7 +503,6 @@ body::before {
 }
 
 .markdown-body blockquote {
-    border-left: 4px solid var(--secondary);
     padding-left: 15px;
     margin: 10px 0;
     color: var(--text-secondary);
@@ -938,31 +942,6 @@ body::before {
     gap: 15px;
 }
 
-.chat-status {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--light-bg);
-    border-radius: 8px;
-    font-size: 13px;
-}
-
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #4ade80;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
 /* 对话统计 */
 .chat-stats {
     display: flex;
@@ -1022,6 +1001,8 @@ body::before {
 
 .setting-control {
     position: relative;
+    display: flex;
+    align-items: center;
 }
 
 .setting-control input[type="checkbox"] {
@@ -1053,6 +1034,31 @@ body::before {
 
 .setting-control input[type="checkbox"]:checked::before {
     transform: translateX(20px);
+}
+
+/* 模式状态徽章 */
+.preview-mode-badge,
+.delay-mode-badge {
+    background: #f59e0b;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.delay-mode-badge {
+    background: #10b981;
+}
+
+/* 模式提示文字 */
+.setting-label small {
+    color: #6b7280;
+    font-size: 11px;
+    margin-left: 4px;
+    font-weight: normal;
 }
 
 
@@ -1195,7 +1201,6 @@ body::before {
 }
 
 .message-text blockquote {
-    border-left: 4px solid var(--primary);
     padding-left: 12px;
     margin: 8px 0;
     color: #666;

@@ -24,9 +24,11 @@ class ChatController {
 
         // 数据状态
         this.messages = [];
-        this.isConnected = false;
         this.isTyping = false;
         this.currentStreamController = null;
+        this.isPreviewMode = false;
+        this.isDelayMode = false;
+        this.delayTime = 3;
 
         // 配置选项
         this.options = {
@@ -40,10 +42,11 @@ class ChatController {
     /**
      * 初始化聊天控制器
      */
-    initialize() {
+    async initialize() {
         this.initializeElements();
+        await this.checkPreviewMode();
+        await this.checkDelayMode();
         this.setupEventListeners();
-        this.checkConnection();
         this.loadChatHistory();
     }
 
@@ -57,7 +60,6 @@ class ChatController {
             sendButton: document.getElementById('sendButton'),
             emptyState: document.getElementById('emptyState'),
             typingIndicator: document.getElementById('typingIndicator'),
-            connectionStatus: document.getElementById('connectionStatus'),
             newChatBtn: document.getElementById('newChatBtn')
         };
     }
@@ -91,32 +93,78 @@ class ChatController {
             });
         }
 
+        // 更新预览模式状态显示
+        const previewModeStatus = document.getElementById('previewModeStatus');
+        if (previewModeStatus) {
+            if (this.isPreviewMode) {
+                previewModeStatus.style.display = 'flex';
+            } else {
+                previewModeStatus.style.display = 'none';
+            }
+        }
+
+        // 更新延迟模式状态显示
+        const delayModeStatus = document.getElementById('delayModeStatus');
+        const delayModeBadge = document.getElementById('delayModeBadge');
+        if (delayModeStatus && delayModeBadge) {
+            if (this.isDelayMode) {
+                delayModeStatus.style.display = 'flex';
+                delayModeBadge.textContent = `${this.delayTime}s`;
+                delayModeBadge.title = `延迟模式已启用，消息将在${this.delayTime}秒后合并处理`;
+            } else {
+                delayModeStatus.style.display = 'none';
+            }
+        }
+
         // 流式模式切换
         const streamModeToggle = document.getElementById('streamModeToggle');
         if (streamModeToggle) {
-            streamModeToggle.addEventListener('change', (e) => {
-                this.options.stream = e.target.checked;
-                const mode = this.options.stream ? '流式' : '普通';
-                this.showMessage(`已切换到${mode}模式`, 'success');
-            });
             // 初始化开关状态
             streamModeToggle.checked = this.options.stream;
-        }
 
-        // 自动保存切换
-        const autoSaveToggle = document.getElementById('autoSaveToggle');
-        if (autoSaveToggle) {
-            autoSaveToggle.addEventListener('change', (e) => {
-                // 可以在这里实现自动保存逻辑
-                const enabled = e.target.checked;
-                this.showMessage(`自动保存已${enabled ? '开启' : '关闭'}`, 'success');
+            // 预览模式下禁用流式开关
+            if (this.isPreviewMode) {
+                streamModeToggle.disabled = true;
+                streamModeToggle.checked = false;
+
+                // 添加预览模式提示
+                const toggleContainer = streamModeToggle.parentElement;
+                if (toggleContainer) {
+                    const previewModeHint = document.createElement('span');
+                    previewModeHint.className = 'preview-mode-hint';
+                    previewModeHint.textContent = ' (预览模式已禁用)';
+                    previewModeHint.style.cssText = 'color: #6b7280; font-size: 12px; margin-left: 8px;';
+                    toggleContainer.appendChild(previewModeHint);
+                }
+            }
+
+            streamModeToggle.addEventListener('change', (e) => {
+                // 预览模式下阻止切换
+                if (this.isPreviewMode) {
+                    e.target.checked = false;
+                    return;
+                }
+
+                this.options.stream = e.target.checked;
+                // 不显示切换提示，保持界面简洁
             });
         }
 
+        
         // 页面关闭前清理
         window.addEventListener('beforeunload', () => {
             this.cleanup();
         });
+
+        // 延迟模式下添加连续发送提示
+        if (this.isDelayMode) {
+            const chatInput = this.elements.chatInput;
+            if (chatInput) {
+                // 添加输入提示
+                const originalPlaceholder = chatInput.placeholder || '请输入您的问题...';
+                chatInput.placeholder = `${originalPlaceholder} (可连续发送多条消息)`;
+            }
+        }
 
         // 错误处理
         window.addEventListener('unhandledrejection', (e) => {
@@ -129,39 +177,58 @@ class ChatController {
         });
     }
 
+    
     /**
-     * 检查连接状态
+     * 检测预览模式状态
      */
-    async checkConnection() {
+    async checkPreviewMode() {
         try {
-            const response = await fetch('/health', {
+            const response = await fetch('/api/chat/config/preview-mode', {
                 method: 'GET',
-                timeout: 5000
+                headers: { 'Content-Type': 'application/json' }
             });
 
-            this.isConnected = response.ok;
-            this.updateConnectionStatus(this.isConnected);
+            if (response.ok) {
+                const data = await response.json();
+                this.isPreviewMode = data.preview_mode === true;
 
+                // 如果预览模式启用，强制禁用流式模式
+                if (this.isPreviewMode) {
+                    this.options.stream = false;
+                }
+            } else {
+                console.warn('Failed to check preview mode status');
+                this.isPreviewMode = false;
+            }
         } catch (error) {
-            console.error('Connection check failed:', error);
-            this.isConnected = false;
-            this.updateConnectionStatus(false);
+            console.warn('Failed to check preview mode:', error);
+            this.isPreviewMode = false;
         }
     }
 
     /**
-     * 更新连接状态显示
+     * 检测延迟模式状态
      */
-    updateConnectionStatus(isConnected) {
-        const statusElement = this.elements.connectionStatus;
-        const indicatorElement = statusElement.previousElementSibling;
+    async checkDelayMode() {
+        try {
+            const response = await fetch('/api/chat/config/delay-mode', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
 
-        if (isConnected) {
-            statusElement.textContent = '已连接';
-            indicatorElement.style.background = '#4ade80';
-        } else {
-            statusElement.textContent = '连接断开';
-            indicatorElement.style.background = '#ef4444';
+            if (response.ok) {
+                const data = await response.json();
+                this.isDelayMode = data.delay_mode === true;
+                this.delayTime = data.delay_time || 3;
+            } else {
+                console.warn('Failed to check delay mode status');
+                this.isDelayMode = false;
+                this.delayTime = 3;
+            }
+        } catch (error) {
+            console.warn('Failed to check delay mode:', error);
+            this.isDelayMode = false;
+            this.delayTime = 3;
         }
     }
 
@@ -203,15 +270,8 @@ class ChatController {
         if (!message) {
             return;
         }
-
-        if (!this.isConnected) {
-            this.showMessage('网络连接已断开，请检查网络后重试', 'error');
-            return;
-        }
-
-        if (this.isTyping) {
-            this.showMessage('AI正在回复中，请稍候', 'warning');
-            return;
+        if (this.isTyping && !this.isDelayMode) {
+            return; 
         }
 
         // 创建用户消息
@@ -241,20 +301,28 @@ class ChatController {
      */
     async sendMessageToServer(userMessage) {
         try {
-            this.setTypingState(true);
+            // 延迟模式下允许连续发送
+            if (!this.isDelayMode) {
+                this.setTypingState(true);
+            }
+
+            // 预览模式下强制使用非流式响应
+            const shouldUseStream = this.options.stream && !this.isPreviewMode;
 
             const requestData = {
                 messages: this.messages,
                 model: this.options.model,
-                stream: this.options.stream,
+                stream: shouldUseStream,
                 temperature: this.options.temperature,
                 max_tokens: this.options.max_tokens,
                 sender_id: 'web_user',
                 sender_nickname: 'Web用户',
-                platform: 'web'
+                platform: 'web',
+                delay_time: this.isDelayMode ? this.delayTime : undefined
             };
 
-            if (this.options.stream) {
+            
+            if (shouldUseStream) {
                 await this.handleStreamResponse(requestData);
             } else {
                 await this.handleNormalResponse(requestData);
@@ -264,7 +332,9 @@ class ChatController {
             console.error('Send message failed:', error);
             this.handleSendError(error);
         } finally {
-            this.setTypingState(false);
+            if (!this.isDelayMode) {
+                this.setTypingState(false);
+            }
         }
     }
 
@@ -367,6 +437,12 @@ class ChatController {
             }
 
             const data = await response.json();
+
+            // 处理延迟模式下的特殊响应
+            if (data.delay_processing) {
+                return;
+            }
+
             const content = data.choices?.[0]?.message?.content || '';
 
             if (content) {
@@ -379,6 +455,7 @@ class ChatController {
 
                 this.addMessage(assistantMessage);
                 this.saveChatHistory();
+
             }
 
         } catch (error) {
@@ -430,7 +507,21 @@ class ChatController {
         if (messageElement) {
             const textElement = messageElement.querySelector('.message-text');
             if (textElement) {
-                textElement.innerHTML = this.formatMessageContent(message.content);
+                let formattedContent = this.formatMessageContent(message.content);
+
+                if (typeof formattedContent !== 'string') {
+                    console.warn('updateMessage: formattedContent is not a string:', typeof formattedContent, formattedContent);
+                    formattedContent = String(formattedContent || '');
+                }
+
+                if (message.role === 'assistant' && formattedContent) {
+                    const pTagMatch = formattedContent.match(/^<p>([\s\S]*?)<\/p>$/);
+                    if (pTagMatch) {
+                        formattedContent = pTagMatch[1];
+                    }
+                }
+
+                textElement.innerHTML = formattedContent;
             }
             this.scrollToBottom();
         }
@@ -473,8 +564,24 @@ class ChatController {
         content.className = 'message-content';
 
         const text = document.createElement('div');
-        text.className = 'message-text';
-        text.innerHTML = this.formatMessageContent(message.content);
+        text.className = message.role === 'assistant' ? 'message-text markdown-body' : 'message-text';
+
+        let formattedContent = this.formatMessageContent(message.content);
+
+        if (typeof formattedContent !== 'string') {
+            console.warn('formattedContent is not a string:', typeof formattedContent, formattedContent);
+            formattedContent = String(formattedContent || '');
+        }
+
+        if (message.role === 'assistant' && formattedContent) {
+            // 如果整个内容被包裹在单个p标签中，移除它
+            const pTagMatch = formattedContent.match(/^<p>([\s\S]*?)<\/p>$/);
+            if (pTagMatch) {
+                formattedContent = pTagMatch[1];
+            }
+        }
+
+        text.innerHTML = formattedContent;
 
         const time = document.createElement('div');
         time.className = 'message-time';
@@ -497,22 +604,46 @@ class ChatController {
      * 格式化消息内容
      */
     formatMessageContent(content) {
-        if (!content) return '';
+        // 确保输入是字符串
+        if (content === null || content === undefined) {
+            return '';
+        }
 
-        // 转义HTML
-        const escapedContent = ContentProcessor.escapeHtml(content);
-
-        // 如果启用了Markdown渲染
-        if (window.ContentProcessor && ContentProcessor.renderMarkdown) {
+        if (typeof content === 'object') {
+            console.warn('formatMessageContent received object:', content);
             try {
-                return ContentProcessor.renderMarkdown(escapedContent);
-            } catch (error) {
-                console.warn('Markdown rendering failed:', error);
-                return escapedContent.replace(/\n/g, '<br>');
+                return JSON.stringify(content, null, 2);
+            } catch (e) {
+                return '[Object conversion failed]';
             }
         }
 
-        return escapedContent.replace(/\n/g, '<br>');
+        if (typeof content !== 'string') {
+            content = String(content);
+        }
+
+        if (window.ContentProcessor && ContentProcessor.renderMarkdown) {
+            try {
+                let result = ContentProcessor.renderMarkdown(content);
+                if (typeof result !== 'string') {
+                    console.warn('ContentProcessor.renderMarkdown returned non-string:', typeof result, result);
+                    result = String(result || '');
+                }
+                return result;
+            } catch (error) {
+                console.warn('Markdown rendering failed:', error);
+                if (window.ContentProcessor && ContentProcessor.escapeHtml) {
+                    return ContentProcessor.escapeHtml(content).replace(/\n/g, '<br>');
+                }
+                return content.replace(/\n/g, '<br>');
+            }
+        }
+
+        if (window.ContentProcessor && ContentProcessor.escapeHtml) {
+            return ContentProcessor.escapeHtml(content).replace(/\n/g, '<br>');
+        }
+
+        return content.replace(/\n/g, '<br>');
     }
 
     /**
@@ -520,8 +651,12 @@ class ChatController {
      */
     setTypingState(isTyping) {
         this.isTyping = isTyping;
-        this.elements.sendButton.disabled = isTyping;
-        this.elements.chatInput.disabled = isTyping;
+
+        // 延迟模式下不禁用输入框和发送按钮
+        if (!this.isDelayMode) {
+            this.elements.sendButton.disabled = isTyping;
+            this.elements.chatInput.disabled = isTyping;
+        }
 
         if (isTyping) {
             this.elements.typingIndicator.style.display = 'flex';
@@ -635,9 +770,12 @@ class ChatController {
      * 切换流式/非流式模式
      */
     toggleStreamMode() {
+        // 预览模式下阻止切换
+        if (this.isPreviewMode) {
+            return;
+        }
+
         this.options.stream = !this.options.stream;
-        const mode = this.options.stream ? '流式' : '普通';
-        this.showMessage(`已切换到${mode}模式`, 'success');
     }
 
     /**
@@ -717,9 +855,10 @@ window.chatDebug = {
         if (window.chatController) {
             return {
                 messageCount: window.chatController.messages.length,
-                isConnected: window.chatController.isConnected,
                 isTyping: window.chatController.isTyping,
-                streamMode: window.chatController.options.stream
+                streamMode: window.chatController.options.stream,
+                previewMode: window.chatController.isPreviewMode,
+                delayMode: window.chatController.isDelayMode
             };
         }
         return null;
