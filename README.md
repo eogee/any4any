@@ -122,8 +122,6 @@ any4any是一个企业级多模态AI平台，提供完整的智能交互解决�
 - **配置管理升级**：新增数字人、语音知识库、外部LLM等配置
 - **文档完善**：新增Any4DH、NL2SQL、语音知识库等详细文档
 
-详细内容请参阅读: [V0.1.3_release_notes.md](docs/version_notes/zh/V0.1.3_release_notes.md)
-
 ---
 
 **历史版本更新**：
