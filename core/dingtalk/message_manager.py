@@ -433,7 +433,6 @@ async def send_reply_after_preview_confirm(preview_id: str, confirmed_content: s
             platform = request_data.get('platform', 'unknown')
 
         if platform != 'dingtalk':
-            logger.info(f"Skipping DingTalk send for non-dingtalk platform: {platform} (preview_id: {preview_id})")
             # 清理内存存储并返回成功，避免阻塞其他平台的预览确认
             memory_store.delete(preview_id)
             return True

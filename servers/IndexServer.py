@@ -146,10 +146,26 @@ class IndexServer(Server):
 
             messages = conversation.get("messages", [])
 
+            # 处理消息格式：字段映射和时间戳序列化
+            processed_messages = []
+            for msg in messages:
+                processed_msg = msg.copy()
+
+                # 将 sender_type 映射为 role
+                if 'sender_type' in processed_msg:
+                    processed_msg['role'] = processed_msg['sender_type']
+                    del processed_msg['sender_type']
+
+                # 序列化时间戳
+                if 'timestamp' in processed_msg:
+                    processed_msg['timestamp'] = safe_serialize(processed_msg['timestamp'])
+
+                processed_messages.append(processed_msg)
+
             return JSONResponse({
                 "success": True,
                 "conversation_info": conversation_info,
-                "messages": messages
+                "messages": processed_messages
             })
 
         except ConnectionError:

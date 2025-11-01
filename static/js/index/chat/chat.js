@@ -34,6 +34,18 @@ class ChatController {
         // 用户信息
         this.currentUser = null;
 
+        // 会话信息
+        this.currentConversationId = null;
+
+        // 历史记录
+        this.conversationHistory = [];
+        this.currentHistoryPage = 0;
+        this.historyPageSize = 20;
+        this.isLoadingHistory = false;
+
+        // 本地存储
+        this.storageKey = 'any4chat_current_conversation';
+
         // 配置选项
         this.options = {
             stream: true,
@@ -49,11 +61,12 @@ class ChatController {
     async initialize() {
         this.initializeElements();
         await this.getCurrentUserInfo();
+        await this.loadConversationHistory(); 
+        await this.initializeConversation();
         await this.checkPreviewMode();
         await this.checkDelayMode();
         await this.checkToolsEnabled();
         this.setupEventListeners();
-        this.loadChatHistory();
     }
 
     /**
@@ -66,7 +79,11 @@ class ChatController {
             sendButton: document.getElementById('sendButton'),
             emptyState: document.getElementById('emptyState'),
             typingIndicator: document.getElementById('typingIndicator'),
-            newChatBtn: document.getElementById('newChatBtn')
+            newChatBtn: document.getElementById('newChatBtn'),
+            historyList: document.getElementById('historyList'),
+            historyLoading: document.getElementById('historyLoading'),
+            historyEmpty: document.getElementById('historyEmpty'),
+            conversationHistory: document.getElementById('conversationHistory')
         };
     }
 
@@ -891,26 +908,409 @@ class ChatController {
     /**
      * 处理开启新会话
      */
-    handleNewChat() {
-        if (this.messages.length === 0) {
-            return; // 已经是新会话，无需处理
+    async handleNewChat() {
+        try {
+            // 创建新会话
+            const response = await this.createNewConversation();
+            if (response && response.conversation_id) {
+                this.currentConversationId = response.conversation_id;
+
+                this.messages = [];
+                this.renderMessages();
+
+                this.isTyping = false;
+                this.currentStreamController = null;
+
+                this.elements.chatInput.focus();
+
+                // 重新加载历史记录以更新列表
+                await this.loadConversationHistory();
+            }
+        } catch (error) {
+            console.error('Failed to create new conversation:', error);
+        }
+    }
+
+    /**
+     * 初始化会话（恢复现有会话或创建新会话）
+     */
+    async initializeConversation() {
+        try {
+            // 首先尝试恢复用户最新的会话
+            let response;
+
+            if (typeof ApiService !== 'undefined' && ApiService.getLatestConversation) {
+                response = await ApiService.getLatestConversation();
+            } else {
+                // 降级处理：直接使用fetch
+                const fetchResponse = await fetch('/api/chat/latest-conversation', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (fetchResponse.ok) {
+                    response = await fetchResponse.json();
+                } else {
+                    throw new Error(`HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`);
+                }
+            }
+
+            if (response && response.success && response.conversation_id) {
+                // 成功恢复现有会话
+                this.currentConversationId = response.conversation_id;
+
+                // 转换消息格式以适配前端渲染逻辑
+                this.messages = (response.messages || []).map(msg => ({
+                    id: msg.message_id || `msg-${msg.sequence_number}`,
+                    role: msg.role || msg.sender_type, // 兼容处理两种字段名
+                    content: msg.content,
+                    timestamp: msg.timestamp
+                }));
+
+                // 保存到本地存储
+                this.saveConversationToStorage();
+
+                // 渲染恢复的消息
+                this.renderMessages();
+
+                // 如果有消息，隐藏空状态
+                if (this.messages.length > 0) {
+                    this.hideEmptyState();
+                }
+
+            } else {
+                // 没有现有会话，创建新会话
+                console.log('No existing conversation found, creating new one...');
+                await this.createNewConversation();
+            }
+        } catch (error) {
+            console.error('Failed to initialize conversation:', error);
+            // 降级处理：直接创建新会话
+            await this.createNewConversation();
+        }
+    }
+
+    /**
+     * 创建新会话（仅在需要时调用）
+     */
+    async createNewConversation() {
+        try {
+            if (typeof ApiService !== 'undefined' && ApiService.createConversation) {
+                const result = await ApiService.createConversation(
+                    this.currentUser?.username || 'web_user',
+                    this.currentUser?.nickname || 'Web用户',
+                    'any4chat'
+                );
+                return result;
+            } else {
+                // 降级处理：直接使用fetch
+                const response = await fetch('/api/conversation/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sender_id: this.currentUser?.username || 'web_user',
+                        sender_nickname: this.currentUser?.nickname || 'Web用户',
+                        platform: 'any4chat'
+                    })
+                });
+
+                if (response.ok) {
+                    return await response.json();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error creating conversation:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 保存会话信息到本地存储
+     */
+    saveConversationToStorage() {
+        try {
+            const conversationData = {
+                conversationId: this.currentConversationId,
+                timestamp: Date.now(),
+                messageCount: this.messages.length
+            };
+            localStorage.setItem(this.storageKey, JSON.stringify(conversationData));
+        } catch (error) {
+            console.warn('Failed to save conversation to storage:', error);
+        }
+    }
+
+    /**
+     * 从本地存储获取会话信息
+     */
+    getConversationFromStorage() {
+        try {
+            const data = localStorage.getItem(this.storageKey);
+            return data ? JSON.parse(data) : null;
+        } catch (error) {
+            console.warn('Failed to get conversation from storage:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 清理本地存储的会话信息
+     */
+    clearConversationFromStorage() {
+        try {
+            localStorage.removeItem(this.storageKey);
+        } catch (error) {
+            console.warn('Failed to clear conversation from storage:', error);
+        }
+    }
+
+    /**
+     * 加载用户历史记录
+     */
+    async loadConversationHistory() {
+        if (this.isLoadingHistory) return;
+
+        try {
+            this.isLoadingHistory = true;
+            this.showHistoryLoading(true);
+
+            let response;
+
+            // 使用ApiService，如果不可用则直接使用fetch
+            if (typeof ApiService !== 'undefined' && ApiService.getUserConversations) {
+                response = await ApiService.getUserConversations(
+                    'any4chat',
+                    this.historyPageSize,
+                    this.currentHistoryPage * this.historyPageSize
+                );
+            } else {
+                // 降级处理：直接使用fetch
+                const fetchResponse = await fetch('/api/conversations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        platform: 'any4chat',
+                        limit: this.historyPageSize,
+                        offset: this.currentHistoryPage * this.historyPageSize
+                    })
+                });
+
+                if (fetchResponse.ok) {
+                    response = await fetchResponse.json();
+                } else {
+                    throw new Error(`HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`);
+                }
+            }
+
+            if (response && response.success) {
+                this.conversationHistory = response.conversations || [];
+                this.renderConversationHistory();
+            } else {
+                console.warn('No success response from API:', response);
+                this.showHistoryEmpty();
+            }
+        } catch (error) {
+            console.error('Failed to load conversation history:', error);
+            this.showHistoryEmpty();
+        } finally {
+            this.isLoadingHistory = false;
+            this.showHistoryLoading(false);
+        }
+    }
+
+    /**
+     * 渲染历史记录列表
+     */
+    renderConversationHistory() {
+        if (!this.elements.historyList) return;
+
+        if (this.conversationHistory.length === 0) {
+            this.showHistoryEmpty();
+            return;
         }
 
-        // 保存当前会话到历史记录
-        this.saveChatHistory();
+        this.elements.historyList.innerHTML = '';
 
-        // 清空当前消息
-        this.messages = [];
+        this.conversationHistory.forEach(conversation => {
+            const historyItem = this.createHistoryItem(conversation);
+            this.elements.historyList.appendChild(historyItem);
+        });
+    }
 
-        // 重新渲染界面
-        this.renderMessages();
+    /**
+     * 创建历史记录项
+     */
+    createHistoryItem(conversation) {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.dataset.conversationId = conversation.conversation_id;
 
-        // 重置会话状态
-        this.isTyping = false;
-        this.currentStreamController = null;
+        // 如果是当前会话，添加active类
+        if (conversation.conversation_id === this.currentConversationId) {
+            item.classList.add('active');
+        }
 
-        // 聚焦到输入框
-        this.elements.chatInput.focus();
+        // 格式化时间
+        const timeStr = this.formatHistoryTime(conversation.last_active);
+
+        // 获取第一条消息作为标题
+        const title = conversation.first_message || '新对话';
+
+        item.innerHTML = `
+            <div class="history-item-title">${this.escapeHtml(title)}</div>
+            <div class="history-item-meta">
+                <span class="history-item-time">${timeStr}</span>
+                <span class="history-item-count">${conversation.message_count || 0}</span>
+            </div>
+        `;
+
+        // 点击事件
+        item.addEventListener('click', () => {
+            this.loadConversation(conversation.conversation_id);
+        });
+
+        return item;
+    }
+
+    /**
+     * 加载指定会话
+     */
+    async loadConversation(conversationId) {
+        if (conversationId === this.currentConversationId) {
+            return; // 已经是当前会话
+        }
+
+        try {
+            let response;
+
+            // 使用ApiService，如果不可用则直接使用fetch
+            if (typeof ApiService !== 'undefined' && ApiService.fetchConversationMessages) {
+                response = await ApiService.fetchConversationMessages(conversationId);
+            } else {
+                // 降级处理：直接使用fetch
+                const fetchResponse = await fetch(`/api/conversation/${conversationId}/history`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (fetchResponse.ok) {
+                    response = await fetchResponse.json();
+                } else {
+                    throw new Error(`HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`);
+                }
+            }
+
+            if (response && response.success) {
+                // 更新当前会话ID
+                this.currentConversationId = conversationId;
+
+                // 转换消息格式以适配前端渲染逻辑
+                this.messages = (response.messages || []).map(msg => ({
+                    id: msg.message_id || `msg-${msg.sequence_number}`,
+                    role: msg.role || msg.sender_type, // 兼容处理两种字段名
+                    content: msg.content,
+                    timestamp: msg.timestamp
+                }));
+                this.renderMessages();
+
+                // 更新历史记录的active状态
+                this.updateHistoryActiveState(conversationId);
+
+                // 滚动到底部
+                this.scrollToBottom();
+
+            } else {
+                console.warn('No success response from conversation API:', response);
+            }
+        } catch (error) {
+            console.error('Failed to load conversation:', error);
+        }
+    }
+
+    /**
+     * 更新历史记录的active状态
+     */
+    updateHistoryActiveState(conversationId) {
+        const items = this.elements.historyList.querySelectorAll('.history-item');
+        items.forEach(item => {
+            if (item.dataset.conversationId === conversationId) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    }
+
+    /**
+     * 显示/隐藏加载状态
+     */
+    showHistoryLoading(show) {
+        if (this.elements.historyLoading) {
+            this.elements.historyLoading.style.display = show ? 'block' : 'none';
+        }
+        if (this.elements.historyEmpty) {
+            this.elements.historyEmpty.style.display = 'none';
+        }
+        if (this.elements.historyList) {
+            this.elements.historyList.style.display = show ? 'none' : 'block';
+        }
+    }
+
+    /**
+     * 显示空状态
+     */
+    showHistoryEmpty() {
+        if (this.elements.historyEmpty) {
+            this.elements.historyEmpty.style.display = 'block';
+        }
+        if (this.elements.historyLoading) {
+            this.elements.historyLoading.style.display = 'none';
+        }
+        if (this.elements.historyList) {
+            this.elements.historyList.style.display = 'none';
+        }
+    }
+
+    /**
+     * 格式化历史记录时间
+     */
+    formatHistoryTime(timestamp) {
+        try {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+
+            if (diff < 24 * 60 * 60 * 1000) { // 24小时内
+                return date.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } else if (diff < 7 * 24 * 60 * 60 * 1000) { // 7天内
+                return date.toLocaleDateString('zh-CN', {
+                    month: 'short',
+                    day: 'numeric'
+                });
+            } else {
+                return date.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+        } catch (error) {
+            return '';
+        }
+    }
+
+    /**
+     * HTML转义
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 

@@ -135,12 +135,19 @@ class ChatServer(Server):
             messages = conversation.get('messages', [])
             formatted_messages = []
 
+            # 处理datetime序列化
+            from datetime import datetime
+            def serialize_datetime(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                return obj
+
             for msg in messages[request.offset:request.offset + request.limit]:
                 formatted_msg = {
                     'message_id': msg.get('message_id'),
                     'role': msg.get('sender_type'),
                     'content': msg.get('content'),
-                    'timestamp': msg.get('timestamp'),
+                    'timestamp': serialize_datetime(msg.get('timestamp')),
                     'sequence_number': msg.get('sequence_number')
                 }
                 formatted_messages.append(formatted_msg)
@@ -159,18 +166,93 @@ class ChatServer(Server):
             self.log_error(f"/api/conversation/{conversation_id}/history", e)
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    async def get_user_conversations(self, request: ConversationListRequest):
+    async def get_user_conversations(self, http_request: Request, request: ConversationListRequest):
         """获取用户对话列表"""
         self.log_request("/api/conversations")
 
         try:
-            # 这里应该从数据库获取用户的对话列表
-            # 暂时返回空列表作为示例
+            # 权限验证 - 添加额外错误处理
+            try:
+                if not await self._verify_request_auth(http_request):
+                    raise HTTPException(status_code=401, detail="Unauthorized")
+            except Exception as auth_error:
+                logger.warning(f"Authentication error in get_user_conversations: {auth_error}")
+                # 如果认证失败，返回默认响应而不是抛出异常
+                return JSONResponse({
+                    'success': True,
+                    'conversations': [],
+                    'total_count': 0,
+                    'limit': request.limit,
+                    'offset': request.offset,
+                    'message': 'Authentication failed'
+                })
+
+            # 获取当前用户信息
+            if await check_user_login(http_request):
+                sender = http_request.session.get('username', 'web_user')
+            else:
+                sender = 'web_user'
+
+            # 安全检查数据库连接
+            try:
+                if self.conversation_manager is None or self.conversation_manager.db is None:
+                    return JSONResponse({
+                        'success': True,
+                        'conversations': [],
+                        'total_count': 0,
+                        'limit': request.limit,
+                        'offset': request.offset,
+                        'message': 'Database not available'
+                    })
+            except Exception as db_check_error:
+                logger.warning(f"Database connection check failed: {db_check_error}")
+                return JSONResponse({
+                    'success': True,
+                    'conversations': [],
+                    'total_count': 0,
+                    'limit': request.limit,
+                    'offset': request.offset,
+                    'message': 'Database check failed'
+                })
+
+            # 从数据库获取会话列表
+            conversations = self.conversation_manager.db.get_user_conversations(
+                sender=sender,
+                platform=request.platform,
+                limit=request.limit,
+                offset=request.offset
+            )
+
+            # 获取总数
+            total_count = self.conversation_manager.db.get_user_conversations_count(
+                sender=sender,
+                platform=request.platform
+            )
+
+            # 处理datetime对象的JSON序列化
+            from datetime import datetime
+
+            def serialize_datetime(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                return obj
+
+            # 处理会话列表中的datetime对象
+            processed_conversations = []
+            for conv in conversations:
+                processed_conv = conv.copy()
+                if 'created_time' in processed_conv:
+                    processed_conv['created_time'] = serialize_datetime(processed_conv['created_time'])
+                if 'last_active' in processed_conv:
+                    processed_conv['last_active'] = serialize_datetime(processed_conv['last_active'])
+                processed_conversations.append(processed_conv)
+
             return JSONResponse({
                 'success': True,
-                'conversations': [],
-                'total_count': 0,
-                'platform': request.platform
+                'conversations': processed_conversations,
+                'total_count': total_count,
+                'limit': request.limit,
+                'offset': request.offset
             })
 
         except Exception as e:
@@ -424,6 +506,103 @@ class ChatServer(Server):
                 "error": str(e)
             }, status_code=500)
 
+    async def get_latest_conversation(self, request: Request):
+        """获取用户的最新会话"""
+        self.log_request("/api/chat/latest-conversation")
+
+        try:
+            # 权限验证 - 添加额外错误处理
+            try:
+                if not await self._verify_request_auth(request):
+                    raise HTTPException(status_code=401, detail="Unauthorized")
+            except Exception as auth_error:
+                logger.warning(f"Authentication error in get_latest_conversation: {auth_error}")
+                # 如果认证失败，返回默认响应而不是抛出异常
+                return JSONResponse({
+                    'success': True,
+                    'conversation_id': None,
+                    'messages': [],
+                    'message': 'Authentication failed'
+                })
+
+            # 获取用户信息
+            if await check_user_login(request):
+                sender = request.session.get('username', 'web_user')
+                nickname = request.session.get('nickname', 'Web用户')
+            else:
+                sender = 'web_user'
+                nickname = 'Web用户'
+
+            # 安全检查数据库连接
+            try:
+                if self.conversation_manager is None or self.conversation_manager.db is None:
+                    return JSONResponse({
+                        'success': True,
+                        'conversation_id': None,
+                        'messages': [],
+                        'message': 'Database not available'
+                    })
+            except Exception as db_check_error:
+                logger.warning(f"Database connection check failed: {db_check_error}")
+                return JSONResponse({
+                    'success': True,
+                    'conversation_id': None,
+                    'messages': [],
+                    'message': 'Database check failed'
+                })
+
+            # 获取最新会话
+            conversation = self.conversation_manager.db.get_latest_conversation(
+                sender=sender,
+                user_nick=nickname,
+                platform='any4chat'
+            )
+
+            if conversation:
+                # 处理datetime对象的JSON序列化
+                import json
+                from datetime import datetime
+
+                def serialize_datetime(obj):
+                    if isinstance(obj, datetime):
+                        return obj.isoformat()
+                    return obj
+
+                # 创建响应数据，确保datetime对象被正确序列化
+                messages = conversation.get('messages', [])
+                processed_messages = []
+                for msg in messages:
+                    processed_msg = msg.copy()
+                    if 'timestamp' in processed_msg:
+                        processed_msg['timestamp'] = serialize_datetime(processed_msg['timestamp'])
+                    processed_messages.append(processed_msg)
+
+                response_data = {
+                    'success': True,
+                    'conversation_id': conversation['conversation_id'],
+                    'messages': processed_messages,
+                    'created_time': serialize_datetime(conversation['created_time']),
+                    'last_active': serialize_datetime(conversation['last_active'])
+                }
+
+                return JSONResponse(response_data)
+            else:
+                return JSONResponse({
+                    'success': True,
+                    'conversation_id': None,
+                    'messages': [],
+                    'message': 'No existing conversation found'
+                })
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.log_error("/api/chat/latest-conversation", e)
+            return JSONResponse({
+                'success': False,
+                'error': str(e)
+            }, status_code=500)
+
     def register_routes(self, app: FastAPI):
         """注册聊天相关路由"""
 
@@ -468,7 +647,7 @@ class ChatServer(Server):
             except:
                 list_request = ConversationListRequest()
 
-            return await self.get_user_conversations(list_request)
+            return await self.get_user_conversations(request, list_request)
 
         @app.post("/api/conversation/create")
         async def create_conversation(request: Request):
@@ -509,6 +688,11 @@ class ChatServer(Server):
         async def current_user(request: Request):
             """获取当前用户信息"""
             return await self.get_current_user(request)
+
+        @app.get("/api/chat/latest-conversation")
+        async def latest_conversation(request: Request):
+            """获取用户的最新会话"""
+            return await self.get_latest_conversation(request)
 
         @app.get("/api/chat/models")
         async def chat_models(request: Request):

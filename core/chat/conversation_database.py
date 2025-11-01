@@ -108,7 +108,7 @@ class ConversationDatabase(Model):
                             formatted_message = {
                                 'message_id': msg.get('message_id', ''),
                                 'content': msg.get('content', ''),
-                                'sender_type': msg.get('sender_type', ''),
+                                'role': msg.get('sender_type', ''),  # 将 sender_type 映射为 role
                                 'timestamp': timestamp,
                                 'sequence_number': msg.get('sequence_number', 0),
                                 'is_timeout': msg.get('is_timeout', 0)
@@ -151,16 +151,20 @@ class ConversationDatabase(Model):
             
             # 构建完整会话数据
             result = conversation.copy()
-            result['messages'] = [
-                {
+            result['messages'] = []
+            for msg in messages:
+                # 处理时间戳序列化
+                timestamp = msg.get('timestamp', '')
+                if hasattr(timestamp, 'isoformat'):
+                    timestamp = timestamp.isoformat()
+
+                result['messages'].append({
                     'message_id': msg['message_id'],
                     'content': msg['content'],
-                    'sender_type': msg['sender_type'],
-                    'timestamp': msg['timestamp'],
+                    'role': msg['sender_type'],  # 将 sender_type 映射为 role
+                    'timestamp': timestamp,
                     'sequence_number': msg['sequence_number']
-                }
-                for msg in messages
-            ]
+                })
             
             return result
             
@@ -226,3 +230,60 @@ class ConversationDatabase(Model):
             return conversation_data
         else:
             raise Exception("Failed to create new conversation")
+
+    def get_user_conversations(self, sender: str, platform: str = None, limit: int = 20, offset: int = 0) -> list:
+        """获取用户的所有会话列表"""
+        try:
+            # 构建查询条件
+            where_conditions = ["sender = %s"]
+            params = [sender]
+
+            if platform:
+                where_conditions.append("platform = %s")
+                params.append(platform)
+
+            where_clause = " AND ".join(where_conditions)
+
+            # 查询会话列表，按最后活跃时间排序
+            query = f"""
+                SELECT c.conversation_id, c.user_nick, c.platform,
+                       c.created_time, c.last_active, c.message_count,
+                       (SELECT m.content FROM messages m
+                        WHERE m.conversation_id = c.conversation_id
+                        AND m.sender_type = 'user'
+                        ORDER BY m.sequence_number ASC
+                        LIMIT 1) as first_message
+                FROM conversations c
+                WHERE {where_clause}
+                ORDER BY c.last_active DESC
+                LIMIT %s OFFSET %s
+            """
+
+            params.extend([limit, offset])
+            conversations = self.fetch_all(query, tuple(params))
+
+            return conversations if conversations else []
+
+        except Exception as e:
+            logger.error(f"Failed to get user conversations: {e}")
+            return []
+
+    def get_user_conversations_count(self, sender: str, platform: str = None) -> int:
+        """获取用户会话总数"""
+        try:
+            where_conditions = ["sender = %s"]
+            params = [sender]
+
+            if platform:
+                where_conditions.append("platform = %s")
+                params.append(platform)
+
+            where_clause = " AND ".join(where_conditions)
+            query = f"SELECT COUNT(*) as count FROM conversations WHERE {where_clause}"
+
+            result = self.fetch_one(query, tuple(params))
+            return result['count'] if result else 0
+
+        except Exception as e:
+            logger.error(f"Failed to get user conversations count: {e}")
+            return 0

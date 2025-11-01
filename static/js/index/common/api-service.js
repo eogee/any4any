@@ -87,6 +87,37 @@ async function getCurrentUser() {
     });
 }
 
+// 创建新对话
+async function createConversation(senderId, senderNickname, platform) {
+    return await apiRequest('/api/conversation/create', {
+        method: 'POST',
+        body: JSON.stringify({
+            sender_id: senderId,
+            sender_nickname: senderNickname,
+            platform: platform
+        })
+    });
+}
+
+// 获取用户会话列表
+async function getUserConversations(platform = 'any4chat', limit = 20, offset = 0) {
+    return await apiRequest('/api/conversations', {
+        method: 'POST',
+        body: JSON.stringify({
+            platform: platform,
+            limit: limit,
+            offset: offset
+        })
+    });
+}
+
+// 获取用户的最新会话
+async function getLatestConversation() {
+    return await apiRequest('/api/chat/latest-conversation', {
+        method: 'GET'
+    });
+}
+
 // 数据库查询
 async function queryDatabase(query) {
     const formData = new FormData();
@@ -108,5 +139,8 @@ window.ApiService = {
     savePreviewContent,
     login,
     getCurrentUser,
+    createConversation,
+    getUserConversations,
+    getLatestConversation,
     queryDatabase
 };
