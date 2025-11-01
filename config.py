@@ -4,15 +4,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def get_bool_env(key: str, default: bool = False) -> bool:
+    """从环境变量获取布尔值"""
+    value = os.getenv(key, str(default)).lower()
+    return value in ('true', '1', 'yes', 'on')
+
 class Config:
     # 服务器配置
     HOST = os.getenv("HOST", "0.0.0.0")
     PORT = int(os.getenv("PORT", 8888))
-    PREVIEW_MODE = os.getenv("PREVIEW_MODE", "True").lower() == "true"
+    PREVIEW_MODE = get_bool_env("PREVIEW_MODE", True)
     PREVIEW_TIMEOUT = int(os.getenv("PREVIEW_TIMEOUT", "60"))
-    DELAY_MODE = os.getenv("DELAY_MODE", "False").lower() == "true"
+    DELAY_MODE = get_bool_env("DELAY_MODE", False)
     DELAY_TIME = int(os.getenv("DELAY_TIME", "3"))
-    KNOWLEDGE_BASE_ENABLED = os.getenv("KNOWLEDGE_BASE_ENABLED", "False").lower() == "true"
+    KNOWLEDGE_BASE_ENABLED = get_bool_env("KNOWLEDGE_BASE_ENABLED", False)
 
     # MCP配置
     MCP_PORT = int(os.getenv("MCP_PORT", 9999))
@@ -23,19 +28,19 @@ class Config:
     SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE", "1800"))
     MAX_CONVERSATION_MESSAGES = int(os.getenv("MAX_CONVERSATION_MESSAGES", "20"))
     MAX_CONVERSATION_TOKENS = int(os.getenv("MAX_CONVERSATION_TOKENS", "8000"))
-    ENABLE_CONVERSATION_TRUNCATION = os.getenv("ENABLE_CONVERSATION_TRUNCATION", "True").lower() == "true"
+    ENABLE_CONVERSATION_TRUNCATION = get_bool_env("ENABLE_CONVERSATION_TRUNCATION", True)
 
     # 模型配置
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-    EDGE_TTS_ENABLED = os.getenv("EDGE_TTS_ENABLED", "False").lower() == "true"
+    EDGE_TTS_ENABLED = get_bool_env("EDGE_TTS_ENABLED", False)
     EDGE_DEFAULT_VOICE = os.getenv("EDGE_DEFAULT_VOICE", "zh-CN-XiaoyiNeural")
 
     # 模型按需加载配置 (默认不加载，只在首次调用时加载)
-    INDEX_TTS_MODEL_ENABLED = os.getenv("INDEX_TTS_MODEL_ENABLED", "False").lower() == "true"
-    ASR_MODEL_ENABLED = os.getenv("ASR_MODEL_ENABLED", "False").lower() == "true"
-    RERANK_MODEL_ENABLED = os.getenv("RERANK_MODEL_ENABLED", "False").lower() == "true"
-    EMBEDDING_MODEL_ENABLED = os.getenv("EMBEDDING_MODEL_ENABLED", "False").lower() == "true"
-    LLM_MODEL_ENABLED = os.getenv("LLM_MODEL_ENABLED", "False").lower() == "true"
+    INDEX_TTS_MODEL_ENABLED = get_bool_env("INDEX_TTS_MODEL_ENABLED", False)
+    ASR_MODEL_ENABLED = get_bool_env("ASR_MODEL_ENABLED", False)
+    RERANK_MODEL_ENABLED = get_bool_env("RERANK_MODEL_ENABLED", False)
+    EMBEDDING_MODEL_ENABLED = get_bool_env("EMBEDDING_MODEL_ENABLED", False)
+    LLM_MODEL_ENABLED = get_bool_env("LLM_MODEL_ENABLED", False)
 
     # 模型路径配置 (按需加载的模型路径)
     INDEX_TTS_MODEL_DIR = os.getenv("INDEX_TTS_MODEL_DIR", "/mnt/c/models/IndexTTS-1.5")
@@ -44,14 +49,14 @@ class Config:
     EMBEDDING_MODEL_DIR = os.getenv("EMBEDDING_MODEL_DIR", "/mnt/c/models/bge-small-zh-v1.5")
     LLM_MODEL_DIR = os.getenv("LLM_MODEL_DIR", "/mnt/c/models/Qwen3-1.7B")
     LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen3-1.7B")
-    NO_THINK = os.getenv("NO_THINK", "True").lower() == "true"
+    NO_THINK = get_bool_env("NO_THINK", True)
     ASR_PROMPT = os.getenv("ASR_PROMPT", "")
 
     # LLM模型加载配置
-    TRUST_REMOTE_CODE = os.getenv("TRUST_REMOTE_CODE", "True").lower() == "true"
-    USE_HALF_PRECISION = os.getenv("USE_HALF_PRECISION", "True").lower() == "true"
-    LOW_CPU_MEM_USAGE = os.getenv("LOW_CPU_MEM_USAGE", "True").lower() == "true"
-    TOKENIZERS_PARALLELISM = os.getenv("TOKENIZERS_PARALLELISM", "False").lower() == "true"
+    TRUST_REMOTE_CODE = get_bool_env("TRUST_REMOTE_CODE", True)
+    USE_HALF_PRECISION = get_bool_env("USE_HALF_PRECISION", True)
+    LOW_CPU_MEM_USAGE = get_bool_env("LOW_CPU_MEM_USAGE", True)
+    TOKENIZERS_PARALLELISM = get_bool_env("TOKENIZERS_PARALLELISM", False)
 
     # LLM模型生成参数配置
     MAX_LENGTH = int(os.getenv("MAX_LENGTH", "4096"))
@@ -74,7 +79,7 @@ class Config:
     RERANK_BATCH_SIZE = int(os.getenv("RERANK_BATCH_SIZE", "16"))
 
     # IndexTTS-1.5引擎配置
-    INDEX_TTS_FAST_ENABLED = os.getenv("INDEX_TTS_FAST_ENABLED", "False").lower() == "true"
+    INDEX_TTS_FAST_ENABLED = get_bool_env("INDEX_TTS_FAST_ENABLED", False)
     INDEX_TTS_FAST_MAX_TOKENS = int(os.getenv("INDEX_TTS_FAST_MAX_TOKENS", "50"))
     INDEX_TTS_FAST_BATCH_SIZE = int(os.getenv("INDEX_TTS_FAST_BATCH_SIZE", "16"))
     INDEX_TTS_STREAMING_MIN_SENTENCE_CHARS = int(os.getenv("INDEX_TTS_STREAMING_MIN_SENTENCE_CHARS", "15"))
@@ -92,7 +97,7 @@ class Config:
     MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "any4any")
 
     # 数据库功能配置
-    QUERY_CLEANING = os.getenv("QUERY_CLEANING", "True").lower() == "true"
+    QUERY_CLEANING = get_bool_env("QUERY_CLEANING", True)
 
     # 工具系统配置
 
@@ -105,20 +110,20 @@ class Config:
     SQL_DB_DATABASE = MYSQL_DATABASE
 
     # 工具服务器配置
-    TOOLS_ENABLED = os.getenv("TOOLS_ENABLED", "True").lower() == "true"
-    TOOLS_DEBUG = os.getenv("TOOLS_DEBUG", "False").lower() == "true"
+    TOOLS_ENABLED = get_bool_env("TOOLS_ENABLED", True)
+    TOOLS_DEBUG = get_bool_env("TOOLS_DEBUG", False)
     TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))  
 
     # 钉钉配置
-    DINGTALK_ENABLED = os.getenv("DINGTALK_ENABLED", "False").lower() == "true"
+    DINGTALK_ENABLED = get_bool_env("DINGTALK_ENABLED", False)
     CLIENT_ID = os.getenv("CLIENT_ID", "")
     CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
     ROBOT_CODE = os.getenv("ROBOT_CODE", "")
     DINGTALK_PORT = os.getenv("DINGTALK_PORT", "6666")
 
     # any4dh 数字人配置
-    ANY4DH_ENABLED = os.getenv("ANY4DH_ENABLED", "False").lower() == "true"
-    ANY4DH_USE_UNIFIED_INTERFACE = os.getenv("ANY4DH_USE_UNIFIED_INTERFACE", "True").lower() == "true"
+    ANY4DH_ENABLED = get_bool_env("ANY4DH_ENABLED", False)
+    ANY4DH_USE_UNIFIED_INTERFACE = get_bool_env("ANY4DH_USE_UNIFIED_INTERFACE", True)
     ANY4DH_TRANSPORT = os.getenv("ANY4DH_TRANSPORT", "webrtc")
     ANY4DH_MODEL = os.getenv("ANY4DH_MODEL", "wav2lip")
     ANY4DH_AVATAR_ID = os.getenv("ANY4DH_AVATAR_ID", "001")
@@ -133,9 +138,9 @@ class Config:
     ANY4DH_AVATARS_DIR = os.getenv("ANY4DH_AVATARS_DIR", "data/avatars")
 
     # any4dh 语音知识库配置
-    ANY4DH_VOICE_KB_ENABLED = os.getenv("ANY4DH_VOICE_KB_ENABLED", "False").lower() == "true"
+    ANY4DH_VOICE_KB_ENABLED = get_bool_env("ANY4DH_VOICE_KB_ENABLED", False)
     ANY4DH_VOICE_KB_LANGUAGE = os.getenv("ANY4DH_VOICE_KB_LANGUAGE", "zh")
-    ANY4DH_VOICE_KB_FALLBACK_TO_TTS = os.getenv("ANY4DH_VOICE_KB_FALLBACK_TO_TTS", "True").lower() == "true"
+    ANY4DH_VOICE_KB_FALLBACK_TO_TTS = get_bool_env("ANY4DH_VOICE_KB_FALLBACK_TO_TTS", True)
     ANY4DH_VOICE_KB_SEMANTIC_THRESHOLD = float(os.getenv("ANY4DH_VOICE_KB_SEMANTIC_THRESHOLD", "0.1"))
     VOICE_KB_CSV_PATH = os.getenv("VOICE_KB_CSV_PATH", "data/csv/en_voice_list.csv")
     VOICE_KB_AUDIO_DIR = os.getenv("VOICE_KB_AUDIO_DIR", "data/en_answer")
@@ -158,7 +163,7 @@ class Config:
     MODEL_NAME = os.getenv("MODEL_NAME", "")
     API_TIMEOUT = int(os.getenv("API_TIMEOUT", "120"))
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
-    STREAM_ENABLED = os.getenv("STREAM_ENABLED", "true").lower() == "true"
+    STREAM_ENABLED = get_bool_env("STREAM_ENABLED", True)
     API_MAX_RETRIES = int(os.getenv("API_MAX_RETRIES", "3"))
     API_RETRY_DELAY = float(os.getenv("API_RETRY_DELAY", "1.0"))
 
