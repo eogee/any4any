@@ -30,6 +30,8 @@ class ChatController {
         this.isDelayMode = false;
         this.delayTime = 3;
         this.isToolsEnabled = false;
+        this.previewTimeout = 60;
+        this.isDingtalkEnabled = false;
 
         // 用户信息
         this.currentUser = null;
@@ -66,6 +68,8 @@ class ChatController {
         await this.checkPreviewMode();
         await this.checkDelayMode();
         await this.checkToolsEnabled();
+        await this.checkPreviewTimeout();
+        await this.checkDingtalkEnabled();
         this.setupEventListeners();
     }
 
@@ -146,6 +150,25 @@ class ChatController {
                 toolsStatus.style.display = 'flex';
             } else {
                 toolsStatus.style.display = 'none';
+            }
+        }
+
+        // 更新预览超时状态显示
+        const previewTimeoutStatus = document.getElementById('previewTimeoutStatus');
+        const previewTimeoutBadge = document.getElementById('previewTimeoutBadge');
+        if (previewTimeoutStatus && previewTimeoutBadge) {
+            previewTimeoutStatus.style.display = 'flex';
+            previewTimeoutBadge.textContent = `${this.previewTimeout}秒`;
+            previewTimeoutBadge.title = `预览超时时间设置为${this.previewTimeout}秒`;
+        }
+
+        // 更新钉钉集成状态显示
+        const dingtalkStatus = document.getElementById('dingtalkStatus');
+        if (dingtalkStatus) {
+            if (this.isDingtalkEnabled) {
+                dingtalkStatus.style.display = 'flex';
+            } else {
+                dingtalkStatus.style.display = 'none';
             }
         }
 
@@ -289,6 +312,52 @@ class ChatController {
     }
 
     /**
+     * 检测预览超时配置
+     */
+    async checkPreviewTimeout() {
+        try {
+            const response = await fetch('/api/chat/config/preview-timeout', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.previewTimeout = data.preview_timeout || 60;
+            } else {
+                console.warn('Failed to check preview timeout status');
+                this.previewTimeout = 60;
+            }
+        } catch (error) {
+            console.warn('Failed to check preview timeout:', error);
+            this.previewTimeout = 60;
+        }
+    }
+
+    /**
+     * 检测钉钉启用配置
+     */
+    async checkDingtalkEnabled() {
+        try {
+            const response = await fetch('/api/chat/config/dingtalk-enabled', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.isDingtalkEnabled = data.dingtalk_enabled === true;
+            } else {
+                console.warn('Failed to check dingtalk enabled status');
+                this.isDingtalkEnabled = false;
+            }
+        } catch (error) {
+            console.warn('Failed to check dingtalk enabled:', error);
+            this.isDingtalkEnabled = false;
+        }
+    }
+
+    /**
      * 获取当前用户信息
      */
     async getCurrentUserInfo() {
@@ -418,7 +487,8 @@ class ChatController {
                 sender_id: this.currentUser?.username || 'web_user',
                 sender_nickname: this.currentUser?.nickname || 'Web用户',
                 platform: 'any4chat',
-                delay_time: this.isDelayMode ? this.delayTime : undefined
+                delay_time: this.isDelayMode ? this.delayTime : undefined,
+                conversation_id: this.currentConversationId  // 明确传递当前会话ID
             };
 
             
@@ -858,12 +928,26 @@ class ChatController {
      * 重置聊天
      */
     resetChat() {
-        if (confirm('确定要清空所有聊天记录吗？')) {
-            this.messages = [];
-            this.renderMessages();
-            localStorage.removeItem('chatHistory');
-            this.showMessage('聊天记录已清空', 'success');
-        }
+        const self = this; // 保存this的引用
+
+        layui.use(['layer'], function(){
+            const layer = layui.layer;
+
+            layer.confirm('确定要清空所有聊天记录吗？', {
+                title: '清空确认',
+                icon: 3,
+                btn: ['确定清空', '取消']
+            }, function(index){
+                // 用户点击确定清空
+                layer.close(index);
+
+                // 执行清空操作
+                self.messages = [];
+                self.renderMessages();
+                localStorage.removeItem('chatHistory');
+                self.showMessage('聊天记录已清空', 'success');
+            });
+        });
     }
 
     /**
@@ -1159,12 +1243,61 @@ class ChatController {
         const title = conversation.first_message || '新对话';
 
         item.innerHTML = `
-            <div class="history-item-title">${this.escapeHtml(title)}</div>
-            <div class="history-item-meta">
-                <span class="history-item-time">${timeStr}</span>
-                <span class="history-item-count">${conversation.message_count || 0}</span>
+            <div class="history-item-content">
+                <div class="history-item-title">${this.escapeHtml(title)}</div>
+                <div class="history-item-meta">
+                    <span class="history-item-time">${timeStr}</span>
+                </div>
+            </div>
+            <div class="history-item-actions">
+                <button class="history-menu-btn" data-conversation-id="${conversation.conversation_id}" title="更多操作">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
             </div>
         `;
+
+        // 创建下拉菜单
+        const dropdown = document.createElement('div');
+        dropdown.className = 'history-dropdown-menu';
+        dropdown.innerHTML = `
+            <div class="history-dropdown-item delete" data-action="delete">
+                <i class="fas fa-trash"></i>
+                删除对话
+            </div>
+        `;
+        item.appendChild(dropdown);
+
+        // 菜单按钮点击事件
+        const menuBtn = item.querySelector('.history-menu-btn');
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止触发历史记录项的点击事件
+
+            // 关闭其他所有菜单
+            document.querySelectorAll('.history-dropdown-menu.show').forEach(menu => {
+                if (menu !== dropdown) {
+                    menu.classList.remove('show');
+                }
+            });
+
+            // 切换当前菜单
+            dropdown.classList.toggle('show');
+        });
+
+        // 删除按钮点击事件
+        const deleteBtn = dropdown.querySelector('[data-action="delete"]');
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            dropdown.classList.remove('show');
+
+            await this.handleDeleteConversation(conversation.conversation_id, title);
+        });
+
+        // 点击页面其他地方关闭菜单
+        document.addEventListener('click', (e) => {
+            if (!item.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
 
         // 点击事件
         item.addEventListener('click', () => {
@@ -1301,6 +1434,84 @@ class ChatController {
             }
         } catch (error) {
             return '';
+        }
+    }
+
+    /**
+     * 处理删除对话
+     */
+    async handleDeleteConversation(conversationId, conversationTitle) {
+        // 显示LayUI确认对话框
+        const self = this; // 保存this的引用
+
+        return new Promise((resolve) => {
+            layui.use(['layer'], function(){
+                const layer = layui.layer;
+
+                layer.confirm(`确定要删除对话"${conversationTitle}"吗？此操作无法撤销。`, {
+                    title: '删除确认',
+                    icon: 3,
+                    btn: ['确定删除', '取消']
+                }, function(index){
+                    // 用户点击确定删除
+                    layer.close(index);
+
+                    // 执行删除操作
+                    self._executeDeleteConversation(conversationId, conversationTitle);
+                    resolve(true);
+                }, function(index){
+                    // 用户点击取消
+                    layer.close(index);
+                    resolve(false);
+                });
+            });
+        });
+    }
+
+    /**
+     * 执行删除对话操作
+     */
+    async _executeDeleteConversation(conversationId, conversationTitle) {
+        try {
+            // 调用删除API
+            const response = await fetch(`/api/conversation/${conversationId}/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+
+                if (result.success) {
+                    // 从界面移除该历史记录项
+                    const historyItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+                    if (historyItem) {
+                        historyItem.remove();
+                    }
+
+                    // 如果删除的是当前会话，创建新会话
+                    if (conversationId === this.currentConversationId) {
+                        // 先清空当前状态，避免使用旧的会话ID
+                        this.currentConversationId = null;
+                        this.messages = [];
+                        this.renderMessages();
+
+                        // 然后创建新会话
+                        await this.handleNewChat();
+                    }
+
+                    this.showMessage('对话删除成功', 'success');
+                } else {
+                    this.showMessage(result.message || '删除失败', 'error');
+                }
+            } else {
+                this.showMessage('删除请求失败', 'error');
+            }
+        } catch (error) {
+            console.error('Delete conversation error:', error);
+            this.showMessage('删除过程中发生错误', 'error');
         }
     }
 

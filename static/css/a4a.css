@@ -1023,7 +1023,9 @@ body::before {
 /* 模式状态徽章 */
 .preview-mode-badge,
 .delay-mode-badge,
-.tools-mode-badge {
+.tools-mode-badge,
+.preview-timeout-badge,
+.dingtalk-mode-badge {
     background: #f59e0b;
     color: white;
     padding: 2px 8px;
@@ -1040,6 +1042,14 @@ body::before {
 
 .tools-mode-badge {
     background: #3b82f6;
+}
+
+.preview-timeout-badge {
+    background: #8b5cf6;
+}
+
+.dingtalk-mode-badge {
+    background: #14b8a6;
 }
 
 /* 历史记录样式 */
@@ -1078,6 +1088,79 @@ body::before {
     cursor: pointer;
     transition: all 0.2s ease;
     border: 1px solid transparent;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.history-item-content {
+    flex: 1;
+    min-width: 0; /* 允许内容收缩 */
+}
+
+/* 三点菜单按钮 */
+.history-item-actions {
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.history-menu-btn {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+/* 下拉菜单 */
+.history-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    min-width: 120px;
+    padding: 4px 0;
+    display: none;
+}
+
+.history-dropdown-menu.show {
+    display: block;
+}
+
+.history-dropdown-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.history-dropdown-item:hover {
+    background: var(--hover-bg);
+}
+
+.history-dropdown-item.delete,
+.history-dropdown-item.delete .fas {
+    color: #ef4444;
+}
+
+.history-dropdown-item.delete:hover {
+    background: #fef2f2;
 }
 
 .history-item:hover {
@@ -1089,6 +1172,20 @@ body::before {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
+}
+
+.history-menu-btn:hover {
+    background: var(--hover-bg);
+    color: var(--primary);
+}
+
+.history-item.active .history-menu-btn {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.history-item.active .history-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
 }
 
 .history-item-title {
@@ -1120,18 +1217,34 @@ body::before {
     font-size: 11px;
 }
 
-.history-item-count {
-    background: var(--primary);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 500;
+
+/* 弹窗圆角样式 */
+.layui-layer,
+.layui-layer-content,
+.layui-layer-title,
+.layui-layer-btn {
+    border-radius: 8px !important;
 }
 
-.history-item.active .history-item-count {
-    background: white;
-    color: var(--primary);
+.layui-layer {
+    border-radius: 12px !important;
+}
+
+.layui-layer-title {
+    border-radius: 12px 12px 0 0 !important;
+}
+
+.layui-layer-content {
+    border-radius: 0 0 12px 12px !important;
+}
+
+.layui-layer-btn {
+    border-radius: 0 0 12px 12px !important;
+}
+
+/* 确保弹窗内容也有圆角 */
+.layui-layer-dialog .layui-layer-content {
+    border-radius: 8px !important;
 }
 
 /* 滚动条样式 */

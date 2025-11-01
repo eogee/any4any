@@ -317,14 +317,29 @@ class ChatServer(Server):
             if not conversation_id:
                 raise HTTPException(status_code=400, detail="Conversation ID is required")
 
-            # 这里应该实现删除对话的逻辑
-            # 暂时返回成功响应作为示例
+            try:
+                success = self.conversation_manager.db.delete_conversation(
+                    conversation_id=conversation_id
+                )
 
-            return JSONResponse({
-                'success': True,
-                'message': 'Conversation deleted successfully',
-                'conversation_id': conversation_id
-            })
+                if success:
+                    return JSONResponse({
+                        'success': True,
+                        'message': 'Conversation deleted successfully',
+                        'conversation_id': conversation_id
+                    })
+                else:
+                    return JSONResponse({
+                        'success': False,
+                        'message': 'Conversation not found or no permission'
+                    }, status_code=404)
+
+            except Exception as db_error:
+                logger.warning(f"Database delete failed: {db_error}")
+                return JSONResponse({
+                    'success': False,
+                    'message': 'Database operation failed'
+                }, status_code=500)
 
         except HTTPException:
             raise
@@ -469,6 +484,52 @@ class ChatServer(Server):
             return JSONResponse({
                 "tools_enabled": False,
                 "description": "Unable to determine tools enabled status",
+                "error": str(e)
+            }, status_code=500)
+
+    async def get_preview_timeout_config(self, request: Request):
+        """获取预览超时配置状态"""
+        self.log_request("/api/chat/config/preview-timeout")
+
+        try:
+            # 权限验证
+            if not await self._verify_request_auth(request):
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            return JSONResponse({
+                "preview_timeout": Config.PREVIEW_TIMEOUT,
+                "description": f"Preview timeout is set to {Config.PREVIEW_TIMEOUT} seconds"
+            })
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.log_error("/api/chat/config/preview-timeout", e)
+            return JSONResponse({
+                "preview_timeout": 60,
+                "description": "Unable to determine preview timeout status",
+                "error": str(e)
+            }, status_code=500)
+
+    async def get_dingtalk_enabled_config(self, request: Request):
+        """获取钉钉启用配置状态"""
+        self.log_request("/api/chat/config/dingtalk-enabled")
+
+        try:
+            # 权限验证
+            if not await self._verify_request_auth(request):
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            return JSONResponse({
+                "dingtalk_enabled": Config.DINGTALK_ENABLED,
+                "description": "DingTalk integration is enabled" if Config.DINGTALK_ENABLED else "DingTalk integration is disabled"
+            })
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.log_error("/api/chat/config/dingtalk-enabled", e)
+            return JSONResponse({
+                "dingtalk_enabled": False,
+                "description": "Unable to determine DingTalk enabled status",
                 "error": str(e)
             }, status_code=500)
 
@@ -684,6 +745,16 @@ class ChatServer(Server):
             """获取工具系统配置状态"""
             return await self.get_tools_enabled_config(request)
 
+        @app.get("/api/chat/config/preview-timeout")
+        async def preview_timeout_config(request: Request):
+            """获取预览超时配置状态"""
+            return await self.get_preview_timeout_config(request)
+
+        @app.get("/api/chat/config/dingtalk-enabled")
+        async def dingtalk_enabled_config(request: Request):
+            """获取钉钉启用配置状态"""
+            return await self.get_dingtalk_enabled_config(request)
+
         @app.get("/api/chat/current-user")
         async def current_user(request: Request):
             """获取当前用户信息"""
@@ -715,54 +786,6 @@ class ChatServer(Server):
 
             except Exception as e:
                 self.log_error("/api/chat/models", e)
-                raise HTTPException(status_code=500, detail="Internal server error")
-
-        # 清空聊天历史
-        @app.delete("/api/conversation/{conversation_id}/clear")
-        async def clear_conversation(conversation_id: str, request: Request):
-            """清空对话历史"""
-            try:
-                if not await self._verify_request_auth(request):
-                    raise HTTPException(status_code=401, detail="Unauthorized")
-
-                if not conversation_id:
-                    raise HTTPException(status_code=400, detail="Conversation ID is required")
-
-                # 这里应该实现清空对话的逻辑
-                # 暂时返回成功响应
-
-                return JSONResponse({
-                    'success': True,
-                    'message': 'Conversation cleared successfully',
-                    'conversation_id': conversation_id
-                })
-
-            except HTTPException:
-                raise
-            except Exception as e:
-                self.log_error(f"/api/conversation/{conversation_id}/clear", e)
-                raise HTTPException(status_code=500, detail="Internal server error")
-
-        # 获取用户统计信息
-        @app.get("/api/chat/stats")
-        async def chat_stats(request: Request):
-            """获取聊天统计信息"""
-            try:
-                # 这里应该从数据库获取统计数据
-                stats = {
-                    'total_conversations': 0,
-                    'total_messages': 0,
-                    'active_conversations': 0,
-                    'daily_messages': 0
-                }
-
-                return JSONResponse({
-                    'success': True,
-                    'stats': stats
-                })
-
-            except Exception as e:
-                self.log_error("/api/chat/stats", e)
                 raise HTTPException(status_code=500, detail="Internal server error")
 
         # 健康检查

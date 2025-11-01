@@ -426,6 +426,7 @@ any4any/
 - **IndexTTS-1.5**: High-quality Chinese speech synthesis - https://huggingface.co/IndexTeam/IndexTTS-1.5
 - **SenseVoice**: Multi-language speech recognition - https://github.com/FunAudioLLM/SenseVoice
 - **Wav2Lip**: Lip sync technology - https://github.com/Rudrabha/Wav2Lip
+- **live-talking**: Real-time speech processing - https://github.com/lipku/livetalking
 - **bge-reranker-base**: Document reranking model - https://huggingface.co/BAAI/bge-reranker-base
 - **bge-small-zh-v1.5**: Chinese text embedding - https://huggingface.co/BAAI/bge-small-zh-v1.5
 - **Qwen3-0.6B**: High-performance language model - https://huggingface.co/Qwen/Qwen3-0.6B

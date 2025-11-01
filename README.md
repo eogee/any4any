@@ -426,6 +426,7 @@ any4any/
 - **IndexTTS-1.5**: 高质量中文语音合成 - https://huggingface.co/IndexTeam/IndexTTS-1.5
 - **SenseVoice**: 多语言语音识别 - https://github.com/FunAudioLLM/SenseVoice
 - **Wav2Lip**: 唇形同步技术 - https://github.com/Rudrabha/Wav2Lip
+- **live-talking**: 实时互动数字人直播系统 - https://github.com/lipku/livetalking
 - **bge-reranker-base**: 文档重排序模型 - https://huggingface.co/BAAI/bge-reranker-base
 - **bge-small-zh-v1.5**: 中文文本嵌入 - https://huggingface.co/BAAI/bge-small-zh-v1.5
 - **Qwen3-0.6B**: 高性能语言模型 - https://huggingface.co/Qwen/Qwen3-0.6B
