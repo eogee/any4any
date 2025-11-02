@@ -22,7 +22,6 @@ class DatabaseTableManager:
                 try:
                     from core.database.connection_pool import get_connection_pool
                     self.connection_pool = get_connection_pool()
-                    logger.info("TableInfo manager using unified connection pool.")
                     return
                 except ImportError:
                     logger.warning("Unified connection pool not available for TableInfo, falling back to SQLAlchemy")

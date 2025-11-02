@@ -81,7 +81,7 @@ class OpenAIAPI:
             
             # 特殊指令 /a
             if user_message_content.strip() == "/a":
-                response, _ = await conversation_manager.process_message(sender, user_nick, platform, user_message_content)
+                response, _, _ = await conversation_manager.process_message(sender, user_nick, platform, user_message_content)
                 return JSONResponse({
                     "id": f"new_conversation_{int(time.time())}",
                     "object": "chat.completion",
@@ -146,28 +146,31 @@ class OpenAIAPI:
                 elif isinstance(obj, dict):
                     return obj.get('msg_id')
                 return None
-            
+
             msg_id = get_msg_id(chat_request)
             
             # 检查是否启用延迟模式
             delay_mode_enabled = getattr(Config, 'DELAY_MODE', False)
             delay_time = getattr(chat_request, 'delay_time', None) or getattr(Config, 'DELAY_TIME', 10)
-            
+
             # 如果是延迟模式且不是预览模式，添加延迟处理标记
             is_delayed_processing = False
             if delay_mode_enabled and not preview_mode:
                 # 检查当前请求是否来自延迟处理器的回调
                 is_delayed_processing = getattr(chat_request, '_is_delayed_processing', False)
             
-            assistant_response, conversation_id = await conversation_manager.process_message(
-                sender, 
-                user_nick, 
-                platform, 
-                user_message_content, 
+            assistant_response, conversation_id, assistant_message_id = await conversation_manager.process_message(
+                sender,
+                user_nick,
+                platform,
+                user_message_content,
                 message_id=msg_id,
                 delay_time=delay_time if delay_mode_enabled and not preview_mode else None,
                 is_delayed_processing=is_delayed_processing
             )
+
+            # 存储助手消息ID用于超时更新
+            stored_assistant_message_id = assistant_message_id
             
             # 检查是否是延迟处理中的消息
             if assistant_response == "DELAY_PROCESSING" and conversation_id == "delay_processing":
@@ -221,10 +224,20 @@ class OpenAIAPI:
                 
                 # 超时处理
                 OpenAIAPI.logger.info(f"Preview confirmation timeout after {timeout} seconds")
-                _, _ = await conversation_manager.process_message(
-                    sender, user_nick, platform, user_message_content, is_timeout=True, 
-                    message_id=msg_id, skip_save=True
-                )
+
+                # 更新已保存消息的超时状态
+                message_id_to_update = None
+
+                # 优先使用存储的助手消息ID
+                if stored_assistant_message_id:
+                    message_id_to_update = stored_assistant_message_id
+                elif msg_id:
+                    message_id_to_update = msg_id
+
+                if message_id_to_update:
+                    await conversation_manager.update_message_timeout(message_id_to_update, is_timeout=True)
+
+                # 直接使用已生成的 assistant_response 构建响应
                 
                 response_data = OpenAIAPI._build_response_data(
                     chat_request, user_message_content, assistant_response
@@ -383,6 +396,12 @@ class OpenAIAPI:
                         if time.time() - start_time >= timeout:
                             timeout_reached = True
                             logging.info(f"Streaming preview timeout after {timeout} seconds")
+
+                            # 更新消息的超时状态
+                            if msg_id:
+                                timeout_update_success = await conversation_manager.update_message_timeout(msg_id, is_timeout=True)
+                                if not timeout_update_success:
+                                    logging.warning(f"Failed to update timeout status for streaming message: {msg_id}")
                             break
                             
                         await asyncio.sleep(1)

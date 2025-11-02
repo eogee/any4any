@@ -18,7 +18,7 @@ class UnifiedLLMInterface:
             from .conversation_manager import get_conversation_manager
             conversation_manager = get_conversation_manager()
 
-            response, conversation_id = await conversation_manager.process_message(
+            response, conversation_id, _ = await conversation_manager.process_message(
                 sender=sender,
                 user_nick=user_nick,
                 platform=platform,

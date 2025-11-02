@@ -27,11 +27,11 @@ class ExternalLLMService:
         self.session = None
 
         if self.server_type == "api" and self.api_key and self.base_url:
-            logger.info(f"External LLM API (OpenAI compatible) initialized: {self.model_name} ({self.base_url})")
+            logger.info(f"Using external LLM API: {self.model_name}")
         elif self.server_type == "api" and not self.api_key:
             logger.warning("External LLM API key is empty, service may not work properly")
         else:
-            logger.info("Using local LLM service (external API disabled)")
+            logger.info("Using local LLM service")
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """获取或创建HTTP会话 - 优化的连接池配置"""

@@ -62,7 +62,7 @@ class ConversationManager:
                 return
             
             # 使用合并后的内容处理消息
-            response, conversation_id = await self._process_immediately(
+            response, conversation_id, assistant_message_id = await self._process_immediately(
                 sender=sender,
                 user_nick=user_nick,
                 platform=platform,
@@ -76,7 +76,8 @@ class ConversationManager:
             if sender in self.user_delay_status:
                 self.user_delay_status[sender]['result'] = {
                     'response': response,
-                    'conversation_id': conversation_id
+                    'conversation_id': conversation_id,
+                    'assistant_message_id': assistant_message_id
                 }
                 self.user_delay_status[sender]['processed'] = True
                 # 通知所有等待的请求
@@ -90,7 +91,8 @@ class ConversationManager:
             if sender in self.user_delay_status:
                 self.user_delay_status[sender]['result'] = {
                     'response': f"处理延迟消息时出错: {str(e)}",
-                    'conversation_id': ""
+                    'conversation_id': "",
+                    'assistant_message_id': None
                 }
                 self.user_delay_status[sender]['processed'] = True
                 if self.user_delay_status[sender].get('completion_event'):
@@ -180,7 +182,9 @@ class ConversationManager:
                 user_nick=user_nick,
                 platform=platform,
                 content=content,
-                message_id=message_id
+                is_timeout=False,
+                message_id=message_id,
+                skip_save=False
             )
         
         # 检查是否已经有在处理中的延迟请求
@@ -260,6 +264,7 @@ class ConversationManager:
                 result = self.user_delay_status[sender]['result']
                 response = result.get('response', '处理完成')
                 conversation_id = result.get('conversation_id', '')
+                assistant_message_id = result.get('assistant_message_id', None)
                 
                 # 增加已完成计数
                 self.user_delay_status[sender]['completed_count'] += 1
@@ -272,8 +277,8 @@ class ConversationManager:
                         del self.user_delay_status[sender]
                     if sender in self.pending_request_counts:
                         del self.pending_request_counts[sender]
-                
-                return response, conversation_id
+
+                return response, conversation_id, assistant_message_id
             else:
                 logger.warning(f"Delay message processing status error, user: {user_nick}, status: {self.user_delay_status.get(sender)}")
                 # 清理异常状态
@@ -281,7 +286,7 @@ class ConversationManager:
                     del self.user_delay_status[sender]
                 if sender in self.pending_request_counts:
                     del self.pending_request_counts[sender]
-                return "消息处理异常，请稍后重试。", ""
+                return "消息处理异常，请稍后重试。", "", None
                 
         except asyncio.TimeoutError:
             logger.warning(f"Delay message processing timeout, user: {user_nick}")
@@ -290,7 +295,7 @@ class ConversationManager:
                 del self.user_delay_status[sender]
             if sender in self.pending_request_counts:
                 del self.pending_request_counts[sender]
-            return "消息处理超时，请稍后重试。", ""
+            return "消息处理超时，请稍后重试。", "", None
     
     async def _process_immediately(self, sender, user_nick, platform, content, is_timeout=False, message_id=None, skip_save=False):
         """立即处理消息"""
@@ -298,7 +303,7 @@ class ConversationManager:
         if content.strip() == '/a':
             new_conversation = self.db.create_new_conversation(sender, user_nick, platform)
             self.active_conversations[(sender, platform)] = new_conversation
-            return "新会话已开启。", new_conversation['conversation_id']
+            return "新会话已开启。", new_conversation['conversation_id'], None
         
         # 获取或创建会话
         cache_key = (sender, platform)
@@ -362,7 +367,7 @@ class ConversationManager:
                 self.db.save_message(conversation['conversation_id'], assistant_message)
                 conversation['messages'].append(assistant_message)
 
-            return response_text, conversation['conversation_id']
+            return response_text, conversation['conversation_id'], assistant_message['message_id']
             
         except Exception as e:
             logger.error(f"Error generating response: {e}")
@@ -375,17 +380,17 @@ class ConversationManager:
             if not skip_save:
                 self.db.save_message(conversation['conversation_id'], error_assistant_message)
             
-            return error_message, conversation['conversation_id']
+            return error_message, conversation['conversation_id'], error_assistant_message['message_id']
     
     async def process_message(self, sender, user_nick, platform, content, is_timeout=False, message_id=None, skip_save=False, delay_time: Optional[int] = None, is_delayed_processing=False):
         """处理用户消息"""
         # 检查消息是否已处理
         if message_id and self._check_message_processed(message_id):
-            return "", ""
+            return "", "", None
 
         # 非主进程检查
         if not self.is_main_process:
-            return "该请求需要在主进程中处理。", "non_main_process"
+            return "该请求需要在主进程中处理。", "non_main_process", None
 
         # 参数验证
         if not all([sender, user_nick, platform, content]):
@@ -397,7 +402,7 @@ class ConversationManager:
             actual_delay_time = delay_time if delay_time is not None else self.delay_time
             
             # 使用延迟处理并等待结果
-            response, conversation_id = await self._process_with_delay(
+            response, conversation_id, assistant_message_id = await self._process_with_delay(
                 sender=sender,
                 user_nick=user_nick,
                 platform=platform,
@@ -405,11 +410,11 @@ class ConversationManager:
                 delay_time=actual_delay_time,
                 message_id=message_id
             )
-            
-            return response, conversation_id
+
+            return response, conversation_id, assistant_message_id
         
         # 直接处理消息
-        return await self._process_immediately(
+        response, conversation_id, assistant_message_id = await self._process_immediately(
             sender=sender,
             user_nick=user_nick,
             platform=platform,
@@ -418,6 +423,9 @@ class ConversationManager:
             message_id=message_id,
             skip_save=skip_save
         )
+
+        # 返回处理结果
+        return response, conversation_id, assistant_message_id
     
     async def process_message_stream(self, sender, user_nick, platform, content, generation_id, is_timeout=False, message_id=None, delay_time: Optional[int] = None, is_delayed_processing=False):
         """流式处理用户消息 流式响应不支持延迟功能"""
@@ -529,7 +537,87 @@ class ConversationManager:
         
         self.db.save_message(conversation['conversation_id'], assistant_message)
         conversation['messages'].append(assistant_message)
-    
+
+    def find_assistant_message_by_user_id(self, user_message_id: str) -> str:
+        """根据用户消息ID查找对应的助手消息ID"""
+        if not user_message_id:
+            return None
+
+        try:
+            # 从数据库中查找对应的助手消息
+            result = self.db.fetch_one(
+                """SELECT m1.message_id
+                   FROM messages m1
+                   JOIN messages m2 ON m1.conversation_id = m2.conversation_id
+                   WHERE m2.message_id = %s
+                   AND m1.sender_type = 'assistant'
+                   AND m2.sender_type = 'user'
+                   AND m1.sequence_number = m2.sequence_number + 1
+                   ORDER BY m1.timestamp DESC
+                   LIMIT 1""",
+                (user_message_id,)
+            )
+
+            if result:
+                assistant_message_id = result.get('message_id')
+                logger.info(f"Found assistant message {assistant_message_id} for user message {user_message_id}")
+                return assistant_message_id
+            else:
+                logger.warning(f"No assistant message found for user message {user_message_id}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error finding assistant message for user message {user_message_id}: {e}")
+            return None
+
+    async def update_message_timeout(self, message_id: str, is_timeout: bool = True) -> bool:
+        """更新消息的超时状态（用于预览超时场景）"""
+        if not message_id:
+            logger.warning("No message_id provided for timeout update")
+            return False
+
+        try:
+            # 如果传入的是用户消息ID，需要找到对应的助手消息ID
+            assistant_message_id = message_id
+
+            # 检查消息是否为用户消息，如果是则查找对应的助手消息
+            message_info = self.db.fetch_one(
+                "SELECT sender_type FROM messages WHERE message_id = %s",
+                (message_id,)
+            )
+
+            if message_info and message_info['sender_type'] == 'user':
+                logger.info(f"Message {message_id} is from user, finding corresponding assistant message")
+                assistant_message_id = self.find_assistant_message_by_user_id(message_id)
+                if not assistant_message_id:
+                    logger.error(f"Could not find assistant message for user message {message_id}")
+                    return False
+
+            # 更新助手消息的超时状态
+            success = self.db.update_message_timeout_status(assistant_message_id, is_timeout)
+            if success:
+                # 更新缓存中的消息状态（如果存在）
+                cache_updated = False
+                for conversation in self.active_conversations.values():
+                    if 'messages' in conversation:
+                        for msg in conversation['messages']:
+                            if msg.get('message_id') == assistant_message_id and msg.get('sender_type') == 'assistant':
+                                old_timeout = msg.get('is_timeout', 0)
+                                msg['is_timeout'] = 1 if is_timeout else 0
+                                cache_updated = True
+                                break
+
+                if not cache_updated:
+                    logger.warning(f"Assistant message {assistant_message_id} not found in cache for update")
+
+            else:
+                logger.error(f"Database update failed for assistant message: {assistant_message_id}")
+
+            return success
+        except Exception as e:
+            logger.error(f"Failed to update message timeout: {e}")
+            return False
+
     def get_conversation_history(self, conversation_id):
         """获取会话历史"""
         if not conversation_id:

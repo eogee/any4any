@@ -210,7 +210,43 @@ class ConversationDatabase(Model):
         except Exception as e:
             logger.error(f"Failed to save message: {e}")
             return False
-    
+
+    def update_message_timeout_status(self, message_id: str, is_timeout: bool = True) -> bool:
+        """更新消息的超时状态"""
+
+        try:
+            # 先查询消息是否存在
+            check_result = self.fetch_one(
+                "SELECT message_id, sender_type, is_timeout FROM messages WHERE message_id = %s",
+                (message_id,)
+            )
+
+            if not check_result:
+                logger.warning(f"Database: Message not found: {message_id}")
+                return False
+
+            if check_result['sender_type'] != 'assistant':
+                logger.warning(f"Database: Message is not from assistant: {check_result['sender_type']}")
+                return False
+
+            # 执行更新
+            affected_rows = self.execute_query(
+                "UPDATE messages SET is_timeout = %s WHERE message_id = %s AND sender_type = 'assistant'",
+                (1 if is_timeout else 0, message_id)
+            )
+            self.commit_transaction()
+
+            if affected_rows > 0:
+                return True
+            else:
+                logger.error(f"Database: No rows affected for message: {message_id}")
+                return False
+
+        except Exception as e:
+            self.rollback_transaction()
+            logger.error(f"Database: Failed to update message timeout status: {e}")
+            return False
+
     def create_new_conversation(self, sender: str, user_nick: str, platform: str) -> dict:
         """创建新的会话"""
         # 生成会话ID
