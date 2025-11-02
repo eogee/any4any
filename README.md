@@ -1,4 +1,4 @@
-# any4any: 企业级多模态AI平台 - 大模型会话、数字人、智能查询、语音处理与知识库系统
+# any4any: 企业级多模态AI系统 - 大模型会话、数字人、智能查询、语音处理与知识库系统
 
 <div align="center">
     <a href="https://zread.ai/eogee/any4any"><img src="https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff"></a>
@@ -15,7 +15,7 @@
 
 ## 项目概述
 
-any4any是一个企业级多模态AI平台，提供完整的智能交互解决方案。集成了大语言模型对话、数字人系统、智能SQL查询、语音处理、知识库系统等核心功能，支持OpenAI兼容API接口，可无缝集成到各类AI应用中。
+any4any是一个企业级多模态AI系统，提供完整的智能交互解决方案。集成了大语言模型对话、数字人系统、智能SQL查询、语音处理、知识库系统等核心功能，支持OpenAI兼容API接口，可无缝集成到各类AI应用中。
 
 **核心特色**：
 - **多模态AI交互**：支持文本、语音、视频的全方位智能交互
@@ -75,7 +75,7 @@ any4any是一个企业级多模态AI平台，提供完整的智能交互解决�
 ### V0.1.3 (2025.11.01) - 重大功能升级
 
 #### 数字人系统全新上线
-- **Any4DH数字人系统**：完整的实时数字人交互平台
+- **Any4DH数字人系统**：完整的实时数字人交互系统
   - WebRTC传输协议支持
   - 实时语音处理和唇形同步
   - 流媒体处理和人脸检测
@@ -404,7 +404,6 @@ any4any/
 │   └── js/                         # JavaScript模块
 ├── data_models/                    # 数据模型定义
 ├── docs/                           # 项目文档
-├── workflows/                      # 工作流配置
 ├── app.py                          # 应用入口
 ├── cli.py                          # 命令行接口
 ├── config.py                       # 配置文件
@@ -469,5 +468,5 @@ any4any/
 
 <div align="center">
   <strong>感谢您对any4any项目的关注！</strong><br>
-  <em>ANY FOR ANY，广受开发者和企业用户信赖的多模态AI开源平台！</em>
+  <em>ANY FOR ANY，广受开发者和企业用户信赖的多模态AI开源系统！</em>
 </div>

@@ -41,7 +41,7 @@ class UnifiedLLMInterface:
         **kwargs
     ):
         try:
-            # 检查是否为voice_kb问题 仅对any4dh平台生效
+            # 检查是否为voice_kb问题 仅对any4dh系统生效
             if platform == "any4dh":
                 try:
                     from .tool_manager import get_tool_manager

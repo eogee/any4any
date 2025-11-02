@@ -404,7 +404,6 @@ any4any/
 │   └── js/                         # JavaScript modules
 ├── data_models/                    # Data model definitions
 ├── docs/                           # Project documentation
-├── workflows/                      # Workflow configuration
 ├── app.py                          # Application entry
 ├── cli.py                          # Command-line interface
 ├── config.py                       # Configuration file

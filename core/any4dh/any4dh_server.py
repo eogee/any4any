@@ -896,7 +896,7 @@ if __name__ == '__main__':
     # 创建 FastAPI 应用
     app = FastAPI(
         title="any4dh API",
-        description="基于 Wav2Lip 的实时交互数字人平台",
+        description="基于 Wav2Lip 的实时交互数字人系统",
         version="1.0.0",
         lifespan=lifespan
     )

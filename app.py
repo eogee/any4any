@@ -11,10 +11,6 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
 from config import Config
-from utils.text_add_keywords.process_text import ProcessTextResponse
-from utils.text_add_keywords.process_text import process_text
-from utils.text_add_keywords.write_content import write_content
-from utils.text_add_keywords.get_chunk_content import get_chunk_content
 from core.log import setup_logging
 from core.database.database import query_data,execute_query
 from core.lifespan import lifespan
@@ -47,7 +43,7 @@ setup_logging()
 # 初始化FastAPI应用
 app = FastAPI(
     title="ANY FOR ANY",
-    description="eogee.com any4any：LLM、ASR、TTS、Rerank模型兼容OpenAI-API并实现数据库连接、文本分块和分块儿后文本生成功能",
+    description="any4any：开源多模态AI服务系统，提供LLM对话、ASR语音识别、TTS语音合成、文本嵌入、重排序、数字人、MCP工具和NL2SQL等AI能力的OpenAI兼容API接口",
     version="0.1.0",
     lifespan=lifespan
 )
@@ -82,9 +78,6 @@ app.get("/health")(health_check)
 app.post("/v1/db/query")(query_data)
 app.post("/v1/db/execute")(execute_query)
 
-app.post("/process_text", response_model=ProcessTextResponse)(process_text)
-app.post("/write_content")(write_content)
-app.post("/get_chunk_content")(get_chunk_content)
 
 # 注册Embedding API路由
 embedding_router = get_embedding_router()
