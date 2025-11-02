@@ -49,3 +49,7 @@ core/any4dh/results/
 
 # backups
 backups/
+
+# docs
+example.md
+example_zh.md

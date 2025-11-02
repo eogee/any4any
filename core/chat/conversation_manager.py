@@ -114,7 +114,7 @@ class ConversationManager:
         truncated_messages = messages[-max_messages:] # 保留最近的消息，确保是成对的对话
 
         conversation_text = "\n".join([ # 进一步基于token数量截断
-            f"{msg['sender_type']}: {msg['content']}"
+            f"{msg.get('sender_type', msg.get('role', 'unknown'))}: {msg['content']}"
             for msg in truncated_messages
         ])
 
@@ -126,7 +126,7 @@ class ConversationManager:
             current_tokens = 0
 
             for msg in reversed(truncated_messages):
-                msg_text = f"{msg['sender_type']}: {msg['content']}"
+                msg_text = f"{msg.get('sender_type', msg.get('role', 'unknown'))}: {msg['content']}"
                 msg_tokens = len(msg_text) * 1.2
 
                 if current_tokens + msg_tokens > max_tokens and final_messages:
@@ -329,10 +329,10 @@ class ConversationManager:
 
         # 生成对话历史
         conversation_history = "\n".join([
-            f"{msg['sender_type']}: {msg['content']}"
+            f"{msg.get('sender_type', msg.get('role', 'unknown'))}: {msg['content']}"
             for msg in truncated_messages
         ])
-        
+
         try:
             # 生成响应 - 检查是否启用工具
             if (hasattr(self.llm_service, 'process_with_tools') and
@@ -469,11 +469,11 @@ class ConversationManager:
 
         # 生成对话历史
         conversation_history = "\n".join([
-            f"{msg['sender_type']}: {msg['content']}"
+            f"{msg.get('sender_type', msg.get('role', 'unknown'))}: {msg['content']}"
             for msg in truncated_messages
         ])
 
-        
+
         accumulated_response = ""
         
         try:
@@ -592,7 +592,8 @@ class ConversationManager:
         openai_messages = []
 
         for msg in messages:
-            role = "user" if msg['sender_type'] == "user" else "assistant"
+            sender_type = msg.get('sender_type', msg.get('role', 'unknown'))
+            role = "user" if sender_type == "user" else "assistant"
             openai_messages.append({
                 "role": role,
                 "content": msg['content']
