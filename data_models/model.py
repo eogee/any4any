@@ -1,16 +1,33 @@
 import logging
+import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from mysql.connector import Error
 from core.database.database import get_db_connection
+from config import Config
 
 class Model(ABC):
     """与数据库交互的基类，供其他类继承使用"""
-    
-    def __init__(self):
+
+    def __init__(self, use_connection_pool: Optional[bool] = None):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.connection = None
         self.cursor = None
+
+        # 连接池配置
+        if use_connection_pool is None:
+            self.use_connection_pool = Config.DB_POOL_ENABLED
+        else:
+            self.use_connection_pool = use_connection_pool
+
+        if self.use_connection_pool:
+            try:
+                from core.database.connection_pool import get_connection_pool
+                self.connection_pool = get_connection_pool()
+                self.retry_manager = self.connection_pool.get_retry_manager()
+            except ImportError:
+                self.logger.warning("Connection pool not available, falling back to direct connection")
+                self.use_connection_pool = False
         
     def __del__(self):
         """析构函数，确保关闭数据库连接"""
@@ -23,22 +40,29 @@ class Model(ABC):
         
     def _get_connection(self):
         """获取数据库连接"""
-        if not self.connection or not self.connection.is_connected():
-            self.connection = get_db_connection()
-        return self.connection
+        if self.use_connection_pool:
+            return self.connection_pool.get_connection()
+        else:
+            if not self.connection or not self.connection.is_connected():
+                self.connection = get_db_connection()
+            return self.connection
         
     def _get_cursor(self, dictionary: bool = True):
         """获取数据库游标"""
         try:
             connection = self._get_connection()
-            self.cursor = connection.cursor(dictionary=dictionary)
-            return self.cursor
+            # 连接池模式下不保存游标，每次都创建新的
+            if self.use_connection_pool:
+                return connection.cursor(dictionary=dictionary)
+            else:
+                self.cursor = connection.cursor(dictionary=dictionary)
+                return self.cursor
         except Exception as e:
             self.logger.error(f"Failed to get cursor: {e}")
-            self.connection = None
+            if not self.use_connection_pool:
+                self.connection = None
             connection = self._get_connection()
-            self.cursor = connection.cursor(dictionary=dictionary)
-            return self.cursor
+            return connection.cursor(dictionary=dictionary)
         
     def _close_connection(self):
         """关闭数据库连接和游标"""
@@ -48,65 +72,182 @@ class Model(ABC):
             except Exception as e:
                 self.logger.error(f"Failed to close cursor: {e}")
             self.cursor = None
-            
-        if self.connection and self.connection.is_connected():
+
+        if self.use_connection_pool and self.connection:
+            try:
+                self.connection_pool.return_connection(self.connection)
+            except Exception as e:
+                self.logger.error(f"Failed to return connection to pool: {e}")
+            finally:
+                self.connection = None
+        elif self.connection and self.connection.is_connected():
             try:
                 self.connection.close()
             except Exception as e:
                 self.logger.error(f"Failed to close connection: {e}")
-            self.connection = None
+            finally:
+                self.connection = None
     
     def execute_query(self, query: str, params: Optional[Tuple] = None) -> int:
         """执行SQL查询（INSERT、UPDATE、DELETE）"""
+        def _execute():
+            connection = self._get_connection()
+            cursor = connection.cursor(dictionary=True)
+
+            try:
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+
+                if not self.use_connection_pool:
+                    connection.commit()
+
+                query_type = query.strip().upper().split()[0]
+                self.logger.info(f"Executed {query_type} query, affected rows: {cursor.rowcount}")
+
+                result = cursor.rowcount
+
+                # 关闭游标
+                cursor.close()
+
+                # 连接池模式下归还连接
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+
+                return result
+
+            except Exception:
+                # 出错时确保关闭游标和归还连接
+                cursor.close()
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+                raise
+
         try:
-            cursor = self._get_cursor()
-            if params:
-                cursor.execute(query, params)
+            if self.use_connection_pool and hasattr(self, 'retry_manager'):
+                result = self.retry_manager.retry_with_backoff(_execute)
             else:
-                cursor.execute(query)
-            
-            self.connection.commit()
-            
-            # 简化日志输出
-            query_type = query.strip().upper().split()[0]
-            self.logger.info(f"Executed {query_type} query, affected rows: {cursor.rowcount}")
-            return cursor.rowcount
-        except Error as e:
+                result = _execute()
+
+            # 记录成功指标
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_success('execute', 0)
+
+            return result
+
+        except Exception as e:
             self.logger.error(f"Query execution failed: {e}")
-            if self.connection:
+            if not self.use_connection_pool and self.connection:
                 self.connection.rollback()
+
+            # 记录错误指标
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_error('execute', str(e))
+
             raise
     
     def fetch_one(self, query: str, params: Optional[Tuple] = None) -> Optional[Dict[str, Any]]:
         """执行SQL查询并返回单行结果"""
+        def _fetch():
+            connection = self._get_connection()
+            cursor = connection.cursor(dictionary=True)
+
+            try:
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+
+                result = cursor.fetchone()
+
+                # 关闭游标
+                cursor.close()
+
+                # 连接池模式下归还连接
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+
+                return result
+
+            except Exception:
+                # 出错时确保关闭游标和归还连接
+                cursor.close()
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+                raise
+
         try:
-            cursor = self._get_cursor()
-            if params:
-                cursor.execute(query, params)
+            if self.use_connection_pool and hasattr(self, 'retry_manager'):
+                result = self.retry_manager.retry_with_backoff(_fetch)
             else:
-                cursor.execute(query)
-            
-            result = cursor.fetchone()
-            self.logger.debug(f"Fetched one record from {self.get_table_name()}")
+                result = _fetch()
+
+            # 记录成功指标
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_success('fetch_one', 0)
+
             return result
-        except Error as e:
+
+        except Exception as e:
             self.logger.error(f"Fetch one failed: {e}")
+
+            # 记录错误指标
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_error('fetch_one', str(e))
+
             raise
     
     def fetch_all(self, query: str, params: Optional[Tuple] = None) -> List[Dict[str, Any]]:
         """执行SQL查询并返回所有结果"""
+        def _fetch():
+            connection = self._get_connection()
+            cursor = connection.cursor(dictionary=True)
+
+            try:
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+
+                result = cursor.fetchall()
+
+                # 关闭游标
+                cursor.close()
+
+                # 连接池模式下归还连接
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+
+                return result
+
+            except Exception:
+                # 出错时确保关闭游标和归还连接
+                cursor.close()
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+                raise
+
         try:
-            cursor = self._get_cursor()
-            if params:
-                cursor.execute(query, params)
+            if self.use_connection_pool and hasattr(self, 'retry_manager'):
+                result = self.retry_manager.retry_with_backoff(_fetch)
             else:
-                cursor.execute(query)
-            
-            result = cursor.fetchall()
+                result = _fetch()
+
+            # 记录成功指标
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_success('fetch_all', 0)
+
             self.logger.info(f"Fetched {len(result)} records from {self.get_table_name()}")
             return result
-        except Error as e:
+
+        except Exception as e:
             self.logger.error(f"Fetch all failed: {e}")
+
+            # 记录错误指标
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_error('fetch_all', str(e))
+
             raise
     
     def find_by_id(self, id_value: Any, id_column: str = 'id') -> Optional[Dict[str, Any]]:

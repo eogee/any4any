@@ -47,6 +47,7 @@ class AuthServer(Server):
                         request.session['user_id'] = user['id']
                         request.session['username'] = user['username']
                         request.session['nickname'] = user.get('nickname', user['username'])
+                        request.session['company'] = user.get('company')
                         request.session['logged_in'] = True
                     
                     self.logger.info(f"User {username} login successful")

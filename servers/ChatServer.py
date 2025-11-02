@@ -551,7 +551,8 @@ class ChatServer(Server):
                     "success": True,
                     "username": request.session.get('username'),
                     "nickname": request.session.get('nickname'),
-                    "user_id": request.session.get('user_id')
+                    "user_id": request.session.get('user_id'),
+                    "company": request.session.get('company')
                 })
             else:
                 return JSONResponse({
@@ -788,6 +789,43 @@ class ChatServer(Server):
                 self.log_error("/api/chat/models", e)
                 raise HTTPException(status_code=500, detail="Internal server error")
 
+        # 数据库连接池状态
+        @app.get("/api/chat/db-pool-status")
+        async def db_pool_status():
+            """获取数据库连接池状态"""
+            try:
+                from core.database.monitoring import get_database_monitoring
+                monitoring = get_database_monitoring()
+                status = monitoring.get_pool_status()
+
+                return JSONResponse(status)
+
+            except Exception as e:
+                self.log_error("/api/chat/db-pool-status", e)
+                return JSONResponse({
+                    'success': False,
+                    'error': str(e)
+                }, status_code=500)
+
+        # 数据库健康检查
+        @app.get("/api/chat/db-health")
+        async def db_health():
+            """数据库健康检查"""
+            try:
+                from core.database.monitoring import get_database_monitoring
+                monitoring = get_database_monitoring()
+                health = monitoring.health_check()
+
+                status_code = 200 if health.get('healthy', False) else 503
+                return JSONResponse(health, status_code=status_code)
+
+            except Exception as e:
+                self.log_error("/api/chat/db-health", e)
+                return JSONResponse({
+                    'healthy': False,
+                    'error': str(e)
+                }, status_code=503)
+
         # 健康检查
         @app.get("/api/chat/health")
         async def chat_health():
@@ -796,12 +834,28 @@ class ChatServer(Server):
                 conversation_manager_available = self.conversation_manager is not None
                 status_code = 200 if conversation_manager_available else 503
 
+                # 检查数据库健康状态
+                db_healthy = True
+                try:
+                    from core.database.monitoring import get_database_monitoring
+                    monitoring = get_database_monitoring()
+                    db_health = monitoring.health_check()
+                    db_healthy = db_health.get('healthy', False)
+                except:
+                    pass  # 数据库监控失败不影响主健康检查
+
+                overall_healthy = conversation_manager_available and db_healthy
+
                 return JSONResponse({
-                    'status': 'healthy' if conversation_manager_available else 'unhealthy',
+                    'status': 'healthy' if overall_healthy else 'unhealthy',
+                    'components': {
+                        'conversation_manager': conversation_manager_available,
+                        'database': db_healthy
+                    },
                     'timestamp': str(logger.handlers[0].formatter.formatTime(logger.makeRecord(
                         name='', level=0, pathname='', lineno=0, msg='', args=(), exc_info=None
                     ))) if logger.handlers else None
-                }, status_code=status_code)
+                }, status_code=200 if overall_healthy else 503)
 
             except Exception as e:
                 self.log_error("/api/chat/health", e)

@@ -138,9 +138,9 @@ CREATE TABLE IF NOT EXISTS `users` (
 
 -- 正在导出表  any4any.users 的数据：~2 rows (大约)
 DELETE FROM `users`;
-INSERT INTO `users` (`id`, `username`, `password_hash`, `nickname`) VALUES
-	(1, 'admin', '888888', 'admin'),
-	(2, 'eogee', '888888', 'eogee');
+INSERT INTO `users` (`id`, `username`, `password_hash`, `nickname`, `company`) VALUES
+	(1, 'admin', '888888', 'admin', NULL),
+	(2, 'eogee', '888888', 'eogee', NULL);
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

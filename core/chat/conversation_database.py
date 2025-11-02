@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 
 class ConversationDatabase(Model):
     """会话数据库交互类，处理会话和消息的存储、查询和删除"""
-    
+
+    def __init__(self):
+        # 启用连接池以提升性能
+        super().__init__(use_connection_pool=True)
+
     def get_table_name(self) -> str:
         """获取表名"""
         return "conversations"

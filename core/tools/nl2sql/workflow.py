@@ -3,6 +3,7 @@ from typing import Dict, Any, List, Optional
 from .table_info import get_table_manager, get_all_tables
 from .sql_executor import get_sql_executor
 from .context_manager import SQLContextManager
+from .user_context_enhancer import get_user_context_enhancer
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class NL2SQLWorkflow:
         self.table_manager = get_table_manager()
         self.sql_executor = get_sql_executor()
         self.context_manager = SQLContextManager()
+        self.user_context_enhancer = get_user_context_enhancer()
 
     async def process_sql_question(
         self,
@@ -25,21 +27,21 @@ class NL2SQLWorkflow:
         """
         处理SQL相关问题的完整工作流程
 
-        增强工作流程：
-        1. 判断为SQL问题 → 进入NL2SQL流程
-        2. 自动获取相关会话历史记录
-        3. 调用get_relevant_tables()获取初步表信息
-        4. LLM分析问题并确定需要的表结构（基于增强上下文）
-        5. 调用get_table_schemas()获取详细表结构
-        6. LLM基于表结构和历史上下文生成SQL语句
-        7. 执行SQL查询
-        8. LLM基于结果和历史上下文生成最终回答
+        工作流程（支持用户上下文）：
+        0. 获取用户上下文信息（用户名、公司、ID等元数据）
+        0.5. 自动获取相关会话历史记录
+        1. 调用get_relevant_tables()获取初步表信息
+        2. LLM分析问题并确定需要的表结构（基于用户上下文+历史上下文）
+        3. 调用get_table_schemas()获取详细表结构
+        4. LLM基于表结构、用户上下文和历史上下文生成SQL语句
+        5. 执行SQL查询
+        6. LLM基于结果和完整上下文生成最终回答
 
         参数:
             question: 用户问题
             context: 手动提供的对话上下文
             conversation_manager: 会话管理器实例（用于自动获取历史记录）
-            user_id: 用户ID（用于获取历史记录）
+            user_id: 用户ID（用于获取历史记录和用户信息）
             platform: 平台标识（用于获取历史记录）
 
         返回:
@@ -48,12 +50,26 @@ class NL2SQLWorkflow:
         try:
             logger.info(f"Start processing SQL question: {question}")
 
-            # 步骤0: 自动获取增强上下文
-            enhanced_context = ""
-            if conversation_manager and user_id:
-                logger.info("Step 0: Auto-enhancing context with conversation history")
+            # 步骤0: 获取用户上下文
+            user_context = ""
+            if user_id:
+                logger.info("Step 0: Getting user context")
                 try:
-                    enhanced_context = await self.context_manager.get_enhanced_context(
+                    user_context = await self.user_context_enhancer.get_user_context(user_id, question)
+                    if user_context:
+                        logger.info(f"User context generated with {len(user_context)} characters")
+                    else:
+                        logger.info("No user context needed or available")
+                except Exception as e:
+                    logger.error(f"Failed to generate user context: {e}")
+                    user_context = ""
+
+            # 步骤0.5: 自动获取增强上下文（对话历史）
+            history_context = ""
+            if conversation_manager and user_id:
+                logger.info("Step 0.5: Auto-enhancing context with conversation history")
+                try:
+                    history_context = await self.context_manager.get_enhanced_context(
                         current_question=question,
                         conversation_manager=conversation_manager,
                         user_id=user_id,
@@ -62,16 +78,26 @@ class NL2SQLWorkflow:
                         max_history=self.context_manager.max_history_items
                     )
 
-                    if enhanced_context:
-                        logger.info(f"Enhanced context generated with {len(enhanced_context)} characters")
+                    if history_context:
+                        logger.info(f"History context generated with {len(history_context)} characters")
                     else:
                         logger.info("No relevant conversation history found for context enhancement")
 
                 except Exception as e:
-                    logger.error(f"Failed to generate enhanced context: {e}")
-                    enhanced_context = context or ""
+                    logger.error(f"Failed to generate history context: {e}")
+                    history_context = context or ""
             else:
-                enhanced_context = context or ""
+                history_context = context or ""
+
+            # 合并所有上下文：用户上下文 + 历史上下文 + 手动上下文
+            enhanced_context = "\n\n".join(filter(None, [
+                user_context,     # 用户元数据上下文
+                history_context,  # 对话历史上下文
+                context           # 手动提供的上下文
+            ]))
+
+            if enhanced_context:
+                logger.info(f"Final enhanced context generated with {len(enhanced_context)} characters")
 
             # 步骤1: 获取所有表的基本信息
             logger.info("Step 1: Get all tables' basic information")
@@ -86,8 +112,8 @@ class NL2SQLWorkflow:
 
             all_tables = all_tables_result['data']['tables']
 
-            # 步骤2: LLM分析问题并确定需要的表-使用增强上下文
-            logger.info("Step 2: Analyze tables needed for the question with enhanced context")
+            # 步骤2: LLM分析问题并确定需要的表（基于用户上下文+历史上下文）
+            logger.info("Step 2: Analyze tables needed for the question with user and history context")
             required_tables = await self._analyze_tables_needed(question, all_tables, enhanced_context)
 
             if not required_tables:
@@ -108,8 +134,8 @@ class NL2SQLWorkflow:
                     'step': 'get_schemas'
                 }
 
-            # 步骤4: LLM生成SQL语句-使用增强上下文
-            logger.info("Step 4: Generate SQL statement with enhanced context")
+            # 步骤4: LLM生成SQL语句（基于用户上下文+历史上下文）
+            logger.info("Step 4: Generate SQL statement with user and history context")
             sql_result = await self._generate_sql(question, table_schemas_result['formatted_output'], enhanced_context)
 
             if not sql_result['success']:
@@ -131,14 +157,23 @@ class NL2SQLWorkflow:
                     'generated_sql': sql_result['generated_sql']
                 }
 
-            # 步骤6: LLM生成最终回答-使用增强上下文
-            logger.info("Step 6: Generate final answer with enhanced context")
+            # 步骤6: LLM生成最终回答（基于完整上下文）
+            logger.info("Step 6: Generate final answer with complete context")
             final_answer = await self._generate_final_answer(
                 question,
                 sql_result['generated_sql'],
                 execution_result['formatted_table'],
                 enhanced_context
             )
+
+            # 分析上下文来源
+            context_sources = []
+            if user_context:
+                context_sources.append('user_metadata')
+            if history_context:
+                context_sources.append('conversation_history')
+            if context:
+                context_sources.append('manual')
 
             return {
                 'success': True,
@@ -149,8 +184,13 @@ class NL2SQLWorkflow:
                 'row_count': execution_result['row_count'],
                 'step': 'completed',
                 'context_used': bool(enhanced_context),
-                'context_source': 'conversation_history' if enhanced_context and not context else 'manual' if context else 'none',
-                'enhanced_context_length': len(enhanced_context) if enhanced_context else 0
+                'context_sources': context_sources,
+                'user_context_used': bool(user_context),
+                'history_context_used': bool(history_context),
+                'manual_context_used': bool(context),
+                'enhanced_context_length': len(enhanced_context) if enhanced_context else 0,
+                'user_context_length': len(user_context) if user_context else 0,
+                'history_context_length': len(history_context) if history_context else 0
             }
 
         except Exception as e:
@@ -426,11 +466,11 @@ SQL语句:"""
 对话上下文:
 {context if context else '无'}
 
-请基于查询结果，用自然语言直接回答用户的问题。要求：
-1. 回答要简洁明了
-2. 基于实际查询结果回答
+请基于查询结果，用自然语言直接回答用户的问题。重要要求：
+1. 直接使用查询结果中的具体数值来回答，不要使用字段名
+2. 回答要简洁明了，例如：如果查询结果是 "follower: 张三"，要回答"张三"而不是"follower"
 3. 如果查询无结果，说明原因
-4. 不要重复技术细节
+4. 不要在回答中重复技术细节或字段名
 
 回答:"""
 

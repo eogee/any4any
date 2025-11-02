@@ -99,6 +99,24 @@ class Config:
     # 数据库功能配置
     QUERY_CLEANING = get_bool_env("QUERY_CLEANING", True)
 
+    # MySQL连接池配置
+    DB_POOL_ENABLED = get_bool_env("DB_POOL_ENABLED", True)
+    DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "15"))
+    DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
+    DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+    DB_POOL_PRE_PING = get_bool_env("DB_POOL_PRE_PING", True)
+
+    # 熔断器配置
+    DB_CIRCUIT_BREAKER_ENABLED = get_bool_env("DB_CIRCUIT_BREAKER_ENABLED", True)
+    DB_CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("DB_CIRCUIT_BREAKER_THRESHOLD", "5"))
+    DB_CIRCUIT_BREAKER_TIMEOUT = int(os.getenv("DB_CIRCUIT_BREAKER_TIMEOUT", "60"))
+
+    # 重试机制配置
+    DB_RETRY_ENABLED = get_bool_env("DB_RETRY_ENABLED", True)
+    DB_RETRY_MAX_ATTEMPTS = int(os.getenv("DB_RETRY_MAX_ATTEMPTS", "3"))
+    DB_RETRY_BACKOFF_FACTOR = float(os.getenv("DB_RETRY_BACKOFF_FACTOR", "2"))
+    DB_RETRY_MAX_DELAY = int(os.getenv("DB_RETRY_MAX_DELAY", "30"))
+
     # 工具系统配置
 
     # SQL数据库配置 (复用现有MySQL配置)

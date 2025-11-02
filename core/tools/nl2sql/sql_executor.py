@@ -12,12 +12,24 @@ class SQLExecutor:
 
     def __init__(self):
         self.engine = None
+        self.connection_pool = None
         self.db_type = getattr(Config, 'SQL_DB_TYPE', 'mysql').lower()
         self._initialize_connection()
 
     def _initialize_connection(self):
         """初始化数据库连接池"""
         try:
+            # 优先使用统一连接池
+            if Config.DB_POOL_ENABLED:
+                try:
+                    from core.database.connection_pool import get_connection_pool
+                    self.connection_pool = get_connection_pool()
+                    logger.info("SQL Executor using unified connection pool.")
+                    return
+                except ImportError:
+                    logger.warning("Unified connection pool not available, falling back to SQLAlchemy pool")
+
+            # 回退到SQLAlchemy连接池
             if self.db_type == 'mysql':
                 connection_string = (
                     f"mysql+mysqlconnector://"
@@ -30,17 +42,16 @@ class SQLExecutor:
             else:
                 raise ValueError(f"不支持的数据库类型: {self.db_type}")
 
-            # 连接池引擎
+            # 使用配置的连接池参数
             self.engine = create_engine(
                 connection_string,
                 poolclass=QueuePool,
-                pool_size=5,          # 连接池大小
-                max_overflow=10,      # 最大溢出连接数
-                pool_pre_ping=True,   # 连接前检查连接有效性
-                pool_recycle=3600,    # 连接回收时间（秒）
+                pool_size=Config.DB_POOL_SIZE,
+                pool_pre_ping=Config.DB_POOL_PRE_PING,
+                pool_recycle=Config.DB_POOL_RECYCLE,
                 echo=False
             )
-            logger.info("SQL Executor initialized successfully with connection pool.")
+            logger.info("SQL Executor initialized successfully with SQLAlchemy connection pool.")
 
         except Exception as e:
             logger.error(f"SQL Executor database connection initialization failed: {e}")
@@ -126,21 +137,29 @@ class SQLExecutor:
                 'formatted_table': '查询执行成功，但没有返回数据。'
             }
 
-        # 转换为字典列表
+        # 处理不同格式的结果
         data = []
-        for row in results:
-            row_dict = {}
-            for i, value in enumerate(row):
-                if i < len(columns):
-                    row_dict[columns[i]] = value
-            data.append(row_dict)
+        if results and isinstance(results[0], dict):
+            data = results
+            if not columns:
+                columns = list(results[0].keys())
+        else:
+            for row in results:
+                row_dict = {}
+                for i, value in enumerate(row):
+                    if i < len(columns):
+                        row_dict[columns[i]] = value
+                data.append(row_dict)
 
         # 创建格式化表格
         if columns and data:
-            # 计算列宽
             col_widths = {}
             for col in columns:
-                col_widths[col] = max(len(str(col)), max(len(str(row.get(col, ''))) for row in data))
+                if data:
+                    max_data_length = max(len(str(row.get(col, ''))) for row in data)
+                    col_widths[col] = max(len(str(col)), max_data_length)
+                else:
+                    col_widths[col] = len(str(col))
 
             # 构建表格字符串
             table_lines = []
@@ -156,8 +175,10 @@ class SQLExecutor:
                 table_lines.append(row_line)
 
             formatted_table = "\n".join(table_lines)
+            logger.debug(f"Formatted table: {formatted_table}")
         else:
-            formatted_table = "无数据显示"
+            formatted_table = "查询执行成功，但没有返回数据。"
+            logger.debug("No data to format in table")
 
         return {
             'success': True,
@@ -178,16 +199,6 @@ class SQLExecutor:
             查询执行结果
         """
         try:
-            # 确保连接可用
-            self._ensure_connection()
-
-            if not self.engine:
-                return {
-                    'success': False,
-                    'error': '数据库连接不可用',
-                    'formatted_output': '数据库连接不可用'
-                }
-
             # 验证SQL安全性
             is_safe, error_msg = self._validate_sql_safety(sql_query)
             if not is_safe:
@@ -195,6 +206,18 @@ class SQLExecutor:
                     'success': False,
                     'error': error_msg,
                     'formatted_output': f'SQL安全验证失败: {error_msg}'
+                }
+
+            # 优先使用统一连接池
+            if self.connection_pool:
+                return self._execute_with_unified_pool(sql_query)
+
+            # 回退到SQLAlchemy连接池
+            if not self.engine:
+                return {
+                    'success': False,
+                    'error': '数据库连接不可用',
+                    'formatted_output': '数据库连接不可用'
                 }
 
             # 执行查询
@@ -225,6 +248,69 @@ class SQLExecutor:
 
         except Exception as e:
             logger.error(f"SQL执行失败: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'sql_query': sql_query,
+                'formatted_output': f'SQL执行失败: {str(e)}'
+            }
+
+    def _execute_with_unified_pool(self, sql_query: str) -> Dict[str, Any]:
+        """使用统一连接池执行SQL查询"""
+        def _execute():
+            connection = self.connection_pool.get_connection()
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute(sql_query)
+                result = cursor.fetchall()
+                # 获取列信息用于后续处理
+                columns = [desc[0] for desc in cursor.description] if hasattr(cursor, 'description') else []
+                return result, columns
+            finally:
+                cursor.close()
+                self.connection_pool.return_connection(connection)
+
+        try:
+            # 使用熔断器和重试机制
+            circuit_breaker = self.connection_pool.get_circuit_breaker()
+            retry_manager = self.connection_pool.get_retry_manager()
+
+            if Config.DB_RETRY_ENABLED:
+                rows, columns = retry_manager.retry_with_backoff(_execute)
+            else:
+                rows, columns = circuit_breaker.call(_execute)
+
+            # 格式化结果
+            if rows:
+                logger.debug(f"Query result type: {type(rows)}")
+                logger.debug(f"First row type: {type(rows[0])}")
+                logger.debug(f"First row content: {rows[0]}")
+                logger.debug(f"Columns: {columns}")
+
+                # 确保rows是字典列表格式
+                if rows and isinstance(rows[0], tuple):
+                    rows = [{columns[i] if i < len(columns) else f'col_{i}': row[i] for i in range(len(row))} for row in rows]
+                elif rows and not isinstance(rows[0], dict):
+                    logger.warning(f"Unexpected result type: {type(rows[0])}")
+                    columns = []
+            else:
+                logger.debug("No rows returned from query")
+                columns = columns or []  # 确保columns不为None
+
+            formatted_results = self._format_query_results(rows, columns)
+
+            self.connection_pool.record_operation_success('sql_query', 0)
+
+            return {
+                'success': True,
+                'sql_query': sql_query,
+                'execution_time': 'N/A',
+                **formatted_results
+            }
+
+        except Exception as e:
+            logger.error(f"SQL执行失败: {e}")
+            self.connection_pool.record_operation_error('sql_query', str(e))
             return {
                 'success': False,
                 'error': str(e),

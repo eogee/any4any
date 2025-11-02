@@ -5,9 +5,9 @@ from data_models.model import Model
 
 class AuthModel(Model):
     """用户认证相关的数据库交互模型"""
-    
+
     def __init__(self):
-        super().__init__()
+        super().__init__(use_connection_pool=True)
         self.logger = logging.getLogger('AuthModel')
         
     def get_table_name(self) -> str:
@@ -18,11 +18,8 @@ class AuthModel(Model):
         """根据用户名获取用户信息"""
         try:
             query = f"SELECT * FROM {self.get_table_name()} WHERE username = %s"
-            cursor = self._get_cursor()
-            cursor.execute(query, (username,))
-            result = cursor.fetchone()
-            return result
-        except Error as e:
+            return self.fetch_one(query, (username,))
+        except Exception as e:
             self.logger.error(f"Failed to get user by username: {e}")
             raise
     
@@ -35,6 +32,6 @@ class AuthModel(Model):
                 if user['password_hash'] == password:
                     return user
             return None
-        except Error as e:
+        except Exception as e:
             self.logger.error(f"Failed to verify credentials: {e}")
             raise

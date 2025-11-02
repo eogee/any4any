@@ -10,12 +10,24 @@ class DatabaseTableManager:
 
     def __init__(self):
         self.engine = None
+        self.connection_pool = None
         self.db_type = getattr(Config, 'SQL_DB_TYPE', 'mysql').lower()
         self._initialize_connection()
 
     def _initialize_connection(self):
         """初始化数据库连接"""
         try:
+            # 优先使用统一连接池
+            if Config.DB_POOL_ENABLED:
+                try:
+                    from core.database.connection_pool import get_connection_pool
+                    self.connection_pool = get_connection_pool()
+                    logger.info("TableInfo manager using unified connection pool.")
+                    return
+                except ImportError:
+                    logger.warning("Unified connection pool not available for TableInfo, falling back to SQLAlchemy")
+
+            # 回退到SQLAlchemy连接
             if self.db_type == 'mysql':
                 connection_string = (
                     f"mysql+mysqlconnector://"
@@ -29,19 +41,55 @@ class DatabaseTableManager:
                 raise ValueError(f"不支持的数据库类型: {self.db_type}")
 
             self.engine = create_engine(connection_string)
+            logger.info("TableInfo manager using SQLAlchemy connection.")
 
         except Exception as e:
-            logger.error(f"Database connection initialization failed: {e}")
+            logger.error(f"TableInfo database connection initialization failed: {e}")
             self.engine = None
 
-    def _execute_query(self, query: str, params: Optional[Dict] = None) -> List[Tuple]:
+    def _execute_query(self, query: str, params: Optional[List] = None) -> List[Tuple]:
         """执行数据库查询并返回结果"""
+        def _execute_with_pool():
+            connection = self.connection_pool.get_connection()
+            cursor = connection.cursor()
+
+            try:
+                # 连接池模式：直接使用位置参数
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+
+                rows = cursor.fetchall()
+                return [tuple(row) for row in rows]
+
+            finally:
+                cursor.close()
+                self.connection_pool.return_connection(connection)
+
+        # 优先使用统一连接池
+        if self.connection_pool:
+            try:
+                # 使用熔断器和重试机制
+                circuit_breaker = self.connection_pool.get_circuit_breaker()
+                retry_manager = self.connection_pool.get_retry_manager()
+
+                if Config.DB_RETRY_ENABLED:
+                    return retry_manager.retry_with_backoff(_execute_with_pool)
+                else:
+                    return circuit_breaker.call(_execute_with_pool)
+
+            except Exception as e:
+                logger.error(f"Query execution failed: {e}")
+                raise
+
+        # 回退到SQLAlchemy连接
         if not self.engine:
             raise Exception("数据库连接未初始化")
 
         try:
             with self.engine.connect() as conn:
-                # SQLAlchemy需要字典参数
+                # SQLAlchemy支持位置参数
                 if params:
                     result = conn.execute(text(query), params)
                 else:
@@ -64,11 +112,11 @@ class DatabaseTableManager:
                     TABLE_COMMENT,
                     TABLE_ROWS
                 FROM information_schema.TABLES
-                WHERE TABLE_SCHEMA = :database_name
+                WHERE TABLE_SCHEMA = %s
                 AND TABLE_TYPE = 'BASE TABLE'
                 ORDER BY TABLE_NAME
                 """
-                params = {"database_name": getattr(Config, 'SQL_DB_DATABASE', 'any4any')}
+                params = [getattr(Config, 'SQL_DB_DATABASE', 'any4any')]
 
                 results = self._execute_query(query, params)
 
@@ -110,14 +158,14 @@ class DatabaseTableManager:
                     EXTRA,
                     COLUMN_COMMENT
                 FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = :database_name
-                AND TABLE_NAME = :table_name
+                WHERE TABLE_SCHEMA = %s
+                AND TABLE_NAME = %s
                 ORDER BY ORDINAL_POSITION
                 """
-                params = {
-                    "database_name": getattr(Config, 'SQL_DB_DATABASE', 'any4any'),
-                    "table_name": table_name
-                }
+                params = [
+                    getattr(Config, 'SQL_DB_DATABASE', 'any4any'),
+                    table_name
+                ]
 
                 columns = self._execute_query(column_query, params)
 
@@ -125,8 +173,8 @@ class DatabaseTableManager:
                 table_comment_query = """
                 SELECT TABLE_COMMENT
                 FROM information_schema.TABLES
-                WHERE TABLE_SCHEMA = :database_name
-                AND TABLE_NAME = :table_name
+                WHERE TABLE_SCHEMA = %s
+                AND TABLE_NAME = %s
                 """
                 table_comment_result = self._execute_query(table_comment_query, params)
                 table_comment = table_comment_result[0][0] if table_comment_result else ''
