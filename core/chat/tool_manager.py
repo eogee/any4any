@@ -132,8 +132,7 @@ class ToolManager:
         sql_keywords = [
             '查询', '统计', '计算', '显示', '列出', '多少', '几个', '总数', '平均',
             '最高', '最低', '最大', '最小', '排序', '分组', '汇总', '数据', '记录',
-            '表', '字段', '数据库', 'SELECT', 'FROM', 'WHERE', 'COUNT', 'SUM', 'AVG',
-            'MAX', 'MIN', 'ORDER BY', 'GROUP BY', '产品', '商品', '订单', '库存'
+            '表', '字段', '数据库', 'SELECT', 'FROM', 'WHERE', 'COUNT', 'SUM', 'AVG', 'MAX', 'MIN', 'ORDER BY', 'GROUP BY', '产品', '商品', '订单', '库存', '车', '辆'
         ]
 
         # 增加追问相关的关键词

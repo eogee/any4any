@@ -48,18 +48,11 @@ class NL2SQLWorkflow:
             包含处理结果或错误信息的字典
         """
         try:
-            logger.info(f"Start processing SQL question: {question}")
-
             # 步骤0: 获取用户上下文
             user_context = ""
             if user_id:
-                logger.info("Step 0: Getting user context")
                 try:
                     user_context = await self.user_context_enhancer.get_user_context(user_id, question)
-                    if user_context:
-                        logger.info(f"User context generated with {len(user_context)} characters")
-                    else:
-                        logger.info("No user context needed or available")
                 except Exception as e:
                     logger.error(f"Failed to generate user context: {e}")
                     user_context = ""
@@ -67,7 +60,6 @@ class NL2SQLWorkflow:
             # 步骤0.5: 自动获取增强上下文（对话历史）
             history_context = ""
             if conversation_manager and user_id:
-                logger.info("Step 0.5: Auto-enhancing context with conversation history")
                 try:
                     history_context = await self.context_manager.get_enhanced_context(
                         current_question=question,
@@ -77,12 +69,6 @@ class NL2SQLWorkflow:
                         manual_context=context,
                         max_history=self.context_manager.max_history_items
                     )
-
-                    if history_context:
-                        logger.info(f"History context generated with {len(history_context)} characters")
-                    else:
-                        logger.info("No relevant conversation history found for context enhancement")
-
                 except Exception as e:
                     logger.error(f"Failed to generate history context: {e}")
                     history_context = context or ""
@@ -96,11 +82,7 @@ class NL2SQLWorkflow:
                 context           # 手动提供的上下文
             ]))
 
-            if enhanced_context:
-                logger.info(f"Final enhanced context generated with {len(enhanced_context)} characters")
-
             # 步骤1: 获取所有表的基本信息
-            logger.info("Step 1: Get all tables' basic information")
             all_tables_result = await self._get_all_tables_async()
 
             if not all_tables_result['success']:
@@ -113,7 +95,6 @@ class NL2SQLWorkflow:
             all_tables = all_tables_result['data']['tables']
 
             # 步骤2: LLM分析问题并确定需要的表（基于用户上下文+历史上下文）
-            logger.info("Step 2: Analyze tables needed for the question with user and history context")
             required_tables = await self._analyze_tables_needed(question, all_tables, enhanced_context)
 
             if not required_tables:
@@ -124,7 +105,6 @@ class NL2SQLWorkflow:
                 }
 
             # 步骤3: 获取详细表结构
-            logger.info(f"Step 3: Get table schemas: {required_tables}")
             table_schemas_result = await self._get_table_schemas_async(required_tables)
 
             if not table_schemas_result['success']:
@@ -135,7 +115,6 @@ class NL2SQLWorkflow:
                 }
 
             # 步骤4: LLM生成SQL语句（基于用户上下文+历史上下文）
-            logger.info("Step 4: Generate SQL statement with user and history context")
             sql_result = await self._generate_sql(question, table_schemas_result['formatted_output'], enhanced_context)
 
             if not sql_result['success']:
@@ -145,8 +124,10 @@ class NL2SQLWorkflow:
                     'step': 'generate_sql'
                 }
 
+            # 记录生成的SQL语句
+            logger.info(f"NL2SQL Question: {question} | Generated SQL: {sql_result['generated_sql']}")
+
             # 步骤5: 执行SQL查询
-            logger.info("Step 5: Execute SQL query")
             execution_result = await self._execute_sql_async(sql_result['generated_sql'])
 
             if not execution_result['success']:
@@ -158,7 +139,6 @@ class NL2SQLWorkflow:
                 }
 
             # 步骤6: LLM生成最终回答（基于完整上下文）
-            logger.info("Step 6: Generate final answer with complete context")
             final_answer = await self._generate_final_answer(
                 question,
                 sql_result['generated_sql'],
@@ -222,14 +202,37 @@ class NL2SQLWorkflow:
             if not llm_service:
                 return None
 
-            # 构建表信息摘要
+            # 获取更详细的表信息
             tables_summary = []
             for table in all_tables:
-                tables_summary.append(
-                    f"表名: {table['table_name']}, 注释: {table['comment']}"
-                )
+                try:
+                    # 先获取表的详细结构
+                    schema_result = self.table_manager.get_table_schema(table['table_name'])
+                    if schema_result.get('success'):
+                        columns_info = []
+                        for col in schema_result['columns']:
+                            col_desc = f"{col['name']} ({col['type']})"
+                            if col.get('comment'):
+                                col_desc += f" -- {col['comment']}"
+                            columns_info.append(f"  - {col_desc}")
 
-            tables_text = "\n".join(tables_summary)
+                        tables_summary.append(
+                            f"表名: {table['table_name']}\n注释: {schema_result.get('table_comment', table['comment'])}\n字段:\n" + "\n".join(columns_info)
+                        )
+                    else:
+                        # 回退到基本信息
+                        logger.warning(f"Failed to get schema for table {table['table_name']}: {schema_result.get('error', 'Unknown error')}")
+                        tables_summary.append(
+                            f"表名: {table['table_name']}, 注释: {table['comment']}"
+                        )
+                except Exception as e:
+                    logger.error(f"Error processing table {table['table_name']}: {e}")
+                    # 回退到基本信息
+                    tables_summary.append(
+                        f"表名: {table['table_name']}, 注释: {table['comment']}"
+                    )
+
+            tables_text = "\n\n".join(tables_summary)
 
             prompt = f"""请分析用户问题，确定需要查询哪些数据库表。
 
@@ -241,7 +244,13 @@ class NL2SQLWorkflow:
 对话上下文:
 {context if context else '无'}
 
-请根据用户问题，从上面的表列表中选择需要查询的表名。只返回表名列表，用逗号分隔。如果没有找到相关的表，请返回"无"。
+分析指导:
+1. 如果用户提到"订单号"、"订单"，请优先考虑"orders"表
+2. 如果用户提到"配送"、"车辆"等物流相关信息，虽然可能没有直接的配送表，但orders表可能包含配送相关信息
+3. 请仔细阅读表的字段信息，判断哪个表最可能包含相关数据
+4. 即使没有完全匹配的表，也请选择最可能相关的表
+
+请根据用户问题，从上面的表列表中选择需要查询的表名。只返回表名列表，用逗号分隔。如果实在找不到任何相关表，请返回"无"。
 
 回答示例格式:
 orders,products
@@ -260,11 +269,12 @@ orders
             # 解析表名
             table_names = [name.strip() for name in response.split(',') if name.strip()]
 
-            logger.info(f"LLM确定的表: {table_names}")
             return table_names
 
         except Exception as e:
             logger.error(f"Failed to analyze tables needed for the question: {e}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             return None
 
     async def _get_table_schemas_async(self, table_names: List[str]) -> Dict[str, Any]:
@@ -404,11 +414,9 @@ SQL语句:"""
     async def _execute_sql_async(self, sql_query: str) -> Dict[str, Any]:
         """异步执行SQL查询"""
         try:
-            logger.info(f"Executing SQL query: {sql_query}")
             result = self.sql_executor.execute_sql_query(sql_query)
             return result
         except Exception as e:
-            logger.error(f"Failed to execute SQL query: {e}")
             return {
                 'success': False,
                 'error': str(e)

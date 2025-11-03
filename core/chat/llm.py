@@ -154,9 +154,11 @@ class ToolProcessor:
                     user_id=user_id,
                     platform=platform
                 )
+
                 if workflow_result['success']:
                     return workflow_result['final_answer']
                 else:
+                    logger.warning(f"NL2SQL workflow failed: {workflow_result.get('error')}")
                     return await self._process_with_knowledge_base(user_message, generate_response_func)
             else:
                 # 其它问题，使用一般的工具分析逻辑

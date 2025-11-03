@@ -49,7 +49,6 @@ class UserContextEnhancer:
                 context_parts.append(f"- 用户ID: {user_info['id']}")
 
             user_context = "\n".join(context_parts)
-            self.logger.info(f"Generated user context for {user_id}: {len(user_context)} characters")
 
             return user_context
 
