@@ -53,11 +53,23 @@ function initializeElements() {
     elements.previewDetail = document.getElementById('previewDetail');
     elements.previewCount = document.getElementById('previewCount');
     elements.approvedCount = document.getElementById('approvedCount');
+    elements.approvedStats = document.getElementById('approvedStats');
     elements.timeoutCount = document.getElementById('timeoutCount');
     elements.emptyState = document.getElementById('emptyState');
     elements.editorContainer = document.getElementById('editorContainer');
     elements.contentEditor = document.getElementById('contentEditor');
     elements.contentPreview = document.getElementById('contentPreview');
+
+    // 为已回复统计添加点击事件
+    if (elements.approvedStats) {
+        elements.approvedStats.style.cursor = 'pointer';
+        elements.approvedStats.addEventListener('click', () => {
+            window.open('/preview', '_blank');
+        });
+
+        // 添加悬停提示
+        elements.approvedStats.title = '点击查看已回复列表';
+    }
 }
 
 // 设置事件监听器

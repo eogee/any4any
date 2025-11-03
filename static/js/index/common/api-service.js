@@ -147,7 +147,7 @@ async function getTimeoutStats(sender = null, platform = null) {
 
 // 获取已回复统计数据
 async function getApprovedStats(sender = null, platform = null) {
-    let url = '/api/stats/approved';
+    let url = '/api/stats/preview';
     const params = new URLSearchParams();
 
     if (sender) params.append('sender', sender);

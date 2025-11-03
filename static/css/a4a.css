@@ -109,7 +109,6 @@ body::before {
 }
 
 .preview-item:hover {
-    transform: translateY(-2px);
     box-shadow: 0 5px 15px var(--shadow);
     border-color: var(--primary);
 }
@@ -258,14 +257,13 @@ body::before {
 }
 
 .layui-btn {
-    border-radius: 8px;
+    border-radius: 5px;
 }
 .layui-btn:hover {
-    opacity: 0.9;
     background: #e9ecef;
     border-color: var(--primary);
     color: var(--primary);
-    transform: translateY(-1px);
+    border: 1px solid var(--primary) !important;
 }
 
 .layui-btn i , .layui-btn-danger i{
@@ -278,11 +276,15 @@ body::before {
 
 
 .layui-btn-normal {
-    background: linear-gradient(90deg, var(--primary), #149a8c);
+    background: #149a8c;
 }
 
 .layui-btn-normal:hover {
     border: 0;
+}
+
+.layui-btn-xs {
+    font-size: 11px;
 }
 
 .layui-input:focus {
@@ -778,7 +780,6 @@ body::before {
     position: absolute;
     left: 10px;
     top: 50%;
-    transform: translateY(-50%);
     color: var(--text-secondary);
     font-size: 18px;
 }
@@ -799,7 +800,6 @@ body::before {
     background: #e9ecef;
     border-color: var(--primary);
     color: var(--primary);
-    transform: translateY(-1px);
 }
 
 .login-footer {
@@ -1495,7 +1495,6 @@ body::before {
 
 .send-button:hover:not(:disabled) {
     background: #14a898;
-    transform: translateY(-1px);
     box-shadow: 0 4px 12px var(--shadow);
 }
 
@@ -1753,6 +1752,167 @@ body::before {
     .empty-state {
         background: var(--card-bg);
     }
+}
+
+/* 已回复预览列表页面样式 */
+.filter-section {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+
+.table-section {
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+
+.table-container {
+    overflow-x: auto;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Layui表格圆角样式 */
+.table-container .layui-table,
+.table-container .layui-table-view {
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.table-container .layui-table-header,
+.table-container .layui-table-body {
+    border-radius: 5px;
+}
+
+/* Layui输入框和下拉框圆角样式 */
+.layui-input,
+.layui-select,
+.layui-textarea {
+    border-radius: 5px !important;
+}
+
+.layui-input:hover,
+.layui-select:hover,
+.layui-textarea:hover {
+    border-radius: 5px !important;
+}
+
+.layui-input:focus,
+.layui-select:focus,
+.layui-textarea:focus {
+    border-radius: 5px !important;
+}
+
+/* Layui表格工具栏按钮圆角样式 */
+.layui-table-tool-self .layui-inline {
+    border-radius: 5px !important;
+}
+
+.layui-table-tool-self .layui-inline:hover {
+    border-radius: 5px !important;
+}
+
+.layui-table-tool .layui-btn-sm {
+    border-radius: 5px !important;
+}
+
+/* Layui分页组件圆角样式 */
+.layui-laypage {
+    border-radius: 5px !important;
+}
+
+.layui-laypage a,
+.layui-laypage span {
+    border-radius: 5px !important;
+}
+
+.layui-laypage .layui-laypage-curr em {
+    border-radius: 5px !important;
+}
+
+.layui-laypage .layui-laypage-skip .layui-input {
+    border-radius: 5px !important;
+}
+
+.layui-laypage .layui-laypage-skip .layui-laypage-btn {
+    border-radius: 5px !important;
+}
+
+.layui-laypage .layui-laypage-limits select {
+    border-radius: 5px !important;
+}
+
+/* 用户信息展示 */
+.user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.user-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-id {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* 徽章样式 */
+
+.platform-badge {
+    background: #f0f0f0;
+    color: #666;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.response-time {
+    text-align: center;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.created-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* 头部操作区域 */
+
+/* 表格工具栏 */
+.table-info {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* 筛选控件增强 */
+.setting-control .layui-select,
+.setting-control .layui-input {
+    width: 180px;
+}
+
+.setting-control .layui-btn-group .layui-btn {
+    margin-left: 5px;
+}
+
+.setting-control .layui-btn-group .layui-btn:first-child {
+    margin-left: 0;
+}
+
+/* 内容截断工具类 */
+.text-truncate {
+    max-width: 200px;
+    word-wrap: break-word;
+    line-height: 1.4;
 }
 
 /* 绿幕控制面板样式 */

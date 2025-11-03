@@ -44,7 +44,7 @@ setup_logging()
 app = FastAPI(
     title="ANY FOR ANY",
     description="any4any：开源多模态AI服务系统，提供LLM对话、ASR语音识别、TTS语音合成、文本嵌入、重排序、数字人、MCP工具和NL2SQL等AI能力的OpenAI兼容API接口",
-    version="0.1.0",
+    version="0.1.3",
     lifespan=lifespan
 )
 
@@ -78,7 +78,11 @@ app.get("/health")(health_check)
 app.post("/v1/db/query")(query_data)
 app.post("/v1/db/execute")(execute_query)
 
-
 # 注册Embedding API路由
 embedding_router = get_embedding_router()
 app.include_router(embedding_router)
+
+# 注册PreviewServer路由
+from servers.PreviewServer import PreviewServer
+preview_server = PreviewServer()
+preview_server.register_routes(app)
