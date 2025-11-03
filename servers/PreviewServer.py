@@ -35,7 +35,7 @@ class PreviewServer(Server):
     async def get_preview_page(self, request: Request):
         """已回复预览列表页面"""
         try:
-            with open(os.path.join("static", "preview", "preview.html"), "r", encoding="utf-8") as f:
+            with open(os.path.join("static", "index", "preview.html"), "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         except FileNotFoundError:
             return JSONResponse({"error": "Page not found"}, status_code=404)
