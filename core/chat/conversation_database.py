@@ -327,3 +327,51 @@ class ConversationDatabase(Model):
         except Exception as e:
             logger.error(f"Failed to get user conversations count: {e}")
             return 0
+
+    def get_timeout_messages_count(self, sender: str = None, platform: str = None) -> int:
+        """获取超时响应消息数量"""
+        try:
+            where_conditions = ["is_timeout = 1", "sender_type = 'assistant'"]
+            params = []
+
+            if sender:
+                where_conditions.append("m.conversation_id IN (SELECT conversation_id FROM conversations WHERE sender = %s)")
+                params.append(sender)
+
+            if platform:
+                where_conditions.append("m.conversation_id IN (SELECT conversation_id FROM conversations WHERE platform = %s)")
+                params.append(platform)
+
+            where_clause = " AND ".join(where_conditions)
+            query = f"SELECT COUNT(*) as count FROM messages m WHERE {where_clause}"
+
+            result = self.fetch_one(query, tuple(params))
+            return result['count'] if result else 0
+
+        except Exception as e:
+            logger.error(f"Failed to get timeout messages count: {e}")
+            return 0
+
+    def get_approved_previews_count(self, sender: str = None, platform: str = None) -> int:
+        """获取已回复预览数量"""
+        try:
+            where_conditions = []
+            params = []
+
+            if sender:
+                where_conditions.append("p.conversation_id IN (SELECT conversation_id FROM conversations WHERE sender = %s)")
+                params.append(sender)
+
+            if platform:
+                where_conditions.append("p.conversation_id IN (SELECT conversation_id FROM conversations WHERE platform = %s)")
+                params.append(platform)
+
+            where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+            query = f"SELECT COUNT(*) as count FROM previews p WHERE {where_clause}"
+
+            result = self.fetch_one(query, tuple(params))
+            return result['count'] if result else 0
+
+        except Exception as e:
+            logger.error(f"Failed to get approved previews count: {e}")
+            return 0

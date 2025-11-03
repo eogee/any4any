@@ -14,6 +14,7 @@ const elements = {
     previewDetail: null,
     previewCount: null,
     approvedCount: null,
+    timeoutCount: null,
     emptyState: null,
     editorContainer: null,
     contentEditor: null,
@@ -39,6 +40,9 @@ function initializeApp() {
     // 初始化编辑器
     setTimeout(initializeEditor, 100);
 
+    // 开始统计更新轮询
+    startStatsPolling();
+
     // 设置页面生命周期监听器
     setupLifecycleListeners();
 }
@@ -49,6 +53,7 @@ function initializeElements() {
     elements.previewDetail = document.getElementById('previewDetail');
     elements.previewCount = document.getElementById('previewCount');
     elements.approvedCount = document.getElementById('approvedCount');
+    elements.timeoutCount = document.getElementById('timeoutCount');
     elements.emptyState = document.getElementById('emptyState');
     elements.editorContainer = document.getElementById('editorContainer');
     elements.contentEditor = document.getElementById('contentEditor');
@@ -68,14 +73,17 @@ function setupLifecycleListeners() {
     // 页面卸载时停止轮询
     window.addEventListener('beforeunload', function() {
         stopPreviewPolling();
+        stopStatsPolling();
     });
 
     // 页面可见性变化时控制轮询
     document.addEventListener('visibilitychange', function() {
         if (document.hidden) {
             stopPreviewPolling();
+            stopStatsPolling();
         } else {
             startPreviewPolling();
+            startStatsPolling();
         }
     });
 }
@@ -131,6 +139,26 @@ function stopPreviewPolling() {
     if (previewPollingInterval) {
         clearInterval(previewPollingInterval);
         previewPollingInterval = null;
+    }
+}
+
+// 统计轮询间隔
+let statsPollingInterval = null;
+
+// 开始统计轮询
+function startStatsPolling() {
+    if (statsPollingInterval) {
+        clearInterval(statsPollingInterval);
+    }
+    statsPollingInterval = setInterval(updateStats, 5000); // 每5秒更新一次统计
+    updateStats(); // 立即执行一次
+}
+
+// 停止统计轮询
+function stopStatsPolling() {
+    if (statsPollingInterval) {
+        clearInterval(statsPollingInterval);
+        statsPollingInterval = null;
     }
 }
 
@@ -574,9 +602,46 @@ function handleTimeoutConfirm() {
 }
 
 // 更新统计信息
-function updateStats() {
-    if (elements.previewCount) elements.previewCount.textContent = previews.length;
-    if (elements.approvedCount) elements.approvedCount.textContent = Math.floor(previews.length * 0.7);
+async function updateStats() {
+    try {
+        // 更新待预览数量
+        if (elements.previewCount) elements.previewCount.textContent = previews.length;
+
+        // 更新已回复数量
+        if (elements.approvedCount) {
+            try {
+                if (typeof ApiService !== 'undefined') {
+                    const result = await ApiService.getApprovedStats();
+                    elements.approvedCount.textContent = result.count || 0;
+                } else {
+                    elements.approvedCount.textContent = '0';
+                }
+            } catch (error) {
+                console.error('Failed to update approved stats:', error);
+                elements.approvedCount.textContent = '0';
+            }
+        }
+
+        // 更新超时响应数量
+        if (elements.timeoutCount) {
+            try {
+                if (typeof previewDataManager !== 'undefined' && previewDataManager.loadTimeoutStats) {
+                    const timeoutStats = await previewDataManager.loadTimeoutStats();
+                    elements.timeoutCount.textContent = timeoutStats.timeoutCount || 0;
+                } else if (typeof ApiService !== 'undefined') {
+                    const result = await ApiService.getTimeoutStats();
+                    elements.timeoutCount.textContent = result.count || 0;
+                } else {
+                    elements.timeoutCount.textContent = '0';
+                }
+            } catch (error) {
+                console.error('Failed to update timeout stats:', error);
+                elements.timeoutCount.textContent = '0';
+            }
+        }
+    } catch (error) {
+        console.error('Failed to update stats:', error);
+    }
 }
 
 // 初始化编辑器

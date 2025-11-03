@@ -155,6 +155,21 @@ class PreviewDataManager {
         return Math.floor(this.previews.length * 0.7);
     }
 
+    // 加载超时统计数据
+    async loadTimeoutStats() {
+        try {
+            const result = await ApiService.getTimeoutStats();
+            const timeoutCount = result.count || 0;
+            dataManager.set('timeoutCount', timeoutCount);
+            return { timeoutCount };
+        } catch (error) {
+            console.error('Failed to load timeout stats:', error);
+            const timeoutCount = 0;
+            dataManager.set('timeoutCount', timeoutCount);
+            return { timeoutCount };
+        }
+    }
+
     // 设置加载状态
     setLoading(loading) {
         this.isLoading = loading;

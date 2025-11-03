@@ -180,6 +180,26 @@ class IndexServer(Server):
                 "error": "Internal server error"
             }, status_code=500)
 
+    async def get_timeout_stats(self, sender: str = None, platform: str = None):
+        """获取超时响应统计数据"""
+        try:
+            db = ConversationDatabase()
+            timeout_count = db.get_timeout_messages_count(sender, platform)
+            return JSONResponse({"count": timeout_count})
+        except Exception as e:
+            logger.error(f"Failed to get timeout stats: {e}")
+            return JSONResponse({"count": 0})
+
+    async def get_approved_stats(self, sender: str = None, platform: str = None):
+        """获取已回复统计数据"""
+        try:
+            db = ConversationDatabase()
+            approved_count = db.get_approved_previews_count(sender, platform)
+            return JSONResponse({"count": approved_count})
+        except Exception as e:
+            logger.error(f"Failed to get approved stats: {e}")
+            return JSONResponse({"count": 0})
+
         
     def register_routes(self, app: FastAPI):
         """注册路由"""
@@ -247,5 +267,17 @@ class IndexServer(Server):
             if redirect := await require_login(request):
                 return redirect
             return await self.get_conversation_messages(conversation_id)
+
+        @app.get("/api/stats/timeout")
+        async def timeout_stats(request: Request, sender: str = None, platform: str = None):
+            if redirect := await require_login(request):
+                return redirect
+            return await self.get_timeout_stats(sender, platform)
+
+        @app.get("/api/stats/approved")
+        async def approved_stats(request: Request, sender: str = None, platform: str = None):
+            if redirect := await require_login(request):
+                return redirect
+            return await self.get_approved_stats(sender, platform)
 
         

@@ -377,28 +377,9 @@ body::before {
 }
 
 .stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.stat-item {
-    background: rgba(255, 255, 255, 0.7);
-    padding: 12px;
-    border-radius: 10px;
-    text-align: center;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary);
-    margin-bottom: 5px;
-}
-
-.stat-label {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 /* 滚动条样式 */
@@ -1042,6 +1023,29 @@ body::before {
 
 .tools-mode-badge {
     background: #3b82f6;
+}
+
+/* 统计数量徽章 */
+.preview-count-badge,
+.approved-count-badge,
+.timeout-count-badge {
+    background: #16baaa;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+    display: inline-block;
+}
+
+.approved-count-badge {
+    background: #22c55e;
+}
+
+.timeout-count-badge {
+    background: #f59e0b;
 }
 
 .preview-timeout-badge {

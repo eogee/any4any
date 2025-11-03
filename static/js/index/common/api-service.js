@@ -130,6 +130,36 @@ async function queryDatabase(query) {
     });
 }
 
+// 获取超时统计数据
+async function getTimeoutStats(sender = null, platform = null) {
+    let url = '/api/stats/timeout';
+    const params = new URLSearchParams();
+
+    if (sender) params.append('sender', sender);
+    if (platform) params.append('platform', platform);
+
+    if (params.toString()) {
+        url += '?' + params.toString();
+    }
+
+    return await apiRequest(url);
+}
+
+// 获取已回复统计数据
+async function getApprovedStats(sender = null, platform = null) {
+    let url = '/api/stats/approved';
+    const params = new URLSearchParams();
+
+    if (sender) params.append('sender', sender);
+    if (platform) params.append('platform', platform);
+
+    if (params.toString()) {
+        url += '?' + params.toString();
+    }
+
+    return await apiRequest(url);
+}
+
 // 导出函数
 window.ApiService = {
     apiRequest,
@@ -142,5 +172,7 @@ window.ApiService = {
     createConversation,
     getUserConversations,
     getLatestConversation,
-    queryDatabase
+    queryDatabase,
+    getTimeoutStats,
+    getApprovedStats
 };
