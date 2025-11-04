@@ -1874,6 +1874,11 @@ body::before {
     font-size: 12px;
 }
 
+.response-time {
+    text-align: center;
+    font-weight: 600;
+    color: var(--primary);
+}
 
 .created-time {
     font-size: 12px;

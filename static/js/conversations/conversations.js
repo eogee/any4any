@@ -1,12 +1,11 @@
 /**
- * 超时响应列表页面控制器
+ * 全部会话列表页面控制器
  */
 
-class TimeoutResponsesManager {
+class ConversationsManager {
     constructor() {
         this.table = null;
         this.layui = null;
-        this.searchTimeout = null;
         this.isInitialized = false; // 防止初始化时触发事件
         this.initialize();
     }
@@ -27,6 +26,9 @@ class TimeoutResponsesManager {
             // 加载用户列表
             await this.loadUsers();
 
+            // 加载平台列表
+            await this.loadPlatforms();
+
             // 最后初始化表格（避免重复查询）
             this.initializeTable();
 
@@ -34,7 +36,7 @@ class TimeoutResponsesManager {
             this.isInitialized = true;
 
         } catch (error) {
-            console.error('Failed to initialize TimeoutResponsesManager:', error);
+            console.error('Failed to initialize ConversationsManager:', error);
             this.showError('页面初始化失败: ' + error.message);
         }
     }
@@ -57,8 +59,8 @@ class TimeoutResponsesManager {
         if (!this.layui) return;
 
         this.table = this.layui.table.render({
-            elem: '#timeoutTable',
-            url: '/api/timeout/list',
+            elem: '#conversationTable',
+            url: '/api/conversations/list',
             method: 'get',
             toolbar: '#tableToolbar',
             defaultToolbar: ['exports', 'print'],
@@ -75,18 +77,24 @@ class TimeoutResponsesManager {
                 };
             },
             text: {
-                none: '暂无超时响应记录'
+                none: '暂无会话记录'
             },
             cols: [[
-                {field: 'sender_nickname', title: '发起用户', width: 150, sort: true, templet: '#userInfoTpl'},
+                {field: 'user_nick', title: '用户昵称', width: 150, sort: true, templet: '#userInfoTpl'},
                 {field: 'platform', title: '平台', width: 100, templet: '#platformTpl'},
-                {field: 'last_user_message', title: '用户请求', width: 200, templet: d => {
-                    return this.truncateText(d.last_user_message || '无', 30);
+                {field: 'last_user_message', title: '最新用户请求', width: 200, templet: d => {
+                    const text = d.last_user_message || '无';
+                    const truncated = this.truncateText(text, 50);
+                    return `<div class="last-message user-message" title="${this.escapeHtml(text)}">${this.escapeHtml(truncated)}</div>`;
                 }},
-                {field: 'content', title: '超时响应', templet: d => {
-                    return this.truncateText(d.content || '无', 50);
+                {field: 'last_assistant_message', title: '最新助手响应', templet: d => {
+                    const text = d.last_assistant_message || '无';
+                    const truncated = this.truncateText(text, 50);
+                    return `<div class="last-message assistant-message" title="${this.escapeHtml(text)}">${this.escapeHtml(truncated)}</div>`;
                 }},
-                                {field: 'created_at', title: '创建时间', width: 150, sort: true, templet: '#createTimeTpl'},
+                {field: 'message_count', title: '消息数量', width: 100, templet: '#messageCountTpl', align: 'center'},
+                {field: 'created_time', title: '创建时间', width: 150, sort: true, templet: '#createTimeTpl'},
+                {field: 'last_active', title: '最后活跃', width: 150, sort: true, templet: '#lastActiveTpl'},
                 {title: '操作', width: 80, align: 'center', toolbar: '#tableOperations', fixed: 'right'}
             ]],
             done: (res) => {
@@ -99,9 +107,9 @@ class TimeoutResponsesManager {
         });
 
         // 监听表格工具条事件
-        this.layui.table.on('tool(timeoutTable)', (obj) => {
+        this.layui.table.on('tool(conversationTable)', (obj) => {
             if (obj.event === 'view') {
-                this.viewTimeoutDetail(obj.data);
+                this.viewConversationDetail(obj.data);
             }
         });
     }
@@ -146,6 +154,17 @@ class TimeoutResponsesManager {
                 });
             });
 
+            // 监听平台筛选变化
+            this.layui.form.on('select(platform)', () => {
+                if (!this.isInitialized) return;
+                // 获取当前表单所有数据
+                const formData = this.layui.form.val('filterForm');
+                // 重新加载表格并传递筛选参数
+                this.table.reload({
+                    where: formData
+                });
+            });
+
             // 监听时间范围筛选变化
             this.layui.form.on('select(dateRange)', () => {
                 if (!this.isInitialized) return;
@@ -157,18 +176,7 @@ class TimeoutResponsesManager {
                 });
             });
 
-            // 监听搜索框变化
-            document.getElementById('searchKeyword')?.addEventListener('input', (e) => {
-                const formData = this.layui.form.val('filterForm');
-                // 使用防抖避免频繁请求
-                clearTimeout(this.searchTimeout);
-                this.searchTimeout = setTimeout(() => {
-                    this.table.reload({
-                        where: formData
-                    });
-                }, 500);
-            });
-
+            
             // 监听表单重置
             document.getElementById('filterForm')?.addEventListener('reset', () => {
                 // 重置后立即重新加载表格，清除所有筛选条件
@@ -181,7 +189,7 @@ class TimeoutResponsesManager {
 
     async loadUsers() {
         try {
-            const response = await ApiService.apiRequest('/api/timeout/users');
+            const response = await ApiService.apiRequest('/api/conversations/users');
             if (response.users && Array.isArray(response.users)) {
                 const userFilter = document.getElementById('userNick');
                 if (userFilter && this.layui && this.layui.form) {
@@ -201,15 +209,37 @@ class TimeoutResponsesManager {
         }
     }
 
-    async viewTimeoutDetail(timeoutData) {
+    async loadPlatforms() {
+        try {
+            const response = await ApiService.apiRequest('/api/conversations/platforms');
+            if (response.platforms && Array.isArray(response.platforms)) {
+                const platformFilter = document.getElementById('platform');
+                if (platformFilter && this.layui && this.layui.form) {
+                    // 更新下拉框选项
+                    let options = '<option value="">全部平台</option>';
+                    response.platforms.forEach(platform => {
+                        options += `<option value="${platform}">${platform}</option>`;
+                    });
+                    platformFilter.innerHTML = options;
+
+                    // 重新渲染表单，但不触发事件
+                    this.layui.form.render('select');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load platforms:', error);
+        }
+    }
+
+    async viewConversationDetail(conversationData) {
         if (!this.layui || !this.layui.layer) {
-            window.open(`/api/timeout/detail/${timeoutData.message_id}`, '_blank');
+            window.open(`/api/conversations/detail/${conversationData.conversation_id}`, '_blank');
             return;
         }
 
         try {
             // 获取详细信息
-            const response = await ApiService.apiRequest(`/api/timeout/detail/${timeoutData.message_id}`);
+            const response = await ApiService.apiRequest(`/api/conversations/detail/${conversationData.conversation_id}`);
 
             if (!response.success) {
                 this.showError('获取详情失败: ' + response.error);
@@ -217,66 +247,64 @@ class TimeoutResponsesManager {
             }
 
             const detail = response.data;
+            const conversation = detail.conversation || {};
             const messages = detail.messages || [];
+
             let messagesHtml = '';
 
             if (Array.isArray(messages)) {
                 messages.forEach(msg => {
-                    const roleClass = msg.role === 'user' ? 'user-message' : 'assistant-message';
-                    const roleIcon = msg.role === 'user' ? 'fa-user' : 'fa-robot';
-                    const roleName = msg.role === 'user' ? '用户' : '助手';
+                    const roleClass = msg.sender_type === 'user' ? 'user-message' : 'assistant-message';
+                    const roleIcon = msg.sender_type === 'user' ? 'fa-user' : 'fa-robot';
+                    const roleName = msg.sender_type === 'user' ? '用户' : '助手';
 
                     messagesHtml += `
                         <div class="message-item ${roleClass}">
                             <div class="message-header">
                                 <i class="fas ${roleIcon}"></i>
                                 <span class="message-role">${roleName}</span>
+                                ${msg.is_timeout === 1 ? '<span class="timeout-badge">超时响应</span>' : ''}
                             </div>
                             <div class="message-content">${this.escapeHtml(msg.content || '')}</div>
+                            <div class="message-time">${msg.timestamp_formatted || msg.timestamp}</div>
                         </div>
                     `;
                 });
             }
 
             const content = `
-                <div class="timeout-detail-content">
+                <div class="conversation-detail-content">
                     <div class="detail-section">
                         <h3><i class="fas fa-info-circle"></i> 基本信息</h3>
                         <div class="detail-grid">
                             <div class="detail-item">
-                                <label>消息ID:</label>
-                                <span>${detail.message_id || ''}</span>
+                                <label>会话ID:</label>
+                                <span>${conversation.conversation_id || ''}</span>
                             </div>
                             <div class="detail-item">
-                                <label>发起用户:</label>
-                                <span>${detail.sender_nickname || ''}</span>
+                                <label>用户昵称:</label>
+                                <span>${conversation.user_nick || ''}</span>
                             </div>
                             <div class="detail-item">
                                 <label>用户ID:</label>
-                                <span>${detail.sender_id || ''}</span>
+                                <span>${conversation.sender || ''}</span>
                             </div>
                             <div class="detail-item">
                                 <label>平台:</label>
-                                <span>${detail.platform || ''}</span>
+                                <span>${conversation.platform || ''}</span>
                             </div>
-                                                        <div class="detail-item">
+                            <div class="detail-item">
+                                <label>消息数量:</label>
+                                <span>${conversation.message_count || 0}</span>
+                            </div>
+                            <div class="detail-item">
                                 <label>创建时间:</label>
-                                <span>${timeoutData.created_at || ''}</span>
+                                <span>${conversation.created_at_formatted || conversation.created_time}</span>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="detail-section">
-                        <h3><i class="fas fa-user"></i> 用户请求内容</h3>
-                        <div class="user-request-content">
-                            ${this.escapeHtml(timeoutData.last_user_message || '无用户请求')}
-                        </div>
-                    </div>
-
-                    <div class="detail-section">
-                        <h3><i class="fas fa-clock"></i> 超时响应内容</h3>
-                        <div class="response-content">
-                            ${this.escapeHtml(timeoutData.content || '无响应内容')}
+                            <div class="detail-item">
+                                <label>最后活跃:</label>
+                                <span>${conversation.last_active_formatted || conversation.last_active}</span>
+                            </div>
                         </div>
                     </div>
 
@@ -291,7 +319,7 @@ class TimeoutResponsesManager {
 
             this.layui.layer.open({
                 type: 1,
-                title: '超时响应详情',
+                title: '会话详情',
                 area: ['80%', '80%'],
                 shadeClose: true,
                 shade: 0.8,
@@ -300,7 +328,7 @@ class TimeoutResponsesManager {
                     // 添加样式
                     const style = document.createElement('style');
                     style.textContent = `
-                        .timeout-detail-content {
+                        .conversation-detail-content {
                             padding: 20px;
                             max-height: 70vh;
                             overflow-y: auto;
@@ -359,21 +387,31 @@ class TimeoutResponsesManager {
                         .message-header i {
                             margin-right: 8px;
                         }
+                        .message-role {
+                            margin-right: 10px;
+                        }
                         .message-content {
                             line-height: 1.6;
                             white-space: pre-wrap;
+                            margin-bottom: 8px;
                         }
-                        .user-request-content {
-                            background: #f8f9fa;
-                            padding: 15px;
-                            border-radius: 8px;
-                            line-height: 1.6;
+                        .message-time {
+                            font-size: 12px;
+                            color: #999;
+                            text-align: right;
+                            margin-top: 4px;
                         }
-                        .response-content {
-                            background: #f8f9fa;
-                            padding: 15px;
-                            border-radius: 8px;
+                        .timeout-badge {
+                            background: #ff9800;
+                            color: white;
+                            padding: 2px 6px;
+                            border-radius: 3px;
+                            font-size: 10px;
+                            margin-left: 8px;
+                        }
+                        .message-content {
                             line-height: 1.6;
+                            white-space: pre-wrap;
                         }
                         .no-messages {
                             text-align: center;
@@ -387,12 +425,12 @@ class TimeoutResponsesManager {
             });
 
         } catch (error) {
-            console.error('Failed to load timeout detail:', error);
+            console.error('Failed to load conversation detail:', error);
             this.showError('加载详情失败: ' + error.message);
         }
     }
 
-    truncateText(text, maxLength) {
+    truncateText(text, maxLength = 50) {
         if (!text) return '无';
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
     }
@@ -423,5 +461,5 @@ class TimeoutResponsesManager {
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    window.timeoutManager = new TimeoutResponsesManager();
+    window.conversationsManager = new ConversationsManager();
 });

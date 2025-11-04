@@ -160,6 +160,37 @@ async function getApprovedStats(sender = null, platform = null) {
     return await apiRequest(url);
 }
 
+// 获取会话统计数据
+async function getConversationStats(user_nick = null, platform = null, date_range = null) {
+    let url = '/api/conversations/stats';
+    const params = new URLSearchParams();
+
+    if (user_nick) params.append('user_nick', user_nick);
+    if (platform) params.append('platform', platform);
+    if (date_range) params.append('date_range', date_range);
+
+    if (params.toString()) {
+        url += '?' + params.toString();
+    }
+
+    return await apiRequest(url);
+}
+
+// 获取会话列表
+async function getConversationsList(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    let url = '/api/conversations/list';
+    if (queryString) {
+        url += '?' + queryString;
+    }
+    return await apiRequest(url);
+}
+
+// 获取会话详情
+async function getConversationDetail(conversationId) {
+    return await apiRequest(`/api/conversations/detail/${conversationId}`);
+}
+
 // 导出函数
 window.ApiService = {
     apiRequest,
@@ -174,5 +205,8 @@ window.ApiService = {
     getLatestConversation,
     queryDatabase,
     getTimeoutStats,
-    getApprovedStats
+    getApprovedStats,
+    getConversationStats,
+    getConversationsList,
+    getConversationDetail
 };

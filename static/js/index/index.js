@@ -12,9 +12,10 @@ let layer = null;
 const elements = {
     previewList: null,
     previewDetail: null,
-    previewCount: null,
     approvedCount: null,
     timeoutCount: null,
+    conversationCount: null,
+    conversationStats: null,
     emptyState: null,
     editorContainer: null,
     contentEditor: null,
@@ -51,11 +52,12 @@ function initializeApp() {
 function initializeElements() {
     elements.previewList = document.getElementById('previewList');
     elements.previewDetail = document.getElementById('previewDetail');
-    elements.previewCount = document.getElementById('previewCount');
     elements.approvedCount = document.getElementById('approvedCount');
     elements.approvedStats = document.getElementById('approvedStats');
     elements.timeoutCount = document.getElementById('timeoutCount');
     elements.timeoutStats = document.getElementById('timeoutStats');
+    elements.conversationCount = document.getElementById('conversationCount');
+    elements.conversationStats = document.getElementById('conversationStats');
     elements.emptyState = document.getElementById('emptyState');
     elements.editorContainer = document.getElementById('editorContainer');
     elements.contentEditor = document.getElementById('contentEditor');
@@ -81,6 +83,17 @@ function initializeElements() {
 
         // 添加悬停提示
         elements.timeoutStats.title = '点击查看超时响应列表';
+    }
+
+    // 为全部会话统计添加点击事件
+    if (elements.conversationStats) {
+        elements.conversationStats.style.cursor = 'pointer';
+        elements.conversationStats.addEventListener('click', () => {
+            window.open('/conversations', '_blank');
+        });
+
+        // 添加悬停提示
+        elements.conversationStats.title = '点击查看全部会话列表';
     }
 }
 
@@ -628,9 +641,6 @@ function handleTimeoutConfirm() {
 // 更新统计信息
 async function updateStats() {
     try {
-        // 更新待预览数量
-        if (elements.previewCount) elements.previewCount.textContent = previews.length;
-
         // 更新已回复数量
         if (elements.approvedCount) {
             try {
@@ -661,6 +671,21 @@ async function updateStats() {
             } catch (error) {
                 console.error('Failed to update timeout stats:', error);
                 elements.timeoutCount.textContent = '0';
+            }
+        }
+
+        // 更新会话总数
+        if (elements.conversationCount) {
+            try {
+                if (typeof ApiService !== 'undefined') {
+                    const result = await ApiService.getConversationStats();
+                    elements.conversationCount.textContent = result.count || 0;
+                } else {
+                    elements.conversationCount.textContent = '0';
+                }
+            } catch (error) {
+                console.error('Failed to update conversation stats:', error);
+                elements.conversationCount.textContent = '0';
             }
         }
     } catch (error) {

@@ -91,3 +91,8 @@ preview_server.register_routes(app)
 from servers.TimeoutServer import TimeoutServer
 timeout_server = TimeoutServer()
 timeout_server.register_routes(app)
+
+# 注册ConversationServer路由
+from servers.ConversationServer import ConversationServer
+conversation_server = ConversationServer()
+conversation_server.register_routes(app)

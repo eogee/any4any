@@ -87,7 +87,7 @@ class ApprovedPreviewsManager {
                     return this.truncateText(d.saved_content || '无', 50);
                 }},
                 {field: 'response_time', title: '响应时间', width: 100, align: 'center', templet: '#responseTimeTpl'},
-                {field: 'created_at', title: '创建时间', width: 160, sort: true, templet: '#createTimeTpl'},
+                {field: 'created_at', title: '创建时间', width: 150, sort: true, templet: '#createTimeTpl'},
                 {title: '操作', width: 80, align: 'center', toolbar: '#tableOperations', fixed: 'right'}
             ]],
             done: (res) => {

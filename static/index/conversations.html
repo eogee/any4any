@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>编辑后已回复列表 - Any4Chat</title>
+    <title>全部会话列表 - Any4Chat</title>
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <link rel="stylesheet" href="/static/css/font-awesome.min.css">
     <link rel="stylesheet" href="/static/css/a4a.css">
@@ -11,7 +11,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>编辑后已回复列表</h1>
+            <h1>全部会话列表</h1>
         </div>
 
         <div class="filter-section">
@@ -20,11 +20,24 @@
                 <div class="layui-col-md3">
                     <div class="setting-item">
                         <label class="setting-label" for="userNick">
-                            <i class="fas fa-user"></i> 发起用户
+                            <i class="fas fa-user"></i> 用户昵称
                         </label>
                         <div class="setting-control">
                             <select name="user_nick" id="userNick" lay-search lay-filter="userNick">
                                 <option value="">全部用户</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layui-col-md3">
+                    <div class="setting-item">
+                        <label class="setting-label" for="platform">
+                            <i class="fas fa-desktop"></i> 平台
+                        </label>
+                        <div class="setting-control">
+                            <select name="platform" id="platform" lay-filter="platform">
+                                <option value="">全部平台</option>
                             </select>
                         </div>
                     </div>
@@ -52,17 +65,6 @@
 
                 <div class="layui-col-md3">
                     <div class="setting-item">
-                        <label class="setting-label" for="searchKeyword">
-                            <i class="fas fa-search"></i> 搜索
-                        </label>
-                        <div class="setting-control">
-                            <input type="text" name="search" id="searchKeyword" placeholder="搜索请求内容或回复内容" class="layui-input">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="layui-col-md3">
-                    <div class="setting-item">
                         <label class="setting-label">
                             <i class="fas fa-tools"></i> 操作
                         </label>
@@ -76,14 +78,13 @@
                         </div>
                     </div>
                 </div>
-                </div>
             </form>
         </div>
+    </div>
 
-        <div class="table-section">
-            <div class="table-container">
-                <table id="previewsTable" lay-filter="previewsTable"></table>
-            </div>
+    <div class="table-section">
+        <div class="table-container">
+            <table id="conversationTable" lay-filter="conversationTable"></table>
         </div>
     </div>
 
@@ -96,7 +97,7 @@
             <button class="layui-btn layui-btn-normal" id="refreshBtn">
                 <i class="fas fa-sync-alt"></i> 刷新
             </button>
-            <span class="table-info">共 <span id="totalCount">0</span> 条记录</span>
+            <span class="table-info">共 <span id="totalCount">0</span> 条会话记录</span>
         </div>
     </script>
 
@@ -104,12 +105,11 @@
         <a class="layui-btn layui-btn-xs layui-btn-primary" lay-event="view">查看</a>
     </script>
 
-    
     <!-- 用户信息模板 -->
     <script type="text/html" id="userInfoTpl">
         <div class="user-info">
-            <div class="user-name">{{ d.sender_nickname || '未知用户' }}</div>
-            <div class="user-id">{{ d.sender_id || '未知ID' }}</div>
+            <div class="user-name">{{ d.user_nick || '未知用户' }}</div>
+            <div class="user-id">{{ d.sender || '未知ID' }}</div>
         </div>
     </script>
 
@@ -118,13 +118,9 @@
         <span class="platform-badge">{{ d.platform || '未知' }}</span>
     </script>
 
-    <!-- 响应时间模板 -->
-    <script type="text/html" id="responseTimeTpl">
-        {{# if(d.response_time){ }}
-            <span class="response-time">{{ parseFloat(d.response_time).toFixed(2) }}s</span>
-        {{# } else { }}
-            <span class="response-time">未知</span>
-        {{# } }}
+    <!-- 消息数量模板 -->
+    <script type="text/html" id="messageCountTpl">
+        <span>{{ d.message_count || 0 }}</span>
     </script>
 
     <!-- 创建时间模板 -->
@@ -132,15 +128,29 @@
         <span class="created-time">{{ d.created_at }}</span>
     </script>
 
-    <!-- 内容截断模板 -->
-    <script type="text/html" id="contentTpl">
-        <span title="{{ d.content }}">{{ d.content }}</span>
+    <!-- 最后活跃时间模板 -->
+    <script type="text/html" id="lastActiveTpl">
+        <span class="created-time">{{ d.last_active_formatted }}</span>
+    </script>
+
+    <!-- 最新用户消息模板 -->
+    <script type="text/html" id="lastUserMessageTpl">
+        <div class="last-message user-message" title="{{ d.last_user_message || '无' }}">
+            {{ d.last_user_message || '无' }}
+        </div>
+    </script>
+
+    <!-- 最新助手响应模板 -->
+    <script type="text/html" id="lastAssistantMessageTpl">
+        <div class="last-message assistant-message" title="{{ d.last_assistant_message || '无' }}">
+            {{ d.last_assistant_message || '无' }}
+        </div>
     </script>
 
     <!-- 引入公共函数库 -->
     <script src="/static/js/index/common/api-service.js"></script>
     <script src="/static/js/index/common/ui-utils.js"></script>
     <script src="/static/layui/layui.js"></script>
-    <script src="/static/js/preview/preview.js"></script>
+    <script src="/static/js/conversations/conversations.js"></script>
 </body>
 </html>
