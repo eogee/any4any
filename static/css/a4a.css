@@ -1027,7 +1027,7 @@ body::before {
 
 /* 统计数量徽章 */
 .preview-count-badge,
-.preview-count-badge,
+.conversation-count-badge,
 .timeout-count-badge {
     background: #16baaa;
     color: white;
