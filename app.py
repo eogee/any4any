@@ -82,5 +82,7 @@ app.post("/v1/db/execute")(execute_query)
 embedding_router = get_embedding_router()
 app.include_router(embedding_router)
 
-# 注册PreviewServer、TimeoutServer、ConversationServer路由（通过lifespan管理）
-# 这些服务器将在lifespan.py中通过get_server_instance单例模式管理
+# 注册PreviewServer路由
+from servers.PreviewServer import PreviewServer
+preview_server = PreviewServer()
+preview_server.register_routes(app)
