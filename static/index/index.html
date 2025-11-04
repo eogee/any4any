@@ -12,7 +12,7 @@
     <div class="container">
         <div class="header">
             <h1>Any4Chat</h1>
-            <p>预览AI响应内容，人工审核编辑确保答复准确（审核控制台）</p>
+            <p>人工审核编辑AI响应内容，确保答复准确（控制台）</p>
         </div>
         
         <div class="app-container">
@@ -42,17 +42,17 @@
                         </div>
                         <div class="setting-item" style="display: flex;" id="approvedStats">
                             <label class="setting-label">
-                                <i class="fas fa-check-circle"></i> 已回复
+                                <a href="/preview" target="_blank"><i class="fas fa-check-circle"></i> 已回复</a>
                             </label>
                             <div class="setting-control">
-                                <span class="approved-count-badge" id="approvedCount" title="点击查看已回复列表">
+                                <span class="preview-count-badge" id="approvedCount" title="点击查看已回复列表">
                                     0
                                 </span>
                             </div>
                         </div>
-                        <div class="setting-item" style="display: flex;">
+                        <div class="setting-item" style="display: flex;" id="timeoutStats">
                             <label class="setting-label">
-                                <i class="fas fa-exclamation-triangle"></i> 超时响应
+                                <a href="/timeout" target="_blank"><i class="fas fa-exclamation-triangle"></i> 超时响应</a>
                             </label>
                             <div class="setting-control">
                                 <span class="timeout-count-badge" id="timeoutCount">

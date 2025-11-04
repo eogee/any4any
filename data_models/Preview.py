@@ -74,44 +74,6 @@ class Preview(Model):
         """删除指定的预览记录"""
         return self.delete(preview_id, id_column="preview_id")
 
-    def parse_date_range(self, date_range: str) -> Tuple[Optional[str], Optional[str]]:
-        """
-        解析时间范围字符串为开始和结束日期
-
-        Args:
-            date_range: 时间范围，支持: all, today, week, month, year, 7days, 30days, 1year
-
-        Returns:
-            tuple: (start_date_str, end_date_str)
-        """
-        now = datetime.now()
-
-        if date_range == "all":
-            return None, None
-        elif date_range == "today":
-            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            return start.strftime('%Y-%m-%d %H:%M:%S'), None
-        elif date_range == "week":
-            start = now - timedelta(days=now.weekday())
-            start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-            return start.strftime('%Y-%m-%d %H:%M:%S'), None
-        elif date_range == "month":
-            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            return start.strftime('%Y-%m-%d %H:%M:%S'), None
-        elif date_range == "year":
-            start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            return start.strftime('%Y-%m-%d %H:%M:%S'), None
-        elif date_range == "7days":
-            start = now - timedelta(days=7)
-            return start.strftime('%Y-%m-%d %H:%M:%S'), None
-        elif date_range == "30days":
-            start = now - timedelta(days=30)
-            return start.strftime('%Y-%m-%d %H:%M:%S'), None
-        elif date_range == "1year":
-            start = now - timedelta(days=365)
-            return start.strftime('%Y-%m-%d %H:%M:%S'), None
-        else:
-            return None, None
 
     def get_previews_count(self, user_nick: str = None, start_date: str = None,
                            end_date: str = None, search: str = None) -> int:

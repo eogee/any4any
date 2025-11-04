@@ -55,6 +55,7 @@ function initializeElements() {
     elements.approvedCount = document.getElementById('approvedCount');
     elements.approvedStats = document.getElementById('approvedStats');
     elements.timeoutCount = document.getElementById('timeoutCount');
+    elements.timeoutStats = document.getElementById('timeoutStats');
     elements.emptyState = document.getElementById('emptyState');
     elements.editorContainer = document.getElementById('editorContainer');
     elements.contentEditor = document.getElementById('contentEditor');
@@ -69,6 +70,17 @@ function initializeElements() {
 
         // 添加悬停提示
         elements.approvedStats.title = '点击查看已回复列表';
+    }
+
+    // 为超时响应统计添加点击事件
+    if (elements.timeoutStats) {
+        elements.timeoutStats.style.cursor = 'pointer';
+        elements.timeoutStats.addEventListener('click', () => {
+            window.open('/timeout', '_blank');
+        });
+
+        // 添加悬停提示
+        elements.timeoutStats.title = '点击查看超时响应列表';
     }
 }
 

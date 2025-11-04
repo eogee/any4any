@@ -1027,7 +1027,7 @@ body::before {
 
 /* 统计数量徽章 */
 .preview-count-badge,
-.approved-count-badge,
+.preview-count-badge,
 .timeout-count-badge {
     background: #16baaa;
     color: white;
@@ -1040,7 +1040,7 @@ body::before {
     display: inline-block;
 }
 
-.approved-count-badge {
+.preview-count-badge {
     background: #22c55e;
 }
 
@@ -1354,8 +1354,8 @@ body::before {
 .message-content {
     max-width: 70%;
     background: white;
-    border-radius: 18px;
-    padding: 16px 20px;
+    border-radius: 10px;
+    padding: 10px 10px;
     box-shadow: 0 2px 10px var(--shadow);
     position: relative;
     border: 1px solid var(--border);
@@ -1874,11 +1874,6 @@ body::before {
     font-size: 12px;
 }
 
-.response-time {
-    text-align: center;
-    font-weight: 600;
-    color: var(--primary);
-}
 
 .created-time {
     font-size: 12px;

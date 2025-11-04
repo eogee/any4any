@@ -86,3 +86,8 @@ app.include_router(embedding_router)
 from servers.PreviewServer import PreviewServer
 preview_server = PreviewServer()
 preview_server.register_routes(app)
+
+# 注册TimeoutServer路由
+from servers.TimeoutServer import TimeoutServer
+timeout_server = TimeoutServer()
+timeout_server.register_routes(app)

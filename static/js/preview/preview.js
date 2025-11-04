@@ -172,8 +172,10 @@ class ApprovedPreviewsManager {
 
             // 监听表单重置
             document.getElementById('filterForm')?.addEventListener('reset', () => {
-                // 重置后立即重新加载表格
-                this.table.reload();
+                // 重置后立即重新加载表格，清除所有筛选条件
+                this.table.reload({
+                    where: {} // 清空筛选条件
+                });
             });
         }
     }

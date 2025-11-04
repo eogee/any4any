@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超时响应列表 - Any4Chat</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/a4a.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>超时响应列表</h1>
+        </div>
+
+        <div class="filter-section">
+            <form class="layui-form" lay-filter="filterForm" id="filterForm">
+                <div class="layui-row layui-col-space15">
+                <div class="layui-col-md3">
+                    <div class="setting-item">
+                        <label class="setting-label" for="userNick">
+                            <i class="fas fa-user"></i> 发起用户
+                        </label>
+                        <div class="setting-control">
+                            <select name="user_nick" id="userNick" lay-search lay-filter="userNick">
+                                <option value="">全部用户</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layui-col-md3">
+                    <div class="setting-item">
+                        <label class="setting-label" for="dateRange">
+                            <i class="fas fa-calendar"></i> 时间范围
+                        </label>
+                        <div class="setting-control">
+                            <select name="date_range" id="dateRange" lay-filter="dateRange">
+                                <option value="all">全部时间</option>
+                                <option value="today">今天</option>
+                                <option value="week">本周</option>
+                                <option value="month">本月</option>
+                                <option value="year">今年</option>
+                                <option value="7days">最近7天</option>
+                                <option value="30days">最近30天</option>
+                                <option value="1year">最近1年</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layui-col-md3">
+                    <div class="setting-item">
+                        <label class="setting-label" for="searchKeyword">
+                            <i class="fas fa-search"></i> 搜索
+                        </label>
+                        <div class="setting-control">
+                            <input type="text" name="search" id="searchKeyword" placeholder="搜索响应内容" class="layui-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layui-col-md3">
+                    <div class="setting-item">
+                        <label class="setting-label">
+                            <i class="fas fa-tools"></i> 操作
+                        </label>
+                        <div class="setting-control">
+                            <button class="layui-btn layui-btn-normal" lay-submit lay-filter="filterSubmit">
+                                <i class="fas fa-filter"></i> 筛选
+                            </button>
+                            <button class="layui-btn layui-btn-primary" type="reset">
+                                <i class="fas fa-redo"></i> 重置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="table-section">
+            <div class="table-container">
+                <table id="timeoutTable" lay-filter="timeoutTable"></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 表格操作模板 -->
+    <script type="text/html" id="tableToolbar">
+        <div class="layui-btn-container">
+            <button class="layui-btn layui-btn-primary" id="backBtn">
+                <i class="fas fa-arrow-left"></i> 返回首页
+            </button>
+            <button class="layui-btn layui-btn-normal" id="refreshBtn">
+                <i class="fas fa-sync-alt"></i> 刷新
+            </button>
+            <span class="table-info">共 <span id="totalCount">0</span> 条超时记录</span>
+        </div>
+    </script>
+
+    <script type="text/html" id="tableOperations">
+        <a class="layui-btn layui-btn-xs layui-btn-primary" lay-event="view">查看</a>
+    </script>
+
+
+    <!-- 用户信息模板 -->
+    <script type="text/html" id="userInfoTpl">
+        <div class="user-info">
+            <div class="user-name">{{ d.sender_nickname || '未知用户' }}</div>
+            <div class="user-id">{{ d.sender_id || '未知ID' }}</div>
+        </div>
+    </script>
+
+    <!-- 平台标签模板 -->
+    <script type="text/html" id="platformTpl">
+        <span class="platform-badge">{{ d.platform || '未知' }}</span>
+    </script>
+
+    
+    <!-- 创建时间模板 -->
+    <script type="text/html" id="createTimeTpl">
+        <span class="created-time">{{ d.created_at }}</span>
+    </script>
+
+    <!-- 内容截断模板 -->
+    <script type="text/html" id="contentTpl">
+        <span title="{{ d.content }}">{{ d.content }}</span>
+    </script>
+
+    <!-- 引入公共函数库 -->
+    <script src="/static/js/index/common/api-service.js"></script>
+    <script src="/static/js/index/common/ui-utils.js"></script>
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/timeout/timeout.js"></script>
+</body>
+</html>
