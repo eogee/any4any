@@ -320,8 +320,132 @@ orders
                 'error': str(e)
             }
 
+    async def _analyze_time_requirements(self, question: str, table_schemas: str) -> Dict[str, Any]:
+        """分析问题中的时间需求并调用时间工具"""
+        try:
+            # 检查是否启用时间工具
+            try:
+                from config import Config
+                if not getattr(Config, 'TIME_TOOLS_ENABLED', True):
+                    return {"has_time_requirement": False}
+            except Exception as e:
+                logger.warning(f"Failed to check TIME_TOOLS_ENABLED: {e}")
+                return {"has_time_requirement": False}
+
+            # 检查是否包含时间关键词
+            time_keywords = ['本月', '最近', '今天', '昨天', '本年', '上月', '本周', '上周', '季度', '年', '月', '天',
+                           '今日', '昨日', '明日', '当月', '今年', '当年', '过去', '未来', '接下来', '上个', '下个']
+            has_time_keywords = any(keyword in question for keyword in time_keywords)
+
+            if not has_time_keywords:
+                return {"has_time_requirement": False}
+
+            # 获取工具管理器
+            from core.chat.tool_manager import get_tool_manager
+            tool_manager = get_tool_manager()
+
+            if not tool_manager:
+                logger.warning("Tool manager not available for time analysis")
+                return {"has_time_requirement": False}
+
+            # 1. 获取当前时间
+            current_time_result = await tool_manager.execute_tool("get_current_time", {})
+
+            # 2. 提取并解析时间表达式
+            from core.tools.nl2sql.time_utils import get_time_utils
+            time_utils = get_time_utils()
+            time_expressions = time_utils.extract_time_expressions(question)
+            logger.info(f"Extracted time expressions from '{question}': {time_expressions}")
+            time_analysis_results = []
+
+            for expression in time_expressions:
+                try:
+                    parse_result = await tool_manager.execute_tool("parse_time_expression", {
+                        "expression": expression
+                    })
+
+                    if parse_result.success:
+                        time_analysis_results.append({
+                            "expression": expression,
+                            "time_range": parse_result.data
+                        })
+                        logger.info(f"Time expression '{expression}' parsed successfully: {parse_result.data}")
+                    else:
+                        logger.warning(f"Failed to parse time expression '{expression}': {parse_result.error}")
+                except Exception as e:
+                    logger.error(f"Error parsing time expression '{expression}': {e}")
+
+            # 3. 识别可能的时间字段
+            time_columns = time_utils.identify_time_columns(table_schemas)
+
+            # 4. 为每个时间表达式生成SQL条件（用于提供给LLM参考）
+            sql_conditions = []
+            valid_time_analysis_results = []
+
+            for result in time_analysis_results:
+                time_range = result["time_range"]
+                expression = result["expression"]
+
+                # 验证时间解析结果的有效性
+                if not time_range.get("success"):
+                    logger.warning(f"Time expression '{expression}' parsing failed: {time_range.get('error')}")
+                    continue
+
+                # 检查必要字段是否存在且有效
+                start_date = time_range.get("start_date_only")
+                end_date = time_range.get("end_date_only")
+
+                if not start_date or not end_date:
+                    logger.warning(f"Time expression '{expression}' has invalid date range")
+                    continue
+
+                # 验证日期格式
+                try:
+                    from datetime import datetime
+                    datetime.strptime(start_date, "%Y-%m-%d")
+                    datetime.strptime(end_date, "%Y-%m-%d")
+                except ValueError:
+                    logger.warning(f"Time expression '{expression}' has invalid date format")
+                    continue
+
+                valid_time_analysis_results.append(result)
+
+                # 为每个时间字段生成SQL条件
+                for column in time_columns:
+                    try:
+                        sql_result = await tool_manager.execute_tool("generate_sql_time_condition", {
+                            "time_range": str(time_range),  # 转换为字符串
+                            "column_name": column
+                        })
+                        if sql_result.success and sql_result.data.get("sql_condition"):
+                            sql_conditions.append({
+                                "expression": expression,
+                                "column": column,
+                                "condition": sql_result.data["sql_condition"]
+                            })
+                    except Exception as e:
+                        logger.error(f"Error generating SQL condition for {expression} on {column}: {e}")
+
+            # 如果没有有效的时间分析结果，关闭时间需求标志
+            if not valid_time_analysis_results:
+                logger.info("No valid time expressions found, disabling time analysis")
+                return {"has_time_requirement": False}
+
+            return {
+                "has_time_requirement": True,
+                "time_expressions": time_expressions,
+                "time_analysis_results": valid_time_analysis_results,  # 只使用有效结果
+                "suggested_columns": time_columns,
+                "current_time": current_time_result.data if current_time_result.success else None,
+                "sql_conditions": sql_conditions
+            }
+
+        except Exception as e:
+            logger.error(f"Time requirements analysis failed: {e}")
+            return {"has_time_requirement": False}
+
     async def _generate_sql(self, question: str, table_schemas: str, context: str) -> Dict[str, Any]:
-        """LLM生成SQL语句"""
+        """LLM生成SQL语句 - 增强时间信息支持"""
         try:
             from core.chat.llm import get_llm_service
 
@@ -332,6 +456,10 @@ orders
                     'error': 'LLM服务不可用'
                 }
 
+            # 分析时间需求
+            time_analysis = await self._analyze_time_requirements(question, table_schemas)
+
+            # 构建基础提示词
             prompt = f"""你是一个专业的SQL查询生成器。请根据用户问题和表结构信息，生成准确的SQL查询语句。
 
 用户问题: {question}
@@ -340,15 +468,66 @@ orders
 {table_schemas}
 
 对话上下文:
-{context if context else '无'}
+{context if context else '无'}"""
+
+            # 添加时间相关信息
+            if time_analysis.get("has_time_requirement"):
+                time_info = "\n\n## 时间相关信息\n\n"
+                time_info += f"检测到时间相关需求，识别到的时间表达式: {', '.join(time_analysis.get('time_expressions', []))}\n\n"
+
+                # 添加时间分析结果
+                for result in time_analysis.get("time_analysis_results", []):
+                    expr = result["expression"]
+                    time_range = result["time_range"]
+                    if time_range.get("success"):
+                        start_date = time_range.get("start_date_only", "")
+                        end_date = time_range.get("end_date_only", "")
+                        time_info += f"时间表达式 '{expr}' 解析为: {start_date} 到 {end_date}\n"
+                    else:
+                        time_info += f"时间表达式 '{expr}' 解析失败: {time_range.get('error', '未知错误')}\n"
+
+                # 建议的时间字段
+                if time_analysis.get("suggested_columns"):
+                    time_info += f"建议的时间字段: {', '.join(time_analysis['suggested_columns'])}\n\n"
+
+                # 生成的SQL条件示例（提供给LLM参考）
+                if time_analysis.get("sql_conditions"):
+                    time_info += "可参考的时间条件示例:\n"
+                    for condition in time_analysis["sql_conditions"][:3]:  # 只显示前3个示例
+                        time_info += f"  - {condition['expression']} 使用 {condition['column']}: {condition['condition']}\n"
+                    time_info += "\n"
+
+                # 当前时间
+                if time_analysis.get("current_time"):
+                    current_time = time_analysis["current_time"]
+                    if current_time.get("success"):
+                        time_info += f"当前时间: {current_time.get('current_time')} (日期: {current_time.get('date')})\n"
+
+                prompt += time_info
+
+            # 添加通用规则
+            prompt += f"""
 
 请遵循以下规则:
 1. 只生成SELECT查询语句
 2. 确保SQL语法正确，符合MySQL规范
-3. 使用适当的WHERE条件
-4. 可以使用聚合函数如COUNT、SUM、AVG、MAX、MIN
-5. 确保表名和字段名与提供的信息完全匹配
-6. 只返回SQL语句，不要包含其他解释文字
+3. 使用适当的WHERE条件"""
+
+            # 添加时间相关的规则
+            if time_analysis.get("has_time_requirement"):
+                prompt += """
+4. 如果问题包含时间需求，请使用时间范围条件过滤数据
+5. 优先使用建议的时间字段（如包含time、date、created等字段的字段名）
+6. 使用BETWEEN或者>=和<=来构建时间范围条件，确保时间格式匹配
+7. 如果有多个时间表达式，请根据问题意图选择最合适的，或者都包含在WHERE条件中
+8. 可以使用聚合函数如COUNT、SUM、AVG、MAX、MIN"""
+            else:
+                prompt += """
+4. 可以使用聚合函数如COUNT、SUM、AVG、MAX、MIN"""
+
+            prompt += """
+9. 确保表名和字段名与提供的信息完全匹配
+10. 只返回SQL语句，不要包含其他解释文字
 
 SQL语句:"""
 
@@ -393,22 +572,57 @@ SQL语句:"""
 
             sql_query = quote_identifiers(sql_query)
 
+            # 强化的SQL验证
             if not sql_query.upper().startswith('SELECT'):
                 return {
                     'success': False,
                     'error': f"生成的SQL不是有效的SELECT查询: {sql_query}"
                 }
 
+            # 检查SQL的基本结构
+            if not re.search(r'\bFROM\b', sql_query, re.IGNORECASE):
+                logger.warning(f"Generated SQL missing FROM clause: {sql_query}")
+                return {
+                    'success': False,
+                    'error': f"生成的SQL缺少FROM子句: {sql_query}"
+                }
+
+            # 检查是否有过长的内容（可能是自然语言）
+            if len(sql_query) > 500:
+                logger.warning(f"Generated SQL too long ({len(sql_query)} chars): {sql_query[:100]}...")
+                return {
+                    'success': False,
+                    'error': f"生成的SQL过长，可能不是有效的SQL语句"
+                }
+
+            # 检查常见的自然语言模式
+            natural_language_patterns = [
+                r'好的|我帮您|请问|还有其他|需要帮忙吗|您的是|根据您的',
+                r'以下是|以下是您|让我为您|我来帮您|很抱歉|对不起',
+                r'查询一下|统计一下|计算一下|显示一下'
+            ]
+
+            for pattern in natural_language_patterns:
+                if re.search(pattern, sql_query):
+                    logger.warning(f"Generated SQL contains natural language patterns: {sql_query}")
+                    return {
+                        'success': False,
+                        'error': f"生成的SQL包含自然语言内容，请重新生成纯SQL语句"
+                    }
+
+            logger.info(f"Successfully generated SQL: {sql_query}")
             return {
                 'success': True,
-                'generated_sql': sql_query
+                'generated_sql': sql_query,
+                'time_analysis': time_analysis
             }
 
         except Exception as e:
             logger.error(f"Failed to generate SQL: {e}")
             return {
                 'success': False,
-                'error': str(e)
+                'error': str(e),
+                'time_analysis': time_analysis
             }
 
     async def _execute_sql_async(self, sql_query: str) -> Dict[str, Any]:

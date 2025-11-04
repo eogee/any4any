@@ -70,6 +70,9 @@ async def lifespan(app: FastAPI):
         from servers.IndexServer import IndexServer
         from servers.AuthServer import AuthServer
         from servers.ChatServer import ChatServer
+        from servers.PreviewServer import PreviewServer
+        from servers.TimeoutServer import TimeoutServer
+        from servers.ConversationServer import ConversationServer
 
         index_server = get_server_instance(IndexServer, "IndexServer")
         index_server.register_routes(app)
@@ -79,6 +82,15 @@ async def lifespan(app: FastAPI):
 
         chat_server = get_server_instance(ChatServer, "ChatServer")
         chat_server.register_routes(app)
+
+        preview_server = get_server_instance(PreviewServer, "PreviewServer")
+        preview_server.register_routes(app)
+
+        timeout_server = get_server_instance(TimeoutServer, "TimeoutServer")
+        timeout_server.register_routes(app)
+
+        conversation_server = get_server_instance(ConversationServer, "ConversationServer")
+        conversation_server.register_routes(app)
 
         if Config.ANY4DH_ENABLED:
             try:

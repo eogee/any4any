@@ -28,7 +28,7 @@ class ToolManager:
 
     def _initialize_tools(self) -> List[Dict[str, Any]]:
         """初始化工具列表"""
-        return [
+        tools = [
             {
                 "name": "sql_query",
                 "description": "执行SQL查询，用于数据库操作和数据分析",
@@ -44,6 +44,77 @@ class ToolManager:
                 }
             }
         ]
+
+        # 检查是否启用时间工具
+        try:
+            from config import Config
+            if getattr(Config, 'TIME_TOOLS_ENABLED', True):
+                tools.extend([
+                    # 获取当前时间工具
+                    {
+                        "name": "get_current_time",
+                        "description": "获取当前系统时间，用于时间相关查询",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "format": {
+                                    "type": "string",
+                                    "description": "时间格式，如'%Y-%m-%d'、'%Y-%m-%d %H:%M:%S'等",
+                                    "default": "%Y-%m-%d %H:%M:%S"
+                                }
+                            },
+                            "required": []
+                        }
+                    },
+                    # 解析时间表达式工具
+                    {
+                        "name": "parse_time_expression",
+                        "description": "解析自然语言时间表达式为具体时间范围，支持'本月'、'最近7天'、'2024年1月'等",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "expression": {
+                                    "type": "string",
+                                    "description": "时间表达式，如'本月'、'最近7天'、'2024年1月'等"
+                                },
+                                "base_date": {
+                                    "type": "string",
+                                    "description": "基准日期，格式为YYYY-MM-DD，默认为当前日期",
+                                    "default": ""
+                                }
+                            },
+                            "required": ["expression"]
+                        }
+                    },
+                    # 生成SQL时间条件工具
+                    {
+                        "name": "generate_sql_time_condition",
+                        "description": "为SQL查询生成时间范围条件",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "time_range": {
+                                    "type": "string",
+                                    "description": "时间范围信息，来自parse_time_expression的结果（JSON格式字符串）"
+                                },
+                                "column_name": {
+                                    "type": "string",
+                                    "description": "时间字段名称，如'create_time'、'order_date'等"
+                                },
+                                "date_format": {
+                                    "type": "string",
+                                    "description": "数据库中日期字段的格式，如'YYYY-MM-DD'、'DATETIME'等",
+                                    "default": "YYYY-MM-DD"
+                                }
+                            },
+                            "required": ["time_range", "column_name"]
+                        }
+                    }
+                ])
+        except Exception as e:
+            self.logger.warning(f"Failed to check TIME_TOOLS_ENABLED setting: {e}")
+
+        return tools
 
     def get_tool_list(self) -> List[Dict[str, Any]]:
         """获取可用工具列表"""
@@ -62,7 +133,17 @@ class ToolManager:
         """
         try:
             if tool_name == "sql_query":
+                self.logger.info(f"Using tool:sql_query")
                 return await self._execute_sql_query(parameters.get("query", ""))
+            elif tool_name == "get_current_time":
+                self.logger.info(f"Using tool:get_current_time")
+                return await self._get_current_time(parameters)
+            elif tool_name == "parse_time_expression":
+                self.logger.info(f"Using tool:parse_time_expression")
+                return await self._parse_time_expression(parameters)
+            elif tool_name == "generate_sql_time_condition":
+                self.logger.info(f"Using tool:generate_sql_time_condition")
+                return await self._generate_sql_time_condition(parameters)
             else:
                 return ToolResult(
                     success=False,
@@ -219,6 +300,115 @@ class ToolManager:
         except Exception as e:
             logger.error(f"Voice KB processing failed: {e}")
             return None
+
+    # ========== 时间工具执行方法 ==========
+
+    async def _get_current_time(self, parameters: Dict[str, Any]) -> ToolResult:
+        """获取当前时间"""
+        try:
+            from core.tools.nl2sql.time_utils import get_time_utils
+            time_utils = get_time_utils()
+
+            time_format = parameters.get("format", "%Y-%m-%d %H:%M:%S")
+            result = time_utils.get_current_time(time_format)
+
+            return ToolResult(
+                success=result.get("success", False),
+                data=result,
+                metadata={"tool_name": "get_current_time", "format": time_format}
+            )
+        except Exception as e:
+            self.logger.error(f"Get current time failed: {e}")
+            return ToolResult(success=False, error=str(e))
+
+    async def _parse_time_expression(self, parameters: Dict[str, Any]) -> ToolResult:
+        """解析时间表达式"""
+        try:
+            from core.tools.nl2sql.time_utils import get_time_utils
+            time_utils = get_time_utils()
+
+            expression = parameters.get("expression", "")
+            base_date = parameters.get("base_date", "")
+
+            if not expression:
+                return ToolResult(
+                    success=False,
+                    error="缺少必需参数: expression",
+                    metadata={"tool_name": "parse_time_expression"}
+                )
+
+            result = time_utils.parse_time_expression(expression, base_date)
+
+            return ToolResult(
+                success=result.get("success", False),
+                data=result,
+                metadata={
+                    "tool_name": "parse_time_expression",
+                    "expression": expression,
+                    "base_date": base_date
+                }
+            )
+        except Exception as e:
+            self.logger.error(f"Parse time expression failed: {e}")
+            return ToolResult(success=False, error=str(e))
+
+    async def _generate_sql_time_condition(self, parameters: Dict[str, Any]) -> ToolResult:
+        """生成SQL时间条件"""
+        try:
+            from core.tools.nl2sql.time_utils import get_time_utils
+            import json
+
+            time_utils = get_time_utils()
+
+            time_range = parameters.get("time_range", "")
+            column_name = parameters.get("column_name", "")
+            date_format = parameters.get("date_format", "YYYY-MM-DD")
+
+            if not time_range:
+                return ToolResult(
+                    success=False,
+                    error="缺少必需参数: time_range",
+                    metadata={"tool_name": "generate_sql_time_condition"}
+                )
+
+            if not column_name:
+                return ToolResult(
+                    success=False,
+                    error="缺少必需参数: column_name",
+                    metadata={"tool_name": "generate_sql_time_condition"}
+                )
+
+            # 解析时间范围信息
+            if isinstance(time_range, str):
+                try:
+                    time_range_info = json.loads(time_range)
+                except json.JSONDecodeError:
+                    return ToolResult(
+                        success=False,
+                        error="time_range 参数格式错误，应为有效的JSON字符串",
+                        metadata={"tool_name": "generate_sql_time_condition"}
+                    )
+            else:
+                time_range_info = time_range
+
+            sql_condition = time_utils.generate_sql_time_range(time_range_info, column_name, date_format)
+
+            return ToolResult(
+                success=True,
+                data={
+                    "sql_condition": sql_condition,
+                    "column_name": column_name,
+                    "date_format": date_format,
+                    "time_range_info": time_range_info
+                },
+                metadata={
+                    "tool_name": "generate_sql_time_condition",
+                    "column_name": column_name
+                }
+            )
+        except Exception as e:
+            self.logger.error(f"Generate SQL time condition failed: {e}")
+            return ToolResult(success=False, error=str(e))
 
 # 全局工具管理器实例
 _tool_manager_instance = None

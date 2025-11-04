@@ -107,5 +107,3 @@ class TimeoutServer(Server):
             if login_check:
                 return login_check
             return await self.get_timeout_detail_api(request, message_id)
-
-        logger.info("Timeout server routes registered successfully")

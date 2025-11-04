@@ -347,8 +347,6 @@ SQL_DB_DATABASE=your_database_name         # 数据库名称
 
 # 工具系统配置
 TOOLS_ENABLED=true                          # 是否启用工具系统
-TOOLS_DEBUG=false                          # 工具系统调试模式
-TOOLS_TIMEOUT=30                           # 工具调用超时时间(秒)
 
 # 模型配置
 LLM_MODEL_DIR=/path/to/your/llm/model     # LLM模型路径

@@ -711,8 +711,6 @@ async for chunk in UnifiedLLMInterface.generate_response_stream(
 |-------|------|-------|
 | ANY4DH_USE_UNIFIED_INTERFACE | 启用统一接口集成 | true |
 | TOOLS_ENABLED | 启用工具调用系统 | true |
-| TOOLS_DEBUG | 工具系统调试模式 | false |
-| TOOLS_TIMEOUT | 工具调用超时时间（秒） | 30 |
 
 ### 7.3 语音知识库配置
 
@@ -832,8 +830,6 @@ INDEX_TTS_FAST_ENABLED=true
 # 统一接口配置
 ANY4DH_USE_UNIFIED_INTERFACE=true
 TOOLS_ENABLED=true
-TOOLS_DEBUG=false
-TOOLS_TIMEOUT=30
 
 # 语音知识库配置
 ANY4DH_VOICE_KB_ENABLED=true

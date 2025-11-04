@@ -84,5 +84,3 @@ class PreviewServer(Server):
             if login_check:
                 return login_check
             return self.handle_users_request(preview_model)
-
-        logger.info("Preview server routes registered successfully")

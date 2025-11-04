@@ -198,5 +198,3 @@ class ConversationServer(Server):
             if login_check:
                 return login_check
             return await self.get_conversation_detail_api(request, conversation_id)
-
-        logger.info("Conversation server routes registered successfully")

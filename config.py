@@ -129,8 +129,11 @@ class Config:
 
     # 工具服务器配置
     TOOLS_ENABLED = get_bool_env("TOOLS_ENABLED", True)
-    TOOLS_DEBUG = get_bool_env("TOOLS_DEBUG", False)
-    TOOLS_TIMEOUT = int(os.getenv("TOOLS_TIMEOUT", "30"))  
+
+    # 时间工具配置
+    TIME_TOOLS_ENABLED = get_bool_env("TIME_TOOLS_ENABLED", True)
+    TIME_ZONE = os.getenv("TIME_ZONE", "Asia/Shanghai")
+    TIME_FORMAT_DEFAULT = os.getenv("TIME_FORMAT_DEFAULT", "%Y-%m-%d %H:%M:%S")  
 
     # 钉钉配置
     DINGTALK_ENABLED = get_bool_env("DINGTALK_ENABLED", False)
