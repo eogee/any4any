@@ -250,7 +250,7 @@ class ConversationManager:
         # 等待处理完成
         completion_event = self.user_delay_status[sender]['completion_event']
         start_time = self.user_delay_status[sender]['start_time']
-        timeout = delay_time + 30  # 延迟时间 + 30秒缓冲
+        timeout = delay_time + 60  # 延迟时间 + 60秒缓冲，给NL2SQL回退处理留出足够时间
         
         try:
             # 等待处理完成事件

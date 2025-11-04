@@ -335,6 +335,25 @@ function renderPreviewDetail(preview) {
             <h3><i class="fas fa-question-circle"></i> 当前问题</h3>
             <div class="preview-request">${lastUserQuestion}</div>
         </div>
+        
+        <div class="preview-section">
+            <h3><i class="fas fa-robot"></i> AI响应</h3>
+            <div class="preview-response">${renderedResponse}</div>
+        </div>
+
+        <div class="preview-actions">
+            ${lastAssistantMessage && lastAssistantMessage.is_timeout === 1 ?
+                `<button class="layui-btn layui-btn-warm" id="confirmTimeoutBtn">
+                    <i class="fas fa-warning"></i> 确认超时回复
+                </button>` :
+                `<button class="layui-btn layui-btn-normal" id="editBtn">
+                    <i class="fas fa-edit"></i> 编辑
+                </button>
+                <button class="layui-btn layui-btn-primary" id="confirmBtnDetail">
+                    <i class="fas fa-check"></i> 确认发送
+                </button>`
+            }
+        </div>
 
         <div class="preview-section">
             <h3><i class="fas fa-paper-plane"></i> 会话历史</h3>
@@ -354,24 +373,6 @@ function renderPreviewDetail(preview) {
                     <i class="fas fa-chevron-down"></i> 显示更多
                 </button>
             </div>
-        </div>
-        <div class="preview-section">
-            <h3><i class="fas fa-robot"></i> AI响应</h3>
-            <div class="preview-response">${renderedResponse}</div>
-        </div>
-
-        <div class="preview-actions">
-            ${lastAssistantMessage && lastAssistantMessage.is_timeout === 1 ?
-                `<button class="layui-btn layui-btn-warm" id="confirmTimeoutBtn">
-                    <i class="fas fa-warning"></i> 确认超时回复
-                </button>` :
-                `<button class="layui-btn layui-btn-normal" id="editBtn">
-                    <i class="fas fa-edit"></i> 编辑
-                </button>
-                <button class="layui-btn layui-btn-primary" id="confirmBtnDetail">
-                    <i class="fas fa-check"></i> 确认发送
-                </button>`
-            }
         </div>`;
 
     // 绑定按钮事件
@@ -404,18 +405,21 @@ async function loadConversationHistory(conversationId) {
         }
 
         const data = await ApiService.fetchConversationMessages(conversationId);
+        console.log('会话历史数据:', data); // 添加调试日志
 
         if (data.success) {
-            const reversedMessages = [...data.messages].reverse();
+            const messages = data.messages || [];
+            const reversedMessages = [...messages].reverse();
             renderConversationMessages(reversedMessages);
-            updateButtonsByTimeoutStatus(data.messages);
+            updateButtonsByTimeoutStatus(messages);
         } else {
             const tableBody = document.getElementById('requestTableBody');
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="2" class="error-state">加载失败</td></tr>';
+                tableBody.innerHTML = `<tr><td colspan="2" class="error-state">加载失败: ${data.error || '未知错误'}</td></tr>`;
             }
         }
     } catch (error) {
+        console.error('加载会话历史失败:', error);
         const tableBody = document.getElementById('requestTableBody');
         if (tableBody) {
             tableBody.innerHTML = '<tr><td colspan="2" class="error-state">网络错误</td></tr>';
@@ -428,6 +432,8 @@ function renderConversationMessages(messages) {
     const tableBody = document.getElementById('requestTableBody');
     if (!tableBody) return;
 
+    console.log('渲染会话消息:', messages); // 添加调试日志
+
     if (!messages || messages.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="2" class="empty-state">无对话消息</td></tr>';
         return;
@@ -439,10 +445,10 @@ function renderConversationMessages(messages) {
     for (let j = 0; j < messages.length; j++) {
         const msg = messages[j];
 
-        if (msg.sender_type === 'user') {
+        if (msg.role === 'user') {
             if (currentPair) pairs.push(currentPair);
             currentPair = { user: msg, assistant: null };
-        } else if (msg.sender_type === 'assistant' && currentPair) {
+        } else if (msg.role === 'assistant' && currentPair) {
             currentPair.assistant = msg;
             pairs.push(currentPair);
             currentPair = null;
@@ -531,7 +537,7 @@ function updateButtonsByTimeoutStatus(messages) {
 
     let lastAssistantMessage = null;
     for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].sender_type === 'assistant') {
+        if (messages[i].role === 'assistant') {
             lastAssistantMessage = messages[i];
             break;
         }

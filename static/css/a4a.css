@@ -162,6 +162,11 @@ body::before {
     gap: 20px;
 }
 
+.preview-detail .empty-state {
+    flex: 1;
+    min-height: 100%;
+}
+
 .preview-section {
     background: rgba(255, 255, 255, 0.7);
     border-radius: 12px;
@@ -201,7 +206,7 @@ body::before {
     display: flex;
     gap: 15px;
     justify-content: flex-end;
-    margin-top: 20px;
+    margin: 10px 0px;
 }
 
 .video-container {
@@ -547,6 +552,12 @@ body::before {
     text-align: center;
     padding: 40px 20px;
     color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    flex-grow: 1;
 }
 
 .empty-state i {
@@ -1547,8 +1558,14 @@ body::before {
 
 .empty-state {
     text-align: center;
-    padding: 60px 20px;
+    padding: 40px 20px;
     color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    flex-grow: 1;
 }
 
 .empty-state i {

@@ -292,7 +292,41 @@ class ApprovedPreviewsManager {
         }
 
         // 创建详情内容
-        const messages = previewData.messages || [];
+        // 兼容两种数据结构：直接在previewData中的messages，或在request中的messages
+        let messages = previewData.messages || (previewData.request ? previewData.request.messages : []) || [];
+
+        // 检查messages是否为JSON字符串，如果是则解析
+        if (typeof messages === 'string' && messages.trim()) {
+            try {
+                // 先尝试直接解析
+                messages = JSON.parse(messages);
+            } catch (e) {
+                try {
+                    // 修复常见的JSON问题：未转义的换行符和引号
+                    let fixedJson = messages
+                        .replace(/\n/g, '\\n')  // 转义换行符
+                        .replace(/\r/g, '\\r')  // 转义回车符
+                        .replace(/\t/g, '\\t')  // 转义制表符
+                        .replace(/(?<!\\)"/g, '\\"');  // 转义未转义的引号
+
+                    // 确保JSON字符串格式正确
+                    if (!fixedJson.startsWith('[')) {
+                        fixedJson = '[' + fixedJson + ']';
+                    }
+
+                    messages = JSON.parse(fixedJson);
+                } catch (e2) {
+                    // 最后尝试：移除所有控制字符
+                    try {
+                        let cleanJson = messages.replace(/[\x00-\x1F\x7F]/g, '');
+                        messages = JSON.parse(cleanJson);
+                    } catch (e3) {
+                        messages = [];
+                    }
+                }
+            }
+        }
+
         let messagesHtml = '';
 
         if (Array.isArray(messages)) {

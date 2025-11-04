@@ -158,7 +158,12 @@ class ToolProcessor:
                 if workflow_result['success']:
                     return workflow_result['final_answer']
                 else:
-                    logger.warning(f"NL2SQL workflow failed: {workflow_result.get('error')}")
+                    error_msg = workflow_result.get('error', '')
+                    # 如果是无法确定表的问题，静默回退到正常处理
+                    if '无法确定需要查询哪些表' in error_msg or '找不到相关表' in error_msg:
+                        logger.info(f"NL2SQL: {error_msg}, falling back to normal LLM response")
+                    else:
+                        logger.warning(f"NL2SQL workflow failed: {error_msg}")
                     return await self._process_with_knowledge_base(user_message, generate_response_func)
             else:
                 # 其它问题，使用一般的工具分析逻辑

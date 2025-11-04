@@ -176,7 +176,6 @@ class ConversationsManager {
                 });
             });
 
-            
             // 监听表单重置
             document.getElementById('filterForm')?.addEventListener('reset', () => {
                 // 重置后立即重新加载表格，清除所有筛选条件

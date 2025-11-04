@@ -92,9 +92,11 @@ class Model(ABC):
         """执行SQL查询（INSERT、UPDATE、DELETE）"""
         def _execute():
             connection = self._get_connection()
-            cursor = connection.cursor(dictionary=True)
+            cursor = None
 
             try:
+                cursor = connection.cursor(dictionary=True)
+
                 if params:
                     cursor.execute(query, params)
                 else:
@@ -109,7 +111,8 @@ class Model(ABC):
                 result = cursor.rowcount
 
                 # 关闭游标
-                cursor.close()
+                if cursor:
+                    cursor.close()
 
                 # 连接池模式下归还连接
                 if self.use_connection_pool:
@@ -117,9 +120,10 @@ class Model(ABC):
 
                 return result
 
-            except Exception:
+            except Exception as e:
                 # 出错时确保关闭游标和归还连接
-                cursor.close()
+                if cursor:
+                    cursor.close()
                 if self.use_connection_pool:
                     self.connection_pool.return_connection(connection)
                 raise
@@ -151,9 +155,11 @@ class Model(ABC):
         """执行SQL查询并返回单行结果"""
         def _fetch():
             connection = self._get_connection()
-            cursor = connection.cursor(dictionary=True)
+            cursor = None
 
             try:
+                cursor = connection.cursor(dictionary=True)
+
                 if params:
                     cursor.execute(query, params)
                 else:
@@ -162,7 +168,8 @@ class Model(ABC):
                 result = cursor.fetchone()
 
                 # 关闭游标
-                cursor.close()
+                if cursor:
+                    cursor.close()
 
                 # 连接池模式下归还连接
                 if self.use_connection_pool:
@@ -170,9 +177,10 @@ class Model(ABC):
 
                 return result
 
-            except Exception:
+            except Exception as e:
                 # 出错时确保关闭游标和归还连接
-                cursor.close()
+                if cursor:
+                    cursor.close()
                 if self.use_connection_pool:
                     self.connection_pool.return_connection(connection)
                 raise
@@ -202,9 +210,11 @@ class Model(ABC):
         """执行SQL查询并返回所有结果"""
         def _fetch():
             connection = self._get_connection()
-            cursor = connection.cursor(dictionary=True)
+            cursor = None
 
             try:
+                cursor = connection.cursor(dictionary=True)
+
                 if params:
                     cursor.execute(query, params)
                 else:
@@ -213,7 +223,8 @@ class Model(ABC):
                 result = cursor.fetchall()
 
                 # 关闭游标
-                cursor.close()
+                if cursor:
+                    cursor.close()
 
                 # 连接池模式下归还连接
                 if self.use_connection_pool:
@@ -221,9 +232,10 @@ class Model(ABC):
 
                 return result
 
-            except Exception:
+            except Exception as e:
                 # 出错时确保关闭游标和归还连接
-                cursor.close()
+                if cursor:
+                    cursor.close()
                 if self.use_connection_pool:
                     self.connection_pool.return_connection(connection)
                 raise
@@ -265,27 +277,65 @@ class Model(ABC):
         columns = ', '.join(data.keys())
         placeholders = ', '.join(['%s'] * len(data))
         query = f"INSERT INTO {self.get_table_name()} ({columns}) VALUES ({placeholders})"
-        
+
+        def _insert():
+            connection = self._get_connection()
+            cursor = None
+
+            try:
+                cursor = connection.cursor(dictionary=False)
+                cursor.execute(query, tuple(data.values()))
+
+                if not self.use_connection_pool:
+                    connection.commit()
+
+                result = cursor.lastrowid
+                self.logger.debug(f"Inserted record into {self.get_table_name()}, ID: {result}")
+
+                # 关闭游标
+                if cursor:
+                    cursor.close()
+
+                # 连接池模式下归还连接
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+
+                return result
+
+            except Exception as e:
+                # 出错时确保关闭游标和归还连接
+                if cursor:
+                    cursor.close()
+                if self.use_connection_pool:
+                    self.connection_pool.return_connection(connection)
+                raise
+
         try:
-            cursor = self._get_cursor(dictionary=False)
-            cursor.execute(query, tuple(data.values()))
-            self.connection.commit()
-            self.logger.debug(f"Inserted record into {self.get_table_name()}, ID: {cursor.lastrowid}")
-            return cursor.lastrowid
-        except Error as e:
+            if self.use_connection_pool and hasattr(self, 'retry_manager'):
+                result = self.retry_manager.retry_with_backoff(_insert)
+            else:
+                result = _insert()
+
+            # 记录成功指标
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_success('insert', 0)
+
+            return result
+
+        except Exception as e:
             self.logger.error(f"Insert failed: {e}")
-            if self.connection:
-                self.connection.rollback()
+            if self.use_connection_pool:
+                self.connection_pool.record_operation_error('insert', str(e))
             raise
     
     def update(self, id_value: Any, data: Dict[str, Any], id_column: str = 'id') -> int:
         """更新一条记录"""
         if id_column in data:
             del data[id_column]
-            
+
         set_clause = ', '.join([f"{key} = %s" for key in data.keys()])
         query = f"UPDATE {self.get_table_name()} SET {set_clause} WHERE {id_column} = %s"
-        
+
         params = tuple(data.values()) + (id_value,)
         return self.execute_query(query, params)
     
