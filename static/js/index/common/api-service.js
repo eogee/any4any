@@ -66,7 +66,7 @@ async function confirmPreview(previewId, requestBody) {
 
 // 保存预览内容
 async function savePreviewContent(previewId, content, additionalFields = {}) {
-    return await apiRequest(`/api/previews/${previewId}`, {
+    return await apiRequest(`/api/preview/${previewId}`, {
         method: 'PUT',
         body: JSON.stringify({ content, ...additionalFields })
     });
@@ -147,7 +147,7 @@ async function getTimeoutStats(sender = null, platform = null) {
 
 // 获取已回复统计数据
 async function getApprovedStats(sender = null, platform = null) {
-    let url = '/api/preview/stats';
+    let url = '/api/previews/stats';
     const params = new URLSearchParams();
 
     if (sender) params.append('sender', sender);

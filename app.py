@@ -81,8 +81,3 @@ app.post("/v1/db/execute")(execute_query)
 # 注册Embedding API路由
 embedding_router = get_embedding_router()
 app.include_router(embedding_router)
-
-# 注册PreviewServer路由
-from servers.PreviewServer import PreviewServer
-preview_server = PreviewServer()
-preview_server.register_routes(app)

@@ -250,7 +250,7 @@ class IndexServer(Server):
             return await self.get_preview_data(preview_id)
         
         @app.post("/api/preview/{preview_id}/edit")
-        @app.put("/api/previews/{preview_id}")
+        @app.put("/api/preview/{preview_id}")
         async def update_preview_route(request: Request, preview_id: str):
             if redirect := await require_login(request):
                 return redirect

@@ -62,16 +62,19 @@ class PreviewServer(Server):
             return await self.get_preview_page(request)
 
         # 使用基类的通用路由处理器创建API路由
-        @app.get("/api/preview/list")
-        async def preview_list_api(request: Request, page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
-                                  user_nick: str = Query(None), date_range: str = Query("all"),
-                                  search: str = Query(None)):
+        @app.get("/api/previews/list")
+        async def preview_list_api(request: Request, 
+                          page: int = Query(1, ge=1), 
+                          limit: int = Query(20, ge=1, le=100),
+                          user_nick: str = Query(None), 
+                          date_range: str = Query("all"),
+                          search: str = Query(None)):
             login_check = await require_login(request)
             if login_check:
                 return login_check
             return self.handle_list_request(preview_model, page, limit, user_nick, date_range, search)
 
-        @app.get("/api/preview/stats")
+        @app.get("/api/previews/stats")
         async def preview_stats_api(request: Request, user_nick: str = Query(None), date_range: str = Query("all")):
             login_check = await require_login(request)
             if login_check:

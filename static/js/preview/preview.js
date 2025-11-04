@@ -58,7 +58,7 @@ class ApprovedPreviewsManager {
 
         this.table = this.layui.table.render({
             elem: '#previewsTable',
-            url: '/api/preview/list',
+            url: '/api/previews/list',
             method: 'get',
             toolbar: '#tableToolbar',
             defaultToolbar: ['exports', 'print'],
@@ -287,7 +287,7 @@ class ApprovedPreviewsManager {
 
     viewPreviewDetail(previewData) {
         if (!this.layui || !this.layui.layer) {
-            window.open(`/api/preview/${previewData.preview_id}`, '_blank');
+            window.open(`/api/previews/${previewData.preview_id}`, '_blank');
             return;
         }
 
