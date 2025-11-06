@@ -28,22 +28,37 @@ class ToolManager:
 
     def _initialize_tools(self) -> List[Dict[str, Any]]:
         """初始化工具列表"""
-        tools = [
-            {
-                "name": "sql_query",
-                "description": "执行SQL查询，用于数据库操作和数据分析",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "要执行的SQL查询语句"
-                        }
-                    },
-                    "required": ["query"]
-                }
-            }
-        ]
+        tools = []
+
+        # 检查是否启用NL2SQL工具
+        try:
+            from config import Config
+            if getattr(Config, 'NL2SQL_ENABLED', True):
+                tools.append({
+                    "name": "sql_query",
+                    "description": "执行SQL查询，用于数据库操作和数据分析",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "要执行的SQL查询语句"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                })
+        except Exception as e:
+            self.logger.warning(f"Failed to check NL2SQL_ENABLED setting: {e}")
+
+        # 检查工具系统总开关
+        try:
+            from config import Config
+            if not getattr(Config, 'TOOLS_ENABLED', True):
+                self.logger.info("Tools system is disabled globally")
+                return tools
+        except Exception as e:
+            self.logger.warning(f"Failed to check TOOLS_ENABLED setting: {e}")
 
         # 检查是否启用时间工具
         try:
@@ -114,6 +129,65 @@ class ToolManager:
         except Exception as e:
             self.logger.warning(f"Failed to check TIME_TOOLS_ENABLED setting: {e}")
 
+        # 检查是否启用ADB工具
+        try:
+            from config import Config
+            if getattr(Config, 'ADB_TOOLS_ENABLED', False):
+                tools.extend([
+                    {
+                        "name": "adb_login",
+                        "description": "通过ADB自动化登录App，需要先确保设备已连接并打开App",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    },
+                    {
+                        "name": "adb_logout",
+                        "description": "通过ADB自动化登出App",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    },
+                    {
+                        "name": "adb_query_bill",
+                        "description": "通过ADB自动化查询电费账单",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    },
+                    {
+                        "name": "adb_pay_bill",
+                        "description": "通过ADB自动化缴纳电费",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "amount": {
+                                    "type": "integer",
+                                    "description": "缴费金额（元），必须大于0"
+                                }
+                            },
+                            "required": ["amount"]
+                        }
+                    },
+                    {
+                        "name": "get_adb_status",
+                        "description": "获取ADB工具状态信息，包括连接状态和登录状态",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                ])
+        except Exception as e:
+            self.logger.warning(f"Failed to check ADB_TOOLS_ENABLED setting: {e}")
+
         return tools
 
     def get_tool_list(self) -> List[Dict[str, Any]]:
@@ -144,6 +218,22 @@ class ToolManager:
             elif tool_name == "generate_sql_time_condition":
                 self.logger.info(f"Using tool:generate_sql_time_condition")
                 return await self._generate_sql_time_condition(parameters)
+            # ADB工具执行
+            elif tool_name == "adb_login":
+                self.logger.info(f"Using tool:adb_login")
+                return await self._execute_adb_login(parameters)
+            elif tool_name == "adb_logout":
+                self.logger.info(f"Using tool:adb_logout")
+                return await self._execute_adb_logout(parameters)
+            elif tool_name == "adb_query_bill":
+                self.logger.info(f"Using tool:adb_query_bill")
+                return await self._execute_adb_query_bill(parameters)
+            elif tool_name == "adb_pay_bill":
+                self.logger.info(f"Using tool:adb_pay_bill")
+                return await self._execute_adb_pay_bill(parameters)
+            elif tool_name == "get_adb_status":
+                self.logger.info(f"Using tool:get_adb_status")
+                return await self._get_adb_status(parameters)
             else:
                 return ToolResult(
                     success=False,
@@ -210,6 +300,14 @@ class ToolManager:
         返回:
             是否需要SQL查询
         """
+        # 首先检查NL2SQL是否启用
+        try:
+            from config import Config
+            if not getattr(Config, 'NL2SQL_ENABLED', True):
+                return False
+        except Exception as e:
+            self.logger.warning(f"Failed to check NL2SQL_ENABLED: {e}")
+            return False
         sql_keywords = [
             '查询', '统计', '计算', '显示', '列出', '多少', '几个', '总数', '平均',
             '最高', '最低', '最大', '最小', '排序', '分组', '汇总', '数据', '记录',
@@ -247,8 +345,7 @@ class ToolManager:
         has_follow_up_keywords = any(keyword.lower() in question_lower for keyword in follow_up_keywords)
         has_data_question = any(re.search(pattern, question, re.IGNORECASE) for pattern in data_question_patterns)
 
-        # 如果有追问关键词，且有数据相关的上下文（简化的判断）
-        # 这里可以通过检查对话历史来增强判断
+        # 如果有追问关键词，且有数据相关的上下文
         has_context_related = any(word in question_lower for word in ['谁', '什么', '哪个', '详情', '具体'])
 
         return has_sql_keywords or has_data_question or (has_follow_up_keywords and has_context_related)
@@ -408,6 +505,93 @@ class ToolManager:
             )
         except Exception as e:
             self.logger.error(f"Generate SQL time condition failed: {e}")
+            return ToolResult(success=False, error=str(e))
+
+    # ========== ADB工具执行方法 ==========
+
+    async def _execute_adb_login(self, parameters: Dict[str, Any]) -> ToolResult:
+        """执行ADB登录"""
+        try:
+            from core.tools.adb.llm_interface import adb_login_for_llm
+            result = await adb_login_for_llm()
+
+            return ToolResult(
+                success=result.get("success", False),
+                data=result,
+                metadata={"tool_name": "adb_login"}
+            )
+        except Exception as e:
+            self.logger.error(f"ADB login failed: {e}")
+            return ToolResult(success=False, error=str(e))
+
+    async def _execute_adb_logout(self, parameters: Dict[str, Any]) -> ToolResult:
+        """执行ADB登出"""
+        try:
+            from core.tools.adb.llm_interface import adb_logout_for_llm
+            result = await adb_logout_for_llm()
+
+            return ToolResult(
+                success=result.get("success", False),
+                data=result,
+                metadata={"tool_name": "adb_logout"}
+            )
+        except Exception as e:
+            self.logger.error(f"ADB logout failed: {e}")
+            return ToolResult(success=False, error=str(e))
+
+    async def _execute_adb_query_bill(self, parameters: Dict[str, Any]) -> ToolResult:
+        """执行ADB账单查询"""
+        try:
+            from core.tools.adb.llm_interface import adb_query_bill_for_llm
+            result = await adb_query_bill_for_llm()
+
+            return ToolResult(
+                success=result.get("success", False),
+                data=result,
+                metadata={"tool_name": "adb_query_bill"}
+            )
+        except Exception as e:
+            self.logger.error(f"ADB query bill failed: {e}")
+            return ToolResult(success=False, error=str(e))
+
+    async def _execute_adb_pay_bill(self, parameters: Dict[str, Any]) -> ToolResult:
+        """执行ADB缴费"""
+        try:
+            amount = parameters.get("amount", 10)
+
+            # 验证参数
+            if not isinstance(amount, (int, float)) or amount <= 0:
+                return ToolResult(
+                    success=False,
+                    error=f"缴费金额无效: {amount}，金额必须是大于0的数字",
+                    metadata={"tool_name": "adb_pay_bill"}
+                )
+
+            from core.tools.adb.llm_interface import adb_pay_bill_for_llm
+            result = await adb_pay_bill_for_llm(amount)
+
+            return ToolResult(
+                success=result.get("success", False),
+                data=result,
+                metadata={"tool_name": "adb_pay_bill", "amount": amount}
+            )
+        except Exception as e:
+            self.logger.error(f"ADB pay bill failed: {e}")
+            return ToolResult(success=False, error=str(e))
+
+    async def _get_adb_status(self, parameters: Dict[str, Any]) -> ToolResult:
+        """获取ADB状态"""
+        try:
+            from core.tools.adb.llm_interface import get_adb_status_for_llm
+            result = await get_adb_status_for_llm()
+
+            return ToolResult(
+                success=True,
+                data=result,
+                metadata={"tool_name": "get_adb_status"}
+            )
+        except Exception as e:
+            self.logger.error(f"Get ADB status failed: {e}")
             return ToolResult(success=False, error=str(e))
 
 # 全局工具管理器实例

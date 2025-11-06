@@ -50,6 +50,9 @@ core/any4dh/results/
 # backups
 backups/
 
+# adb
+core/tools/adb/
+
 # docs
 example.md
 example_zh.md

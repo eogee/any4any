@@ -274,8 +274,8 @@ async def list_available_models() -> list:
 
     if Config.LLM_SERVER_TYPE == "api":
         return [{
-            "id": Config.MODEL_NAME or "gpt-3.5-turbo",
-            "name": Config.MODEL_NAME or "gpt-3.5-turbo",
+            "id": Config.MODEL_NAME or "glm-4.6",
+            "name": Config.MODEL_NAME or "glm-4.6",
             "description": "External LLM API",
             "provider": "external"
         }]

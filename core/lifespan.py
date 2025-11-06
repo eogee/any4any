@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
 
     # 初始化NL2SQL工具的示例数据
     try:
-        if getattr(Config, 'TOOLS_ENABLED', False):
+        if getattr(Config, 'NL2SQL_ENABLED', False):
             from core.tools.nl2sql.table_info import get_table_manager
             table_manager = get_table_manager()            
             logger.info("NL2SQL tool initialized")

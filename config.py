@@ -127,8 +127,10 @@ class Config:
     SQL_DB_PASSWORD = MYSQL_PASSWORD
     SQL_DB_DATABASE = MYSQL_DATABASE
 
-    # 工具服务器配置
-    TOOLS_ENABLED = get_bool_env("TOOLS_ENABLED", True)
+    # 工具系统配置
+    TOOLS_ENABLED = get_bool_env("TOOLS_ENABLED", True) 
+    # NL2SQL工具配置
+    NL2SQL_ENABLED = get_bool_env("NL2SQL_ENABLED", True)
 
     # 时间工具配置
     TIME_TOOLS_ENABLED = get_bool_env("TIME_TOOLS_ENABLED", True)
@@ -190,3 +192,9 @@ class Config:
 
     # 本地LLM模型名称配置
     LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen3-0.6b")
+
+    # ADB工具配置
+    ADB_TOOLS_ENABLED = get_bool_env("ADB_TOOLS_ENABLED", False)
+    ADB_COMMAND_PATH = os.getenv("ADB_COMMAND_PATH", "/mnt/c/platform-tools/adb.exe")
+    ADB_TIMEOUT = int(os.getenv("ADB_TIMEOUT", 30))
+    ADB_RETRY_COUNT = int(os.getenv("ADB_RETRY_COUNT", 3))
