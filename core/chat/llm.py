@@ -9,7 +9,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 from config import Config
 
 from .external_llm import generate_chat_response, is_external_llm_enabled
-from .tool_processor import ToolProcessor
+from core.tools import process_with_tools
 
 logger = logging.getLogger(__name__)
 
@@ -446,8 +446,7 @@ class UnifiedLLMService:
     def __init__(self):
         self.local_service = None
         self.service_type = "external" if is_external_llm_enabled() else "local"
-        self.tool_processor = ToolProcessor(getattr(Config, 'TOOLS_ENABLED', True))
-        self._tools_enabled = self.tool_processor._tools_enabled
+        self._tools_enabled = getattr(Config, 'TOOLS_ENABLED', True)
         self._initialized = False
 
     async def initialize(self):
@@ -588,6 +587,40 @@ class UnifiedLLMService:
         else:
             return "LLM服务未正确初始化。"
 
+    async def process_with_tools_support(
+        self,
+        user_message: str,
+        conversation_manager=None,
+        user_id: str = None,
+        platform: str = None
+    ) -> str:
+        """处理用户消息，支持工具调用"""
+        if not self._tools_enabled:
+            return await self.generate_response(user_message)
+
+        try:
+            # 调用tools模块的处理逻辑
+            tool_result = await process_with_tools(
+                user_message, self.generate_response,
+                conversation_manager, user_id, platform
+            )
+
+            # 如果工具处理成功，返回结果
+            if tool_result:
+                return tool_result
+
+            # 否则回退到普通LLM响应
+            return await self.generate_response(user_message)
+
+        except Exception as e:
+            logger.error(f"Tool processing error: {e}")
+            return await self.generate_response(user_message)
+
+    def is_tool_supported(self) -> bool:
+        """检查是否支持工具功能"""
+        return self._tools_enabled
+
+    # 保持向后兼容的方法
     async def process_with_tools(
         self,
         user_message: str,
@@ -595,18 +628,13 @@ class UnifiedLLMService:
         user_id: str = None,
         platform: str = None
     ) -> str:
-        """使用工具处理用户消息"""
-        return await self.tool_processor.process_with_tools(
+        """使用工具处理用户消息（向后兼容）"""
+        return await self.process_with_tools_support(
             user_message,
-            self.generate_response,
             conversation_manager,
             user_id,
             platform
         )
-
-    def is_tool_supported(self) -> bool:
-        """检查是否支持工具功能"""
-        return self.tool_processor._tools_enabled
 
     async def list_available_models(self) -> List[Dict[str, Any]]:
         """获取可用模型列表"""

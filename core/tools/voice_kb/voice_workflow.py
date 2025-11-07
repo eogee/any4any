@@ -1,26 +1,88 @@
+"""
+语音知识库工具 - 整合检测、处理和执行逻辑
+"""
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Callable
+
 from config import Config
-from core.tools.voice_kb.voice_retriever import get_voice_retriever
+from ..base_tool import BaseTool
+from ..result import ToolResult
+from .voice_retriever import get_voice_retriever
 
 logger = logging.getLogger(__name__)
 
-class VoiceKBWorkflow:
-    """语音知识库工作流程 - 参考nl2sql设计模式"""
+class VoiceKBTool(BaseTool):
+    """语音知识库工具 - 完整的语音查询检测、处理和执行"""
 
-    def __init__(self):
+    def __init__(self, enabled: bool = True):
+        super().__init__(enabled)
         self.voice_retriever = get_voice_retriever()
 
-    async def process_voice_query(self, user_input: str) -> Dict[str, Any]:
-        """
-        处理语音查询的完整工作流程
+    @property
+    def priority(self) -> int:
+        return 2  # 中等优先级
 
-        工作流程：
-        1. 检查是否启用语音知识库
-        2. 进行语音匹配搜索
-        3. 评估匹配质量
-        4. 返回语音文件信息
-        """
+    @property
+    def name(self) -> str:
+        return "voice_kb"
+
+    @property
+    def description(self) -> str:
+        return "语音知识库查询工具，支持语义语音匹配和播放"
+
+    async def can_handle(self, user_message: str) -> bool:
+        """检测是否为英文输入 - VoiceKB主要用于英文内容响应"""
+        if not user_message or not user_message.strip() or not self.enabled:
+            return False
+
+        # 检查配置
+        if not Config.ANY4DH_VOICE_KB_ENABLED:
+            return False
+
+        # 检测输入是否包含英文内容
+        return self._is_english_input(user_message)
+
+    def _is_english_input(self, text: str) -> bool:
+        """检测文本是否包含英文内容"""
+        # 检查是否包含英文字母
+        english_chars = sum(1 for char in text if char.isalpha() and ord(char) < 128)
+        total_chars = sum(1 for char in text if char.isalpha())
+
+        # 如果英文字符占字母字符总数的50%以上，认为是英文输入
+        if total_chars == 0:
+            return False
+
+        english_ratio = english_chars / total_chars
+        return english_ratio >= 0.5
+
+    async def process(self, user_message: str, generate_response_func: Callable,
+                     conversation_manager=None, user_id: str = None,
+                     platform: str = None) -> Optional[str]:
+        """处理语音查询"""
+        try:
+            if not Config.ANY4DH_VOICE_KB_ENABLED:
+                return None
+
+            result = await self.process_voice_query(user_message)
+
+            if result["success"] and result["should_use_voice"]:
+                voice_info = result["voice_info"]
+                if voice_info:
+                    return f"[VOICE_KB_RESPONSE:{voice_info['audio_file']}:{voice_info['response_text']}]"
+                else:
+                    self.logger.warning("Voice info is empty, falling back to text")
+                    return None
+            else:
+                self.logger.info(f"Voice KB not suitable: confidence={result.get('confidence', 0):.3f}")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Voice KB processing failed: {e}")
+            return None
+
+    # 保持原有的工作流程方法
+    async def process_voice_query(self, user_input: str) -> Dict[str, Any]:
+        """原有的语音查询工作流程 - 保持不变"""
         try:
             logger.info(f"Processing voice query: {user_input}")
 
@@ -101,12 +163,78 @@ class VoiceKBWorkflow:
             }
 
     def is_voice_kb_question(self, question: str) -> bool:
-        """
-        判断问题是否适合使用语音知识库回复
+        """语音知识库问题检测（兼容原接口）"""
+        import asyncio
 
-        简化逻辑：只要启用了voice_kb且问题不为空就使用
-        """
-        return Config.ANY4DH_VOICE_KB_ENABLED and question and question.strip()
+        # 由于这是一个同步方法，我们需要运行异步的检测逻辑
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # 如果已经在事件循环中，创建任务
+                task = asyncio.create_task(self.can_handle(question))
+                return task
+            else:
+                # 如果没有运行的事件循环，直接运行
+                return asyncio.run(self.can_handle(question))
+        except Exception as e:
+            self.logger.error(f"Voice KB question detection failed: {e}")
+            return False
+
+    async def execute(self, parameters: Dict[str, Any]) -> ToolResult:
+        """执行语音知识库工具方法（兼容原接口）"""
+        try:
+            operation = parameters.get("operation", "")
+            query = parameters.get("query", "")
+
+            if operation == "get_categories":
+                categories = self.get_available_categories()
+                return ToolResult.success_result(
+                    data=categories,
+                    tool_name=self.name,
+                    metadata={"operation": "get_categories"}
+                )
+
+            elif operation == "search_by_category":
+                category = parameters.get("category", "")
+                if not category:
+                    return ToolResult.error_result(
+                        "缺少必需参数: category",
+                        tool_name=self.name
+                    )
+
+                result = await self.search_by_category(category, query)
+                return ToolResult.success_result(
+                    data=result,
+                    tool_name=self.name,
+                    metadata={"operation": "search_by_category", "category": category}
+                )
+
+            elif operation == "voice_query":
+                if not query:
+                    return ToolResult.error_result(
+                        "缺少必需参数: query",
+                        tool_name=self.name
+                    )
+
+                result = await self.process_voice_query(query)
+                return ToolResult.success_result(
+                    data=result,
+                    tool_name=self.name,
+                    metadata={"operation": "voice_query"}
+                )
+
+            else:
+                return ToolResult.error_result(
+                    f"不支持的操作: {operation}",
+                    tool_name=self.name
+                )
+
+        except Exception as e:
+            self.logger.error(f"Voice KB tool execution failed: {e}")
+            return ToolResult.error_result(
+                f"语音知识库工具执行失败: {str(e)}",
+                tool_name=self.name
+            )
 
     def get_available_categories(self) -> Dict[str, Any]:
         """获取可用的语音分类"""
@@ -145,11 +273,25 @@ class VoiceKBWorkflow:
                 "results": []
             }
 
-# 全局实例
-_voice_workflow = None
+# 保持向后兼容的类和函数
+class VoiceKBWorkflow(VoiceKBTool):
+    """向后兼容的语音知识库工作流程类"""
+    pass
+
+# 工厂函数
+def get_voice_kb_tool() -> VoiceKBTool:
+    """获取语音知识库工具实例"""
+    return VoiceKBTool()
 
 def get_voice_workflow() -> VoiceKBWorkflow:
-    """获取语音工作流程单例"""
+    """获取语音工作流程实例（向后兼容）"""
+    return VoiceKBWorkflow()
+
+# 保持原有的全局实例（向后兼容）
+_voice_workflow = None
+
+def get_voice_workflow_legacy() -> VoiceKBWorkflow:
+    """获取语音工作流程单例（向后兼容）"""
     global _voice_workflow
     if _voice_workflow is None:
         _voice_workflow = VoiceKBWorkflow()
