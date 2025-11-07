@@ -9,7 +9,7 @@ from fastapi import Header, HTTPException
 from edge_tts import VoicesManager
 from FlagEmbedding import FlagReranker
 from core.auth.model_auth import verify_token
-from core.chat.llm import get_llm_service
+from core.chat.llm import llm_service
 from core.tts.index_tts_engine import IndexTTSEngine
 from core.asr.model import SenseVoiceSmall
 
@@ -113,8 +113,7 @@ class ModelManager:
 
             if load_llm and not cls.llm_service:
                 logger.info("Loading LLM model...")
-                cls.llm_service = get_llm_service()
-                init_success = await cls.llm_service.initialize()
+                init_success = await llm_service.initialize()
                 if init_success:
                     logger.info(f"LLM service initialized...")
                 else:
@@ -145,7 +144,7 @@ class ModelManager:
 
     @classmethod
     def get_llm_service(cls):
-        return cls.llm_service
+        return llm_service
 
     @classmethod
     def get_embedding_model(cls):

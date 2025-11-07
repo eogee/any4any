@@ -225,8 +225,8 @@ async def process_llm_stream(text: str) -> AsyncGenerator[str, None]:
                 if chunk and chunk.strip():
                     yield chunk
         else:
-            from core.chat.llm import get_llm_service
-            llm_service = get_llm_service()
+            from core.chat.llm import llm_service
+            llm_service = llm_service()
 
             async for chunk in llm_service.generate_stream(text):
                 if chunk and chunk.strip():

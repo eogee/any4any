@@ -196,9 +196,7 @@ class NL2SQLWorkflow:
     async def _analyze_tables_needed(self, question: str, all_tables: List[Dict], context: str) -> Optional[List[str]]:
         """LLM分析问题并确定需要的表"""
         try:
-            from core.chat.llm import get_llm_service
-
-            llm_service = get_llm_service()
+            from core.chat.llm import llm_service
             if not llm_service:
                 return None
 
@@ -447,9 +445,7 @@ orders
     async def _generate_sql(self, question: str, table_schemas: str, context: str) -> Dict[str, Any]:
         """LLM生成SQL语句 - 增强时间信息支持"""
         try:
-            from core.chat.llm import get_llm_service
-
-            llm_service = get_llm_service()
+            from core.chat.llm import llm_service
             if not llm_service:
                 return {
                     'success': False,
@@ -665,9 +661,7 @@ SQL语句:"""
     async def _generate_final_answer(self, question: str, sql_query: str, query_result: str, context: str) -> str:
         """LLM生成最终回答"""
         try:
-            from core.chat.llm import get_llm_service
-
-            llm_service = get_llm_service()
+            from core.chat.llm import llm_service
             if not llm_service:
                 return "抱歉，无法生成回答。"
 

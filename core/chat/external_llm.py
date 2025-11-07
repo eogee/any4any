@@ -261,8 +261,8 @@ def generate_chat_response(messages: list, temperature: float = None,
         else:
             user_message = ""
 
-        from core.chat.llm import get_llm_service
-        local_service = get_llm_service()
+        from core.chat.llm import llm_service
+        local_service = llm_service
         if stream:
             return local_service.generate_stream(user_message, **kwargs)
         else:
@@ -281,8 +281,8 @@ async def list_available_models() -> list:
         }]
     else:
         try:
-            from core.chat.llm import get_llm_service
-            local_service = get_llm_service()
+            from core.chat.llm import llm_service
+            local_service = llm_service
             if hasattr(local_service, 'legacy_service') and local_service.legacy_service and hasattr(local_service.legacy_service, 'model'):
                 return [{
                     "id": Config.LLM_MODEL_NAME,

@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime
 from typing import Optional
 from core.chat.conversation_database import ConversationDatabase
-from core.chat.llm import get_llm_service
+from core.chat.llm import llm_service
 from core.dingtalk.message_manager import message_dedup
 from config import Config
 
@@ -29,7 +29,7 @@ class ConversationManager:
         
         if self.is_main_process:
             self.db = ConversationDatabase()
-            self.llm_service = get_llm_service()
+            self.llm_service = llm_service
         else:
             self.db = None
             self.llm_service = None

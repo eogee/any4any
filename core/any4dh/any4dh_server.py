@@ -685,10 +685,10 @@ async def process_llm_chat(text: str) -> str:
     """LLM对话处理"""
     try:
         # 调用LLM服务
-        from core.chat.llm import get_llm_service
+        from core.chat.llm import llm_service
 
         def llm_call():
-            llm_service = get_llm_service()
+            llm_service = llm_service()
             # 使用同步方式调用异步方法
             import asyncio
             loop = asyncio.new_event_loop()

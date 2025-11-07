@@ -340,10 +340,10 @@ async def generate_and_execute_sql(question: str, table_schemas: str, context: s
         包含查询结果或错误详情的字典
     """
     try:
-        from core.chat.llm import get_llm_service
+        from core.chat.llm import llm_service
 
         # 获取用于SQL生成的LLM服务
-        llm_service = get_llm_service()
+        llm_service = llm_service
         if not llm_service:
             return {
                 'success': False,
