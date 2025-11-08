@@ -1,4 +1,7 @@
-# Lip Real - Wav2Lip Digital Human Implementation
+"""
+LipReal - Wav2Lip数字人实现
+源自于open-webSearch项目(https://github.com/lipku/LiveTalking)，针对any4any进行适当调整优化
+"""
 
 import math
 import torch

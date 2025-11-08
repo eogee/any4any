@@ -52,6 +52,14 @@ class ToolRegistry:
             except Exception as e:
                 logger.warning(f"Failed to load ADB tool: {e}")
 
+            # 导入并注册Web搜索工具
+            try:
+                from .web_search.workflow import WebSearchTool
+                self.register_tool(WebSearchTool())
+                logger.debug("Web search tool loaded")
+            except Exception as e:
+                logger.warning(f"Failed to load Web search tool: {e}")
+
             # 按优先级排序
             self._tools.sort(key=lambda tool: tool.priority)
 
@@ -100,7 +108,7 @@ class ToolRegistry:
                     conversation_manager, user_id, platform
                 )
 
-            # 单步骤操作 - 使用原有逻辑
+            # 单步骤操作 - 使用LLM选择的工具
             selected_tool = await self._select_tool_with_llm(
                 user_message, generate_response_func,
                 conversation_manager, user_id, platform
@@ -108,18 +116,25 @@ class ToolRegistry:
 
             if selected_tool:
                 self.logger.info(f"LLM selected tool: {selected_tool.name}")
-                result = await selected_tool.process(
-                    user_message, generate_response_func,
-                    conversation_manager, user_id, platform
-                )
-                if result:
-                    return result
+                # 首先检查工具是否能处理该消息
+                can_handle = await selected_tool.can_handle(user_message)
+                if not can_handle:
+                    self.logger.info(f"Tool '{selected_tool.name}' cannot handle this message")
+                    return None
 
-            # 如果没有工具被选中，回退到优先级匹配
-            return await self._fallback_to_priority_matching(
-                user_message, generate_response_func,
-                conversation_manager, user_id, platform
-            )
+                try:
+                    result = await selected_tool.process(
+                        user_message, generate_response_func,
+                        conversation_manager, user_id, platform
+                    )
+                    if result:
+                        return result
+                except Exception as e:
+                    self.logger.error(f"Tool '{selected_tool.name}' execution failed: {e}")
+                    return None
+            else:
+                self.logger.info("No tool was selected by LLM")
+                return None
 
         except Exception as e:
             logger.error(f"Tool processing error: {e}")
@@ -191,25 +206,34 @@ class ToolRegistry:
 {tools_text}
 
 选择标准:
-1. **NL2SQL工具**: 用户需要查询、统计、分析数据库中的数据时使用
+**优先级规则**: 当用户明确使用"搜索"关键词时，优先选择Web搜索工具
+
+1. **Web搜索工具**: 用户需要搜索网络信息、最新资讯或实时内容时使用
+   - **优先关键词**: 搜索、查找、搜、查一下、找一找、检索
+   - 其他关键词: 最新、新闻、当前、实时、网页、网站等
+   - 示例: "搜索Python最新版本"、"查找今天新闻"、"搜索 eogee"、"实时信息查询"
+   - **注意**: 只要包含"搜索"相关词汇，就优先使用Web搜索工具
+
+2. **NL2SQL工具**: 用户需要查询、统计、分析数据库中的数据时使用（不包含"搜索"关键词）
    - 关键词: 查询、统计、多少、几个、总数、平均、最高、最低、列表等
    - 示例: "查询所有用户信息"、"统计产品数量"、"销售额最高的产品"
+   - **排除**: 如果同时有"搜索"关键词，则优先选择Web搜索工具
 
-2. **语音知识库工具**: 用户输入英文内容时使用，通过embedding模型快速匹配语音知识库
+3. **语音知识库工具**: 用户输入英文内容时使用，通过embedding模型快速匹配语音知识库
    - 主要用于英文内容的快速响应
    - 示例: "Hello", "How are you", "What's the weather"等英文输入
 
-3. **时间工具**: 用户需要时间相关信息或生成时间条件时使用
+4. **时间工具**: 用户需要时间相关信息或生成时间条件时使用
    - 关键词: 时间、日期、现在、今天、昨天、明天、时间范围等
    - 示例: "现在几点了"、"解析时间表达式"、"生成时间条件"
 
-4. **ADB工具**: 用户需要自动化操作App时使用
-   - 关键词: 登录、登出、查询、缴费、账单、自动化等
-   - 示例: "自动登录查询账单"
+5. **ADB工具**: 用户需要自动化操作App时使用
+   - 关键词: 登录、登出、自动化等
+   - 示例: "自动登录应用"
 
-如果没有工具能够处理用户的请求，请回答"无工具"。
+**重要**: 只选择完全匹配用户需求的工具，不要试图选择"差不多"的工具。如果没有工具能够准确处理用户的请求，请回答"无工具"。
 
-请直接回答工具名称（nl2sql、voice_kb、time、adb）或"无工具"，不要添加其他解释:
+请直接回答工具名称（nl2sql、voice_kb、time、adb、web_search）或"无工具"，不要添加其他解释:
 """
         return prompt
 
@@ -238,29 +262,7 @@ class ToolRegistry:
             self.logger.error(f"Failed to parse LLM selection: {e}")
             return None
 
-    async def _fallback_to_priority_matching(self, user_message: str, generate_response_func: Callable,
-                                             conversation_manager=None, user_id: str = None,
-                                             platform: str = None) -> Optional[str]:
-        """回退到优先级匹配 - 现在只是按优先级尝试工具"""
-        try:
-            # 按优先级尝试各个工具（现在所有工具的can_handle都返回True，所以会依次尝试）
-            for tool in self._tools:
-                self.logger.info(f"Trying tool '{tool.name}' by priority order")
-                result = await tool.process(
-                    user_message, generate_response_func,
-                    conversation_manager, user_id, platform
-                )
-                if result:
-                    return result
-
-            # 如果没有工具能处理
-            self.logger.info("No tool could handle the message (priority fallback)")
-            return None
-
-        except Exception as e:
-            logger.error(f"Priority fallback tool processing error: {e}")
-            return None
-
+    
     async def execute_tool_by_name(self, tool_name: str, parameters: Dict[str, Any]) -> ToolResult:
         """根据工具名称执行工具（兼容原ToolManager.execute_tool接口）"""
         try:
@@ -308,13 +310,12 @@ class ToolRegistry:
 1. ADB工具:
    - login: 登录应用（关键词：登录、进入、打开）
    - logout: 登出/退出应用（关键词：退出、登出、关闭、离开）
-   - query_bill: 查询账单（关键词：查询、查看、账单、电费、费用）
-   - pay_bill: 缴费操作（关键词：缴费、交费、支付、付款）
    - get_status: 获取状态（关键词：状态、情况、当前状况）
 
 2. NL2SQL工具: 数据库查询操作
 3. 时间工具: 时间相关操作
 4. 语音知识库工具: 语音检索操作
+5. Web搜索工具: 网络搜索操作
 
 请分析用户请求，确定：
 1. 是否需要多步骤执行（是/否）
@@ -390,12 +391,6 @@ class ToolRegistry:
                 elif any(keyword in line for keyword in ['退出', '登出', 'logout']):
                     tool_found = 'adb'
                     operation_found = 'logout'
-                elif any(keyword in line for keyword in ['查询', '账单', 'query']):
-                    tool_found = 'adb'
-                    operation_found = 'query_bill'
-                elif any(keyword in line for keyword in ['缴费', '交费', 'pay']):
-                    tool_found = 'adb'
-                    operation_found = 'pay_bill'
                 elif any(keyword in line for keyword in ['状态', 'status']):
                     tool_found = 'adb'
                     operation_found = 'get_status'
@@ -471,10 +466,6 @@ class ToolRegistry:
                 result = await tool._execute_adb_login({})
             elif operation == 'logout':
                 result = await tool._execute_adb_logout({})
-            elif operation == 'query_bill':
-                result = await tool._execute_adb_query_bill({})
-            elif operation == 'pay_bill':
-                result = await tool._execute_adb_pay_bill({})
             elif operation == 'get_status':
                 result = await tool._get_adb_status({})
             else:

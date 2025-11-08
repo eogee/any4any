@@ -1,4 +1,7 @@
-# Base Real - Digital Human Base Class
+"""
+BaseReal - 数字人基础类
+源自于open-webSearch项目(https://github.com/lipku/LiveTalking)，针对any4any进行适当调整优化
+"""
 
 import math
 import torch

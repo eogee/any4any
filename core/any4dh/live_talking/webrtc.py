@@ -1,4 +1,7 @@
-# WebRTC - Real-time Communication Module
+"""
+WebRTC - 实时通信模块
+源自于open-webSearch项目(https://github.com/lipku/LiveTalking)，针对any4any进行适当调整优化
+"""
 
 import asyncio
 import json

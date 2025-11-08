@@ -1,4 +1,7 @@
-# Base ASR - Speech Recognition Base Class
+"""
+BaseASR - 语音识别基础类
+源自于open-webSearch项目(https://github.com/lipku/LiveTalking)，针对any4any进行适当调整优化
+"""
 
 import time
 import numpy as np

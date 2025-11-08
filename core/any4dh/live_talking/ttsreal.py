@@ -1,4 +1,8 @@
-# TTS Real - Text-to-Speech Services Integration (Simplified)
+"""
+TTSReal - 文本到语音服务集成
+源自于open-webSearch项目(https://github.com/lipku/LiveTalking)，针对any4any进行适当调整优化
+"""
+
 from __future__ import annotations
 import time
 import numpy as np

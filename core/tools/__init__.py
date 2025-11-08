@@ -53,15 +53,21 @@ def get_voice_kb_tool():
     from .voice_kb.workflow import get_voice_kb_tool
     return get_voice_kb_tool()
 
-def get_adb_tool():
-    """获取ADB工具"""
-    from .adb.workflow import get_adb_tool
-    return get_adb_tool()
 
 def get_time_tool():
     """获取时间工具"""
     from .time.workflow import get_time_tool
     return get_time_tool()
+
+def get_adb_tool():
+    """获取ADB工具"""
+    from .adb.workflow import get_adb_tool
+    return get_adb_tool()
+
+def get_web_search_tool():
+    """获取Web搜索工具"""
+    from .web_search.workflow import get_web_search_tool
+    return get_web_search_tool()
 
 # 向后兼容的接口
 try:
@@ -81,12 +87,11 @@ except ImportError as e:
     get_nl2sql_workflow = None
 
 try:
-    from .adb.llm_interface import ADB_LLM_TOOLS
+    from .adb import login, logout
     ADB_TOOLS_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Failed to import ADB tools: {e}")
     ADB_TOOLS_AVAILABLE = False
-    ADB_LLM_TOOLS = []
 
 # 构建导出列表
 __all__ = [
@@ -99,6 +104,7 @@ __all__ = [
     'get_voice_kb_tool',
     'get_time_tool',
     'get_adb_tool',
+    'get_web_search_tool',
     'ToolResult'
 ]
 
@@ -109,8 +115,6 @@ if VOICE_WORKFLOW_AVAILABLE:
 if NL2SQL_WORKFLOW_AVAILABLE:
     __all__.append('get_nl2sql_workflow')
 
-if ADB_TOOLS_AVAILABLE:
-    __all__.append('ADB_LLM_TOOLS')
 
 __all__.extend([
     'VOICE_WORKFLOW_AVAILABLE',

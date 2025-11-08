@@ -924,6 +924,7 @@ body::before {
     border: 1px solid var(--border);
     box-shadow: 0 10px 30px var(--shadow);
     height: calc(100vh - 190px);
+    max-width: 990px;
 }
 
 /* 对话控制 */

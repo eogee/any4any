@@ -153,13 +153,17 @@ class ChatController {
             }
         }
 
-        // 更新预览超时状态显示
+        // 更新预览超时状态显示（仅在预览模式启用时显示）
         const previewTimeoutStatus = document.getElementById('previewTimeoutStatus');
         const previewTimeoutBadge = document.getElementById('previewTimeoutBadge');
         if (previewTimeoutStatus && previewTimeoutBadge) {
-            previewTimeoutStatus.style.display = 'flex';
-            previewTimeoutBadge.textContent = `${this.previewTimeout}秒`;
-            previewTimeoutBadge.title = `预览超时时间设置为${this.previewTimeout}秒`;
+            if (this.isPreviewMode) {
+                previewTimeoutStatus.style.display = 'flex';
+                previewTimeoutBadge.textContent = `${this.previewTimeout}秒`;
+                previewTimeoutBadge.title = `预览超时时间设置为${this.previewTimeout}秒`;
+            } else {
+                previewTimeoutStatus.style.display = 'none';
+            }
         }
 
         // 更新钉钉集成状态显示
@@ -178,25 +182,15 @@ class ChatController {
             // 初始化开关状态
             streamModeToggle.checked = this.options.stream;
 
-            // 预览模式下禁用流式开关
-            if (this.isPreviewMode) {
+            // 预览模式或工具启用时禁用流式开关
+            if (this.isPreviewMode || this.isToolsEnabled) {
                 streamModeToggle.disabled = true;
                 streamModeToggle.checked = false;
-
-                // 添加预览模式提示
-                const toggleContainer = streamModeToggle.parentElement;
-                if (toggleContainer) {
-                    const previewModeHint = document.createElement('span');
-                    previewModeHint.className = 'preview-mode-hint';
-                    previewModeHint.textContent = ' (预览模式已禁用)';
-                    previewModeHint.style.cssText = 'color: #6b7280; font-size: 12px; margin-left: 8px;';
-                    toggleContainer.appendChild(previewModeHint);
-                }
             }
 
             streamModeToggle.addEventListener('change', (e) => {
-                // 预览模式下阻止切换
-                if (this.isPreviewMode) {
+                // 预览模式或工具启用时阻止切换
+                if (this.isPreviewMode || this.isToolsEnabled) {
                     e.target.checked = false;
                     return;
                 }
@@ -475,8 +469,8 @@ class ChatController {
                 this.setTypingState(true);
             }
 
-            // 预览模式下强制使用非流式响应
-            const shouldUseStream = this.options.stream && !this.isPreviewMode;
+            // 预览模式和工具启用时强制使用非流式响应
+            const shouldUseStream = this.options.stream && !this.isPreviewMode && !this.isToolsEnabled;
 
             const requestData = {
                 messages: this.messages,
@@ -954,8 +948,8 @@ class ChatController {
      * 切换流式/非流式模式
      */
     toggleStreamMode() {
-        // 预览模式下阻止切换
-        if (this.isPreviewMode) {
+        // 预览模式或工具启用时阻止切换
+        if (this.isPreviewMode || this.isToolsEnabled) {
             return;
         }
 

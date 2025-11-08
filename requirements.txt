@@ -54,3 +54,4 @@ aiohttp                     # 异步HTTP客户端
 av                          # 音视频处理库
 face_alignment              # 人脸对齐库
 imageio-ffmpeg              # FFmpeg 封装
+beautifulsoup4              # HTML解析库

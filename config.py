@@ -198,3 +198,10 @@ class Config:
     ADB_COMMAND_PATH = os.getenv("ADB_COMMAND_PATH", "/mnt/c/platform-tools/adb.exe")
     ADB_TIMEOUT = int(os.getenv("ADB_TIMEOUT", 30))
     ADB_RETRY_COUNT = int(os.getenv("ADB_RETRY_COUNT", 3))
+    
+    # Web搜索工具配置
+    WEB_SEARCH_ENABLED = get_bool_env("WEB_SEARCH_ENABLED", True)
+    WEB_SEARCH_PROXY_URL = os.getenv("WEB_SEARCH_PROXY_URL", "http://127.0.0.1:10809")
+    WEB_SEARCH_USE_PROXY = get_bool_env("WEB_SEARCH_USE_PROXY", False)
+    WEB_SEARCH_RESULT_LIMIT = int(os.getenv("WEB_SEARCH_RESULT_LIMIT", "10"))
+    WEB_SEARCH_TIMEOUT = int(os.getenv("WEB_SEARCH_TIMEOUT", "30"))
