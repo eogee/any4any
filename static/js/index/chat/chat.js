@@ -33,6 +33,10 @@ class ChatController {
         this.previewTimeout = 60;
         this.isDingtalkEnabled = false;
 
+        // Web搜索状态
+        this.isWebSearchEnabled = false;
+        this.isWebSearchActive = false;
+
         // 用户信息
         this.currentUser = null;
 
@@ -63,11 +67,12 @@ class ChatController {
     async initialize() {
         this.initializeElements();
         await this.getCurrentUserInfo();
-        await this.loadConversationHistory(); 
+        await this.loadConversationHistory();
         await this.initializeConversation();
         await this.checkPreviewMode();
         await this.checkDelayMode();
         await this.checkToolsEnabled();
+        await this.checkWebSearchEnabled();
         await this.checkPreviewTimeout();
         await this.checkDingtalkEnabled();
         this.setupEventListeners();
@@ -81,6 +86,7 @@ class ChatController {
             chatMessages: document.getElementById('chatMessages'),
             chatInput: document.getElementById('chatInput'),
             sendButton: document.getElementById('sendButton'),
+            websearchButton: document.getElementById('websearchButton'),
             emptyState: document.getElementById('emptyState'),
             typingIndicator: document.getElementById('typingIndicator'),
             newChatBtn: document.getElementById('newChatBtn'),
@@ -99,6 +105,13 @@ class ChatController {
         this.elements.sendButton.addEventListener('click', () => {
             this.handleSendMessage();
         });
+
+        // Web搜索按钮点击事件
+        if (this.elements.websearchButton) {
+            this.elements.websearchButton.addEventListener('click', () => {
+                this.toggleWebSearch();
+            });
+        }
 
         // 输入框事件
         this.elements.chatInput.addEventListener('keydown', (e) => {
@@ -305,6 +318,51 @@ class ChatController {
         }
     }
 
+    async checkWebSearchEnabled() {
+        try {
+            const response = await fetch('/api/chat/config/websearch', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.isWebSearchEnabled = data.websearch_enabled === true;
+
+                // 控制按钮显示/隐藏
+                if (this.elements.websearchButton) {
+                    this.elements.websearchButton.style.display =
+                        this.isWebSearchEnabled ? 'flex' : 'none';
+                }
+            } else {
+                console.warn('Failed to check websearch enabled status');
+                this.isWebSearchEnabled = false;
+                if (this.elements.websearchButton) {
+                    this.elements.websearchButton.style.display = 'none';
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to check websearch enabled:', error);
+            this.isWebSearchEnabled = false;
+            if (this.elements.websearchButton) {
+                this.elements.websearchButton.style.display = 'none';
+            }
+        }
+    }
+
+    toggleWebSearch() {
+        this.isWebSearchActive = !this.isWebSearchActive;
+
+        // 更新按钮样式
+        if (this.elements.websearchButton) {
+            this.elements.websearchButton.classList.toggle('active', this.isWebSearchActive);
+        }
+
+        // 显示状态提示
+        const status = this.isWebSearchActive ? '已启用' : '已关闭';
+        this.showNotification(`联网搜索${status}`, 'info');
+    }
+
     /**
      * 检测预览超时配置
      */
@@ -482,7 +540,8 @@ class ChatController {
                 sender_nickname: this.currentUser?.nickname || 'Web用户',
                 platform: 'any4chat',
                 delay_time: this.isDelayMode ? this.delayTime : undefined,
-                conversation_id: this.currentConversationId  // 明确传递当前会话ID
+                conversation_id: this.currentConversationId,  // 明确传递当前会话ID
+                force_web_search: this.isWebSearchActive
             };
 
             

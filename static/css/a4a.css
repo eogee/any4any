@@ -790,7 +790,7 @@ body::before {
 .form-icon {
     position: absolute;
     left: 10px;
-    top: 50%;
+    top: 25%;
     color: var(--text-secondary);
     font-size: 18px;
 }
@@ -1450,9 +1450,7 @@ body::before {
 .chat-input-container {
     background: white;
     border-radius: 12px;
-    border: 1px solid var(--border);
     padding: 15px;
-    box-shadow: 0 2px 8px var(--shadow);
 }
 
 .input-wrapper {
@@ -1462,11 +1460,18 @@ body::before {
     max-width: 100%;
 }
 
-.chat-input {
+.chat-input-wrapper {
     flex: 1;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+}
+
+.chat-input {
+    width: 100%;
     min-height: 44px;
     max-height: 120px;
-    padding: 12px 16px;
+    padding: 12px 100px 12px 16px;
     border: 1px solid var(--border);
     border-radius: 8px;
     outline: none;
@@ -1489,10 +1494,58 @@ body::before {
     cursor: not-allowed;
 }
 
+.input-buttons {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.websearch-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.websearch-button:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--primary);
+}
+
+.websearch-button:active {
+    transform: scale(0.95);
+}
+
+.websearch-button.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.websearch-button.active:hover {
+    background: #14a898;
+    color: white;
+}
+
+.websearch-button i {
+    font-size: 14px;
+}
+
 .send-button {
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
     background: var(--primary);
     color: white;
     border: none;
@@ -1502,16 +1555,14 @@ body::before {
     justify-content: center;
     transition: all 0.2s;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px var(--shadow);
 }
 
 .send-button:hover:not(:disabled) {
     background: #14a898;
-    box-shadow: 0 4px 12px var(--shadow);
 }
 
 .send-button:active:not(:disabled) {
-    transform: translateY(0);
+    transform: scale(0.95);
 }
 
 .send-button:disabled {
@@ -1520,7 +1571,7 @@ body::before {
 }
 
 .send-button i {
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .typing-indicator {
@@ -1643,16 +1694,25 @@ body::before {
     .chat-input {
         font-size: 16px; /* 防止 iOS 缩放 */
         min-height: 40px;
-        padding: 10px 12px;
+        padding: 10px 80px 10px 12px;
+    }
+
+    .websearch-button {
+        width: 28px;
+        height: 28px;
+    }
+
+    .websearch-button i {
+        font-size: 12px;
     }
 
     .send-button {
-        width: 40px;
-        height: 40px;
+        width: 28px;
+        height: 28px;
     }
 
     .send-button i {
-        font-size: 14px;
+        font-size: 12px;
     }
 
     .message-avatar {
@@ -1703,17 +1763,26 @@ body::before {
 
     .chat-input {
         font-size: 16px;
-        padding: 8px 12px;
+        padding: 8px 70px 8px 12px;
         min-height: 36px;
     }
 
+    .websearch-button {
+        width: 24px;
+        height: 24px;
+    }
+
+    .websearch-button i {
+        font-size: 10px;
+    }
+
     .send-button {
-        width: 36px;
-        height: 36px;
+        width: 24px;
+        height: 24px;
     }
 
     .send-button i {
-        font-size: 12px;
+        font-size: 10px;
     }
 
     .message-avatar {

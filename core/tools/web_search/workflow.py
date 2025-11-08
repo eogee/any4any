@@ -27,6 +27,8 @@ class WebSearchTool(BaseTool):
     def __init__(self, enabled: bool = True):
         super().__init__(enabled)
         self.search_engine = None
+        # 读取搜索结果数量限制配置
+        self.result_limit = int(os.getenv("WEB_SEARCH_RESULT_LIMIT", "10"))
         self._init_search_engine()
 
     def _init_search_engine(self):
@@ -216,7 +218,7 @@ class WebSearchTool(BaseTool):
             parsed_query = await self._parse_user_query_with_llm(user_message, generate_response_func)
 
             # 第二步：执行智能搜索
-            search_results = await self._perform_intelligent_search(parsed_query)
+            search_results = await self._perform_intelligent_search(parsed_query, self.result_limit)
 
             if not search_results:
                 return f"抱歉，我没有找到关于\"{parsed_query['search_keywords']}\"的相关信息。"

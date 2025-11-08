@@ -20,15 +20,16 @@ class ChatCompletionRequest(BaseModel):
     messages: List[ChatMessage]
     model: str = "default"
     stream: bool = False
-    temperature: float = Config.TEMPERATURE 
-    max_tokens: Optional[int] = Config.MAX_LENGTH 
+    temperature: float = Config.TEMPERATURE
+    max_tokens: Optional[int] = Config.MAX_LENGTH
     stop: Optional[List[str]] = None
     top_p: Optional[float] = Config.TOP_P
     repetition_penalty: Optional[float] = Config.REPETITION_PENALTY
     sender_id: Optional[str] = None
     sender_nickname: Optional[str] = None
     platform: Optional[str] = None
-    delay_time: Optional[int] = None  # 新增延迟时间参数
+    delay_time: Optional[int] = None
+    force_web_search: Optional[bool] = False
 
 class OpenAIAPI:
     
@@ -112,12 +113,12 @@ class OpenAIAPI:
             if chat_request.stream:
                 return await OpenAIAPI._handle_streaming_response(
                     chat_request, sender, user_nick, platform,
-                    user_message_content, Config.PREVIEW_MODE
+                    user_message_content, Config.PREVIEW_MODE, chat_request.force_web_search
                 )
             else:
                 return await OpenAIAPI._handle_non_streaming_response(
                     chat_request, sender, user_nick, platform,
-                    user_message_content, Config.PREVIEW_MODE
+                    user_message_content, Config.PREVIEW_MODE, chat_request.force_web_search
                 )
                 
         except Exception as e:
@@ -134,7 +135,7 @@ class OpenAIAPI:
             }, status_code=500)
 
     @staticmethod
-    async def _handle_non_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode):
+    async def _handle_non_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode, force_web_search=False):
         """处理非流式响应"""
         try:
             # 获取message_id用于去重
@@ -166,7 +167,8 @@ class OpenAIAPI:
                 user_message_content,
                 message_id=msg_id,
                 delay_time=delay_time if delay_mode_enabled and not preview_mode else None,
-                is_delayed_processing=is_delayed_processing
+                is_delayed_processing=is_delayed_processing,
+                force_web_search=force_web_search
             )
 
             # 存储助手消息ID用于超时更新
@@ -267,7 +269,7 @@ class OpenAIAPI:
             raise
 
     @staticmethod
-    async def _handle_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode):
+    async def _handle_streaming_response(chat_request, sender, user_nick, platform, user_message_content, preview_mode, force_web_search=False):
         """处理流式响应"""
         generation_id = f"chatcmpl-{int(time.time())}"
         preview_id = None
@@ -326,9 +328,10 @@ class OpenAIAPI:
                 
                 # 流式生成 - 流式模式下不支持延迟，直接处理
                 async for text_chunk in conversation_manager.process_message_stream(
-                    sender, user_nick, platform, user_message_content, generation_id, 
+                    sender, user_nick, platform, user_message_content, generation_id,
                     is_timeout=timeout_reached, message_id=msg_id,
-                    is_delayed_processing=True  # 流式模式下强制立即处理
+                    is_delayed_processing=True,  # 流式模式下强制立即处理
+                    force_web_search=force_web_search
                 ):
                     if not text_chunk or text_chunk.isspace():
                         continue

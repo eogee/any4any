@@ -487,6 +487,31 @@ class ChatServer(Server):
                 "error": str(e)
             }, status_code=500)
 
+    async def get_websearch_config(self, request: Request):
+        """获取Web搜索配置状态"""
+        self.log_request("/api/chat/config/websearch")
+
+        try:
+            # 权限验证
+            if not await self._verify_request_auth(request):
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            return JSONResponse({
+                "websearch_enabled": Config.WEB_SEARCH_ENABLED,
+                "rate_limit": Config.WEB_SEARCH_RATE_LIMIT,
+                "description": "Web search is available" if Config.WEB_SEARCH_ENABLED else "Web search is disabled"
+            })
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.log_error("/api/chat/config/websearch", e)
+            return JSONResponse({
+                "websearch_enabled": False,
+                "rate_limit": 1,
+                "description": "Unable to determine web search status",
+                "error": str(e)
+            }, status_code=500)
+
     async def get_preview_timeout_config(self, request: Request):
         """获取预览超时配置状态"""
         self.log_request("/api/chat/config/preview-timeout")
@@ -745,6 +770,11 @@ class ChatServer(Server):
         async def tools_enabled_config(request: Request):
             """获取工具系统配置状态"""
             return await self.get_tools_enabled_config(request)
+
+        @app.get("/api/chat/config/websearch")
+        async def websearch_config(request: Request):
+            """获取Web搜索配置状态"""
+            return await self.get_websearch_config(request)
 
         @app.get("/api/chat/config/preview-timeout")
         async def preview_timeout_config(request: Request):

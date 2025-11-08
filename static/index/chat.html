@@ -145,16 +145,23 @@
                 <!-- 聊天输入区域 -->
                 <div class="chat-input-container">
                     <div class="input-wrapper">
-                        <textarea
-                            class="chat-input"
-                            id="chatInput"
-                            placeholder="输入您的问题，按 Enter 发送..."
-                            rows="1"
-                            maxlength="2000"
-                        ></textarea>
-                        <button class="send-button" id="sendButton" type="button">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
+                        <div class="chat-input-wrapper">
+                            <textarea
+                                class="chat-input"
+                                id="chatInput"
+                                placeholder="输入您的问题，按 Enter 发送..."
+                                rows="1"
+                                maxlength="2000"
+                            ></textarea>
+                            <div class="input-buttons">
+                                <button class="websearch-button" id="websearchButton" type="button" title="互联网搜索">
+                                    <i class="fas fa-globe"></i>
+                                </button>
+                                <button class="send-button" id="sendButton" type="button">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

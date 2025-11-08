@@ -34,10 +34,8 @@ CREATE TABLE IF NOT EXISTS `conversations` (
   KEY `idx_last_active` (`last_active`) COMMENT '最后活跃时间索引'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话主表 - 存储会话基本信息';
 
--- 正在导出表  any4any.conversations 的数据：~1 rows (大约)
+-- 正在导出表  any4any.conversations 的数据：~0 rows (大约)
 DELETE FROM `conversations`;
-INSERT INTO `conversations` (`conversation_id`, `sender`, `user_nick`, `platform`, `created_time`, `last_active`, `message_count`) VALUES
-	('80361d2f-fb78-4ed0-913a-2671b9e34a96', 'admin', 'admin', 'any4chat', '2025-11-06 00:57:40', '2025-11-06 01:04:10', 6);
 
 -- 导出  表 any4any.messages 结构
 CREATE TABLE IF NOT EXISTS `messages` (
@@ -55,15 +53,8 @@ CREATE TABLE IF NOT EXISTS `messages` (
   CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`conversation_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息表 - 存储所有对话消息内容';
 
--- 正在导出表  any4any.messages 的数据：~6 rows (大约)
+-- 正在导出表  any4any.messages 的数据：~0 rows (大约)
 DELETE FROM `messages`;
-INSERT INTO `messages` (`message_id`, `conversation_id`, `content`, `sender_type`, `is_timeout`, `timestamp`, `sequence_number`) VALUES
-	('1fcfb36a-3d7f-4b2f-a0e8-06d920619520', '80361d2f-fb78-4ed0-913a-2671b9e34a96', '退出登录', 'user', 0, '2025-11-06 00:57:54', 1),
-	('5a48ec7b-bedd-413d-a30a-048bce0dcf45', '80361d2f-fb78-4ed0-913a-2671b9e34a96', '退出登录', 'user', 0, '2025-11-06 01:03:33', 5),
-	('80b9d4b7-9ede-4942-8e83-d98ffba38949', '80361d2f-fb78-4ed0-913a-2671b9e34a96', '您已成功退出登录。', 'assistant', 0, '2025-11-06 00:58:31', 2),
-	('889cbd53-8473-49a4-9b64-8829981207c2', '80361d2f-fb78-4ed0-913a-2671b9e34a96', '登录', 'user', 0, '2025-11-06 01:02:41', 3),
-	('bb9c93c7-35a8-4aba-886c-0133ceef7ee7', '80361d2f-fb78-4ed0-913a-2671b9e34a96', '登录已完成。', 'assistant', 0, '2025-11-06 01:03:23', 4),
-	('ed0ab3c5-04f3-4844-a1a1-f7671b728c17', '80361d2f-fb78-4ed0-913a-2671b9e34a96', '您已成功退出登录。', 'assistant', 0, '2025-11-06 01:04:10', 6);
 
 -- 导出  表 any4any.previews 结构
 CREATE TABLE IF NOT EXISTS `previews` (

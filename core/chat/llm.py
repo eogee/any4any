@@ -592,7 +592,8 @@ class UnifiedLLMService:
         user_message: str,
         conversation_manager=None,
         user_id: str = None,
-        platform: str = None
+        platform: str = None,
+        force_web_search=False
     ) -> str:
         """处理用户消息，支持工具调用"""
         if not self._tools_enabled:
@@ -602,7 +603,8 @@ class UnifiedLLMService:
             # 调用tools模块的处理逻辑
             tool_result = await process_with_tools(
                 user_message, self.generate_response,
-                conversation_manager, user_id, platform
+                conversation_manager, user_id, platform,
+                force_web_search=force_web_search
             )
 
             # 如果工具处理成功，返回结果
@@ -626,14 +628,16 @@ class UnifiedLLMService:
         user_message: str,
         conversation_manager=None,
         user_id: str = None,
-        platform: str = None
+        platform: str = None,
+        force_web_search=False
     ) -> str:
         """使用工具处理用户消息（向后兼容）"""
         return await self.process_with_tools_support(
             user_message,
             conversation_manager,
             user_id,
-            platform
+            platform,
+            force_web_search
         )
 
     async def list_available_models(self) -> List[Dict[str, Any]]:

@@ -106,7 +106,7 @@ class BingSearchEngine:
             results = await self._standard_search(clean_query, limit)
 
             response_time = f"{time.time() - start_time:.1f}s"
-            self.logger.info(f"搜索完成: 查询='{clean_query}', 结果数量={len(results)}, 耗时={response_time}")
+            self.logger.info(f"Search completed: Query='{clean_query}', Results count={len(results)}, Time taken={response_time}")
 
             return results
 
@@ -145,7 +145,7 @@ class BingSearchEngine:
                 "SRCHUID": "V=2&GUID=1234567890ABCDEF&dmnchg=1",
                 "SRCHS": "PC=VALB",
                 "_EDGE_S": "SID=1234567890",
-                "SRCHUSR": "DOB=20240101"
+                "SRCHUSR": "DOB=19900101"
             }
 
             try:

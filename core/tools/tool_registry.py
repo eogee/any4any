@@ -2,9 +2,12 @@
 工具注册器
 """
 import logging
+import time
 from typing import Dict, Any, List, Optional, Callable
+from datetime import datetime, timedelta
 from .base_tool import BaseTool
 from .result import ToolResult
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +18,8 @@ class ToolRegistry:
         self.logger = logging.getLogger(__name__)
         self._tools: List[BaseTool] = []
         self._tool_schemas: List[Dict[str, Any]] = []
+        self._web_search_history: Dict[str, List[float]] = {}
+        self._rate_limit = getattr(Config, 'WEB_SEARCH_RATE_LIMIT', 1)
         self._load_tools()
 
     def _load_tools(self):
@@ -88,7 +93,7 @@ class ToolRegistry:
 
     async def process_with_tools(self, user_message: str, generate_response_func: Callable,
                                conversation_manager=None, user_id: str = None,
-                               platform: str = None) -> Optional[str]:
+                               platform: str = None, force_web_search=False) -> Optional[str]:
         """使用工具处理用户消息 - 支持多步骤执行"""
         if not user_message or not user_message.strip():
             return None
@@ -108,19 +113,40 @@ class ToolRegistry:
                     conversation_manager, user_id, platform
                 )
 
-            # 单步骤操作 - 使用LLM选择的工具
-            selected_tool = await self._select_tool_with_llm(
-                user_message, generate_response_func,
-                conversation_manager, user_id, platform
-            )
+            # 单步骤操作 - 检查是否强制使用Web搜索
+            selected_tool = None
+            if force_web_search:
+                # 检查搜索频率限制
+                if not self._check_web_search_rate_limit(user_id):
+                    self.logger.warning(f"Web search rate limit exceeded for user {user_id}")
+                    # 降级处理：回退到普通LLM响应
+                    return await generate_response_func(user_message)
+
+                # 强制使用Web搜索工具
+                selected_tool = self.get_tool_by_name("web_search")
+                if selected_tool:
+                    self.logger.info("Force web search mode - using web_search tool")
+                else:
+                    self.logger.warning("Force web search requested but web_search tool not available")
+                    # 降级处理：回退到普通LLM响应
+                    return await generate_response_func(user_message)
+            else:
+                # 使用LLM选择工具
+                selected_tool = await self._select_tool_with_llm(
+                    user_message, generate_response_func,
+                    conversation_manager, user_id, platform
+                )
 
             if selected_tool:
                 self.logger.info(f"LLM selected tool: {selected_tool.name}")
-                # 首先检查工具是否能处理该消息
-                can_handle = await selected_tool.can_handle(user_message)
-                if not can_handle:
-                    self.logger.info(f"Tool '{selected_tool.name}' cannot handle this message")
-                    return None
+
+                # 在强制搜索模式下，跳过can_handle检查
+                if not force_web_search:
+                    # 首先检查工具是否能处理该消息
+                    can_handle = await selected_tool.can_handle(user_message)
+                    if not can_handle:
+                        self.logger.info(f"Tool '{selected_tool.name}' cannot handle this message")
+                        return None
 
                 try:
                     result = await selected_tool.process(
@@ -128,9 +154,16 @@ class ToolRegistry:
                         conversation_manager, user_id, platform
                     )
                     if result:
+                        # 如果是Web搜索工具且成功执行，记录搜索时间
+                        if selected_tool.name == "web_search" and force_web_search:
+                            self._record_web_search(user_id)
                         return result
                 except Exception as e:
                     self.logger.error(f"Tool '{selected_tool.name}' execution failed: {e}")
+                    # 如果是Web搜索工具执行失败，回退到普通LLM响应（降级处理）
+                    if selected_tool.name == "web_search" and force_web_search:
+                        self.logger.warning("Web search failed, falling back to LLM response")
+                        return await generate_response_func(user_message)
                     return None
             else:
                 self.logger.info("No tool was selected by LLM")
@@ -575,6 +608,41 @@ class ToolRegistry:
             logger.error(f"Voice KB question detection failed: {e}")
             return False
 
+    def _check_web_search_rate_limit(self, user_id: str) -> bool:
+        """检查用户Web搜索频率限制"""
+        if not user_id:
+            user_id = "anonymous"
+
+        current_time = time.time()
+        one_minute_ago = current_time - 60
+
+        # 获取用户搜索历史
+        if user_id not in self._web_search_history:
+            self._web_search_history[user_id] = []
+
+        # 清理超过1分钟的记录
+        self._web_search_history[user_id] = [
+            timestamp for timestamp in self._web_search_history[user_id]
+            if timestamp > one_minute_ago
+        ]
+
+        # 检查是否超过频率限制
+        if len(self._web_search_history[user_id]) >= self._rate_limit:
+            return False
+
+        return True
+
+    def _record_web_search(self, user_id: str):
+        """记录用户的Web搜索请求"""
+        if not user_id:
+            user_id = "anonymous"
+
+        if user_id not in self._web_search_history:
+            self._web_search_history[user_id] = []
+
+        self._web_search_history[user_id].append(time.time())
+        self.logger.info(f"Recorded web search for user {user_id}, count in last minute: {len(self._web_search_history[user_id])}")
+
 # 全局注册器实例
 _registry_instance: Optional[ToolRegistry] = None
 
@@ -592,10 +660,10 @@ def get_tool_manager():
 
 async def process_with_tools(user_message: str, generate_response_func: Callable,
                            conversation_manager=None, user_id: str = None,
-                           platform: str = None) -> Optional[str]:
+                           platform: str = None, force_web_search=False) -> Optional[str]:
     """兼容原process_with_tools接口"""
     registry = get_tool_registry()
     return await registry.process_with_tools(
         user_message, generate_response_func,
-        conversation_manager, user_id, platform
+        conversation_manager, user_id, platform, force_web_search
     )

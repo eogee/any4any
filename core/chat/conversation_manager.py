@@ -297,7 +297,7 @@ class ConversationManager:
                 del self.pending_request_counts[sender]
             return "消息处理超时，请稍后重试。", "", None
     
-    async def _process_immediately(self, sender, user_nick, platform, content, is_timeout=False, message_id=None, skip_save=False):
+    async def _process_immediately(self, sender, user_nick, platform, content, is_timeout=False, message_id=None, skip_save=False, force_web_search=False):
         """立即处理消息"""
         # 新建会话指令
         if content.strip() == '/a':
@@ -346,7 +346,8 @@ class ConversationManager:
                     content,
                     conversation_manager=self,
                     user_id=sender,
-                    platform=platform
+                    platform=platform,
+                    force_web_search=force_web_search
                 )
             else:
                 # 检查LLM服务类型，为外部API提供正确的消息格式
@@ -382,7 +383,7 @@ class ConversationManager:
             
             return error_message, conversation['conversation_id'], error_assistant_message['message_id']
     
-    async def process_message(self, sender, user_nick, platform, content, is_timeout=False, message_id=None, skip_save=False, delay_time: Optional[int] = None, is_delayed_processing=False):
+    async def process_message(self, sender, user_nick, platform, content, is_timeout=False, message_id=None, skip_save=False, delay_time: Optional[int] = None, is_delayed_processing=False, force_web_search=False):
         """处理用户消息"""
         # 检查消息是否已处理
         if message_id and self._check_message_processed(message_id):
@@ -421,13 +422,14 @@ class ConversationManager:
             content=content,
             is_timeout=is_timeout,
             message_id=message_id,
-            skip_save=skip_save
+            skip_save=skip_save,
+            force_web_search=force_web_search
         )
 
         # 返回处理结果
         return response, conversation_id, assistant_message_id
     
-    async def process_message_stream(self, sender, user_nick, platform, content, generation_id, is_timeout=False, message_id=None, delay_time: Optional[int] = None, is_delayed_processing=False):
+    async def process_message_stream(self, sender, user_nick, platform, content, generation_id, is_timeout=False, message_id=None, delay_time: Optional[int] = None, is_delayed_processing=False, force_web_search=False):
         """流式处理用户消息 流式响应不支持延迟功能"""
         
         if message_id and self._check_message_processed(message_id):
@@ -493,7 +495,8 @@ class ConversationManager:
                     content,
                     conversation_manager=self,
                     user_id=sender,
-                    platform=platform
+                    platform=platform,
+                    force_web_search=force_web_search
                 )
                 accumulated_response = full_response
 

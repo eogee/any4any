@@ -205,3 +205,4 @@ class Config:
     WEB_SEARCH_USE_PROXY = get_bool_env("WEB_SEARCH_USE_PROXY", False)
     WEB_SEARCH_RESULT_LIMIT = int(os.getenv("WEB_SEARCH_RESULT_LIMIT", "10"))
     WEB_SEARCH_TIMEOUT = int(os.getenv("WEB_SEARCH_TIMEOUT", "30"))
+    WEB_SEARCH_RATE_LIMIT = int(os.getenv("WEB_SEARCH_RATE_LIMIT", "2"))
