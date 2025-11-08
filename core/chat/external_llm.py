@@ -245,9 +245,58 @@ def get_external_llm_service() -> ExternalLLMService:
     return external_llm_service
 
 def generate_chat_response(messages: list, temperature: float = None,
-                           max_tokens: int = None, stream: bool = False, **kwargs):
+                           max_tokens: int = None, stream: bool = False, skip_kb: bool = False, **kwargs):
     """统一的聊天响应生成接口"""
     from config import Config
+
+    # 知识库检索
+    knowledge_content = ""
+    if Config.KNOWLEDGE_BASE_ENABLED and messages and len(messages) > 0 and not skip_kb:
+        try:
+            # 使用同步方式运行异步知识库检索
+            async def retrieve_knowledge():
+                from core.chat.llm import get_kb_manager, format_knowledge_content
+                # 提取用户消息
+                user_message = ""
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        user_message = msg.get("content", "")
+                        break
+
+                if user_message:
+                    kb_manager = get_kb_manager()
+                    kb_result = await kb_manager.retrieve_documents(user_message)
+                    if kb_result and kb_result.get('has_results'):
+                        documents = kb_result.get('documents', [])
+                        content = format_knowledge_content(documents, "external LLM")
+                        return content
+                return ""
+
+            # 运行异步函数
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 如果已经在事件循环中，创建任务
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, retrieve_knowledge())
+                        knowledge_content = future.result(timeout=30)
+                else:
+                    knowledge_content = asyncio.run(retrieve_knowledge())
+            except Exception as e:
+                logger.warning(f"Knowledge base retrieval failed for external LLM: {e}")
+                knowledge_content = ""
+        except Exception as e:
+            logger.warning(f"Knowledge base setup failed for external LLM: {e}")
+            knowledge_content = ""
+
+    # 将知识库内容添加到最后一个用户消息中
+    if knowledge_content and messages:
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i].get("role") == "user":
+                original_content = messages[i].get("content", "")
+                messages[i]["content"] = f"{knowledge_content}\n\n用户问题：{original_content}"
+                break
 
     if Config.LLM_SERVER_TYPE == "api":
         service = get_external_llm_service()

@@ -263,7 +263,8 @@ class LocalLLMService:
         self.active_queues.add(text_queue)
 
         try:
-            prompt = self._build_legacy_prompt(user_message)
+            skip_kb = kwargs.get('skip_kb', False)
+            prompt = await self._build_legacy_prompt(user_message, skip_kb=skip_kb)
             inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.device)
 
             streamer = CustomTextStreamer(
@@ -360,14 +361,31 @@ class LocalLLMService:
         if self._cleanup_count % 100 == 0:
             logger.debug(f"Generation cleanup count: {self._cleanup_count}")
 
-    def _build_legacy_prompt(self, user_message: str) -> str:
+    async def _build_legacy_prompt(self, user_message: str, skip_kb: bool = False) -> str:
         """为本地LLM构建提示格式"""
         system_prompt = getattr(Config, 'LLM_PROMPT', '')
+
+        # 知识库检索
+        knowledge_content = ""
+        if Config.KNOWLEDGE_BASE_ENABLED and not skip_kb:
+            try:
+                kb_manager = get_kb_manager()
+                kb_result = await kb_manager.retrieve_documents(user_message)
+                if kb_result and kb_result.get('has_results'):
+                    documents = kb_result.get('documents', [])
+                    knowledge_content = format_knowledge_content(documents, "legacy prompt builder")
+            except Exception as e:
+                logger.warning(f"Knowledge base retrieval failed: {e}")
+
+        # 构建用户消息
+        enhanced_user_message = user_message
+        if knowledge_content:
+            enhanced_user_message = f"{knowledge_content}\n\n用户问题：{user_message}"
 
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": user_message})
+        messages.append({"role": "user", "content": enhanced_user_message})
 
         try:
             if hasattr(self.tokenizer, 'apply_chat_template'):
@@ -396,7 +414,8 @@ class LocalLLMService:
             return "抱歉，模型未初始化。"
 
         try:
-            prompt = self._build_legacy_prompt(user_message)
+            skip_kb = kwargs.get('skip_kb', False)
+            prompt = await self._build_legacy_prompt(user_message, skip_kb=skip_kb)
             inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.device)
 
             outputs = self.model.generate(
@@ -573,11 +592,12 @@ class UnifiedLLMService:
             return "LLM服务未正确初始化。"
 
         if self.service_type == "external":
+            skip_kb = kwargs.get('skip_kb', False)
             messages = self._prepare_messages(user_message)
             return await generate_chat_response(
                 messages=messages,
                 stream=False,
-                **kwargs
+                skip_kb=skip_kb
             )
         elif self.local_service:
             return await self.local_service.generate_response(
@@ -600,9 +620,13 @@ class UnifiedLLMService:
             return await self.generate_response(user_message)
 
         try:
-            # 调用tools模块的处理逻辑
+            # 创建一个跳过知识库检索的回调函数，避免重复调用
+            async def callback_with_skip_kb(message: str, **kwargs) -> str:
+                return await self.generate_response(message, skip_kb=True, **kwargs)
+
+            # 调用tools模块的处理逻辑，使用跳过知识库的回调
             tool_result = await process_with_tools(
-                user_message, self.generate_response,
+                user_message, callback_with_skip_kb,
                 conversation_manager, user_id, platform,
                 force_web_search=force_web_search
             )
@@ -611,12 +635,12 @@ class UnifiedLLMService:
             if tool_result:
                 return tool_result
 
-            # 否则回退到普通LLM响应
-            return await self.generate_response(user_message)
+            # 否则回退到普通LLM响应（此时会进行知识库检索）
+            return await self.generate_response(user_message, skip_kb=False)
 
         except Exception as e:
             logger.error(f"Tool processing error: {e}")
-            return await self.generate_response(user_message)
+            return await self.generate_response(user_message, skip_kb=False)
 
     def is_tool_supported(self) -> bool:
         """检查是否支持工具功能"""

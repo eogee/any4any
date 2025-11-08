@@ -140,6 +140,11 @@ class ToolRegistry:
             if selected_tool:
                 self.logger.info(f"LLM selected tool: {selected_tool.name}")
 
+                # 检查是否为Web搜索工具且用户未激活搜索模式
+                if selected_tool.name == "web_search" and not force_web_search:
+                    self.logger.info("LLM selected web_search but user has not activated web search mode - blocking execution")
+                    return None
+
                 # 在强制搜索模式下，跳过can_handle检查
                 if not force_web_search:
                     # 首先检查工具是否能处理该消息
