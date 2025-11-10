@@ -8,10 +8,11 @@ import re
 import json
 from typing import Dict, Any, Optional, Callable, List
 import os
+from config import Config
 
 from ..base_tool import BaseTool
 from ..result import ToolResult
-from .bing_search import BingSearchEngine
+from .bing_search import BingSearchEngine, DuckDuckGoSearchEngine
 from .search_types import (
     SearchResult, SearchResponse,
     SEARCH_INTENT_KEYWORDS,
@@ -26,23 +27,27 @@ class WebSearchTool(BaseTool):
 
     def __init__(self, enabled: bool = True):
         super().__init__(enabled)
-        self.search_engine = None
+        self.search_engines = {}
         # 读取搜索结果数量限制配置
         self.result_limit = int(os.getenv("WEB_SEARCH_RESULT_LIMIT", "10"))
-        self._init_search_engine()
+        self._init_search_engines()
 
-    def _init_search_engine(self):
-        """初始化搜索引擎"""
+    def _init_search_engines(self):
+        """初始化多个搜索引擎"""
         try:
-            # 从环境变量读取配置
-            proxy_url = os.getenv("WEB_SEARCH_PROXY_URL")
-            use_proxy = os.getenv("WEB_SEARCH_USE_PROXY", "false").lower() == "true"
-            timeout = int(os.getenv("WEB_SEARCH_TIMEOUT", "30"))
+            # 从配置读取参数
+            proxy_url = Config.WEB_SEARCH_PROXY_URL
+            timeout = Config.WEB_SEARCH_TIMEOUT
 
             # 配置代理
-            final_proxy_url = proxy_url if use_proxy and proxy_url else None
+            final_proxy_url = proxy_url if Config.WEB_SEARCH_USE_PROXY and proxy_url else None
 
-            self.search_engine = BingSearchEngine(
+            # 初始化所有可用的搜索引擎
+            self.search_engines["bing"] = BingSearchEngine(
+                proxy_url=final_proxy_url,
+                timeout=timeout
+            )
+            self.search_engines["duckduckgo"] = DuckDuckGoSearchEngine(
                 proxy_url=final_proxy_url,
                 timeout=timeout
             )
@@ -50,6 +55,49 @@ class WebSearchTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Web search tool initialization failed: {str(e)}")
             self.enabled = False
+
+    async def search_with_fallback(self, query: str, limit: int = None) -> List[SearchResult]:
+        """使用故障转移机制进行搜索"""
+        if limit is None:
+            limit = self.result_limit
+
+        # 确定搜索引擎优先级
+        primary_engine = Config.WEB_SEARCH_PRIMARY_ENGINE
+        fallback_engines = Config.WEB_SEARCH_FALLBACK_ENGINES
+
+        engines_to_try = [primary_engine]
+        for engine in fallback_engines:
+            if engine not in engines_to_try and engine in self.search_engines:
+                engines_to_try.append(engine)
+
+        last_error = None
+        for engine_name in engines_to_try:
+            try:
+                if engine_name not in self.search_engines:
+                    self.logger.warning(f"搜索引擎 {engine_name} 未初始化")
+                    continue
+
+                self.logger.info(f"尝试使用搜索引擎: {engine_name}")
+                engine = self.search_engines[engine_name]
+
+                async with engine:
+                    results = await engine.search(query, limit)
+
+                    if results:
+                        self.logger.info(f"搜索成功，使用引擎: {engine_name}, 结果数: {len(results)}")
+                        return results
+                    else:
+                        self.logger.warning(f"搜索引擎 {engine_name} 返回空结果")
+
+            except Exception as e:
+                last_error = e
+                self.logger.warning(f"搜索引擎 {engine_name} 失败: {e}")
+                continue
+
+        # 所有引擎都失败
+        error_msg = f"所有搜索引擎均失败，最后错误: {last_error}"
+        self.logger.error(error_msg)
+        raise Exception(error_msg)
 
     @property
     def priority(self) -> int:
@@ -207,7 +255,7 @@ class WebSearchTool(BaseTool):
         """
         处理用户消息，执行智能搜索并生成增强回答
         """
-        if not self.enabled or not self.search_engine:
+        if not self.enabled or not self.search_engines:
             return "智能Web搜索工具未启用或初始化失败"
 
         try:
@@ -304,7 +352,7 @@ class WebSearchTool(BaseTool):
         直接执行智能搜索（支持参数化调用）
         """
         try:
-            if not self.enabled or not self.search_engine:
+            if not self.enabled or not self.search_engines:
                 return ToolResult.error_result(
                     "智能Web搜索工具未启用或初始化失败",
                     tool_name=self.name
@@ -372,7 +420,7 @@ class WebSearchTool(BaseTool):
     
     async def _perform_intelligent_search(self, parsed_query: Dict[str, Any], limit: int = 8) -> List[SearchResult]:
         """
-        执行智能搜索
+        执行智能搜索（使用故障转移机制）
         """
         try:
             search_keywords = parsed_query["search_keywords"]
@@ -383,14 +431,34 @@ class WebSearchTool(BaseTool):
 
             self.logger.info(f"Start intelligent search: {optimized_query} (intent: {search_intent})")
 
-            # 执行搜索
-            async with self.search_engine as engine:
-                results = await engine.search(optimized_query, limit)
+            # 使用故障转移机制执行搜索，并增加重试机制
+            max_retries = Config.WEB_SEARCH_MAX_RETRIES
+            retry_delay = Config.WEB_SEARCH_RETRY_DELAY
 
-            # 根据搜索意图对结果进行排序和过滤
-            filtered_results = self._filter_and_rank_results(results, parsed_query)
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    results = await self.search_with_fallback(optimized_query, limit)
 
-            return filtered_results
+                    if results:
+                        # 根据搜索意图对结果进行排序和过滤
+                        filtered_results = self._filter_and_rank_results(results, parsed_query)
+                        return filtered_results
+                    else:
+                        self.logger.warning(f"搜索返回空结果，尝试 {attempt + 1}/{max_retries}")
+
+                except Exception as e:
+                    last_error = e
+                    self.logger.warning(f"搜索尝试 {attempt + 1}/{max_retries} 失败: {e}")
+
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay * (2 ** attempt))  # 指数退避
+                    continue
+
+            # 所有重试都失败
+            error_msg = f"搜索失败，已重试 {max_retries} 次，最后错误: {last_error}"
+            self.logger.error(error_msg)
+            raise WebSearchError(error_msg)
 
         except Exception as e:
             self.logger.error(f"Intelligent search execution failed: {str(e)}")
@@ -597,8 +665,12 @@ class WebSearchTool(BaseTool):
     
     async def cleanup(self):
         """清理资源"""
-        if self.search_engine:
-            await self.search_engine.close()
+        for engine_name, engine in self.search_engines.items():
+            try:
+                if engine:
+                    await engine.close()
+            except Exception as e:
+                self.logger.warning(f"关闭搜索引擎 {engine_name} 失败: {e}")
 
 
 def get_web_search_tool() -> WebSearchTool:

@@ -205,3 +205,7 @@ class Config:
     WEB_SEARCH_RESULT_LIMIT = int(os.getenv("WEB_SEARCH_RESULT_LIMIT", "10"))
     WEB_SEARCH_TIMEOUT = int(os.getenv("WEB_SEARCH_TIMEOUT", "30"))
     WEB_SEARCH_RATE_LIMIT = int(os.getenv("WEB_SEARCH_RATE_LIMIT", "2"))
+    WEB_SEARCH_PRIMARY_ENGINE = os.getenv("WEB_SEARCH_PRIMARY_ENGINE", "bing").lower()
+    WEB_SEARCH_FALLBACK_ENGINES = os.getenv("WEB_SEARCH_FALLBACK_ENGINES", "duckduckgo").lower().split(",")
+    WEB_SEARCH_MAX_RETRIES = int(os.getenv("WEB_SEARCH_MAX_RETRIES", "3"))
+    WEB_SEARCH_RETRY_DELAY = float(os.getenv("WEB_SEARCH_RETRY_DELAY", "1.0"))
