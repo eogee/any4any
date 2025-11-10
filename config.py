@@ -107,7 +107,6 @@ class Config:
     DB_POOL_PRE_PING = get_bool_env("DB_POOL_PRE_PING", True)
 
     # 熔断器配置
-    DB_CIRCUIT_BREAKER_ENABLED = get_bool_env("DB_CIRCUIT_BREAKER_ENABLED", True)
     DB_CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("DB_CIRCUIT_BREAKER_THRESHOLD", "5"))
     DB_CIRCUIT_BREAKER_TIMEOUT = int(os.getenv("DB_CIRCUIT_BREAKER_TIMEOUT", "60"))
 

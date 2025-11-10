@@ -412,12 +412,12 @@ any4any/
 
 ## Detailed Documentation
 
-- [Conversation Management System Documentation](./zh/会话管理系统说明文档.md)
-- [NL2SQL Intelligent Query System Documentation](./zh/NL2SQL智能查询系统说明文档.md)
-- [Knowledge Base System Documentation](./zh/知识库系统说明文档.md)
-- [TTS Implementation and Integration Documentation](./zh/TTS实现与集成说明文档.md)
-- [Any4DH System Documentation](./zh/any4dh系统说明文档.md)
-- [Version Release Update Documentation](./version_notes/zh/V0.1.3_release_notes.md)
+- [Conversation Management System Documentation](./en/Conversation_Management_System_Documentation.md)
+- [NL2SQL Intelligent Query System Documentation](./en/NL2SQL_Intelligent_Query_System_Documentation.md)
+- [Knowledge Base System Documentation](./en/KnowledgeBase_System_Documentation.md)
+- [TTS Implementation and Integration Documentation](./en/TTS_Implementation_and_Integration_Documentation.md)
+- [Any4DH System Documentation](./en/Any4dh_System_Documentation.md)
+- [Version Release Update Documentation](./version_notes/en/v0.1.3_release_notes.md)
 
 ## Related Open Source Projects
 

@@ -54,12 +54,11 @@ async def lifespan(app: FastAPI):
         message_manager.register_preview_confirm_callback()
         logger.info("Preview confirm callback registered")
 
-    # 初始化NL2SQL工具的示例数据
+    # 初始化NL2SQL工具
     try:
         if getattr(Config, 'NL2SQL_ENABLED', False):
             from core.tools.nl2sql.table_info import get_table_manager
-            table_manager = get_table_manager()            
-            logger.info("NL2SQL tool initialized")
+            table_manager = get_table_manager()
     except ImportError as e:
         logger.warning(f"NL2SQL tool initialization skipped, module not available: {e}")
     except Exception as e:

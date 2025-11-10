@@ -417,7 +417,7 @@ any4any/
 - [知识库系统说明文档](./docs/zh/知识库系统说明文档.md)
 - [TTS实现与集成说明文档](./docs/zh/TTS实现与集成说明文档.md)
 - [Any4DH系统说明文档](./docs/zh/any4dh系统说明文档.md)
-- [版本发布更新文档](./docs/version_notes/zh/V0.1.3_release_notes.md)
+- [版本发布更新文档](./docs/version_notes/zh/v0.1.3_release_notes.md)
 
 ## 相关开源项目
 
